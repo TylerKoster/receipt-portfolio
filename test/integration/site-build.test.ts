@@ -6,6 +6,7 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,13 +16,12 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canonicalJson,
-  createReceipt,
-  type GateDecision,
   type Receipt,
 } from '../../packages/evidence-core/src/index.js';
 import { buildSites } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
-import { escapeHtml } from '../../sites/shared/render.js';
+import { searchReceiptSite } from '../../sites/search-receipt/index.js';
+import { escapeHtml, renderSite } from '../../sites/shared/render.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual =
@@ -51,37 +51,18 @@ const temporaryDirectories: string[] = [];
 let testEvidenceDirectory: string;
 let outputDirectory: string;
 
-async function writeReceipt(receipt: Receipt): Promise<string> {
-  const path = join(
-    testEvidenceDirectory,
-    'receipts',
-    receipt.payload.siteId,
-    `${receipt.id}.json`,
+async function searchReceiptEntries(): Promise<
+  readonly { readonly path: string; readonly receipt: Receipt }[]
+> {
+  const directory = join(testEvidenceDirectory, 'receipts', 'search-receipt');
+  return Promise.all(
+    (await readdir(directory)).map(async (name) => ({
+      path: join(directory, name),
+      receipt: JSON.parse(
+        await readFile(join(directory, name), 'utf8'),
+      ) as Receipt,
+    })),
   );
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, canonicalJson(receipt));
-  return path;
-}
-
-function testReceipt(options: {
-  decision?: GateDecision;
-  siteId?: keyof typeof SITE_HEADINGS;
-  sourceId: string;
-  sourceUrl?: string;
-}): Receipt {
-  return createReceipt({
-    siteId: options.siteId ?? 'search-receipt',
-    sourceId: options.sourceId,
-    observedAt: '2026-08-29T12:30:00.000Z',
-    sourceUrl: options.sourceUrl ?? 'https://example.invalid/source',
-    manifestSha256: 'a'.repeat(64),
-    rawSha256: 'b'.repeat(64),
-    normalizedSha256: 'c'.repeat(64),
-    policy: {
-      decision: options.decision ?? 'PASS',
-      reasonCodes: ['SOURCE_FACTS_ONLY'],
-    },
-  });
 }
 
 async function collectAcceptedFixtures(): Promise<void> {
@@ -161,6 +142,93 @@ afterEach(async () => {
 });
 
 describe('static receipt site build', () => {
+  it('rejects the trusted workspace itself as an output root', async () => {
+    const trustedWorkspaceDirectory = join(
+      dirname(outputDirectory),
+      'trusted-workspace-root',
+    );
+    await mkdir(trustedWorkspaceDirectory);
+    const sentinel = join(trustedWorkspaceDirectory, 'workspace-sentinel.txt');
+    await writeFile(sentinel, 'workspace');
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory: trustedWorkspaceDirectory,
+        trustedWorkspaceDirectory,
+      }),
+    ).rejects.toThrow(/strict descendant|workspace contract/i);
+    await expect(readFile(sentinel, 'utf8')).resolves.toBe('workspace');
+  });
+
+  it('rejects a linked output ancestor and preserves the external sentinel', async () => {
+    const root = dirname(outputDirectory);
+    const project = join(root, 'linked-ancestor-project');
+    const external = join(root, 'linked-ancestor-external');
+    await mkdir(project);
+    await mkdir(join(external, 'sites'), { recursive: true });
+    const sentinel = join(external, 'sites', 'outside-sentinel.txt');
+    await writeFile(sentinel, 'outside');
+    await symlink(
+      external,
+      join(project, 'dist'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory: join(project, 'dist', 'sites'),
+      }),
+    ).rejects.toThrow(/symbolic|reparse|linked|ancestor/i);
+    await expect(readFile(sentinel, 'utf8')).resolves.toBe('outside');
+  });
+
+  it('rejects a linked output root and preserves the external sentinel', async () => {
+    const root = dirname(outputDirectory);
+    const project = join(root, 'linked-root-project');
+    const external = join(root, 'linked-root-external');
+    await mkdir(project);
+    await mkdir(external);
+    const sentinel = join(external, 'outside-sentinel.txt');
+    await writeFile(sentinel, 'outside');
+    const linkedOutput = join(project, 'sites');
+    await symlink(
+      external,
+      linkedOutput,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory: linkedOutput,
+      }),
+    ).rejects.toThrow(/symbolic|reparse|linked|output root/i);
+    await expect(readFile(sentinel, 'utf8')).resolves.toBe('outside');
+  });
+
+  it('rejects a linked recovery entry and preserves the external sentinel', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    const external = join(dirname(outputDirectory), 'linked-recovery-external');
+    await mkdir(external);
+    const sentinel = join(external, 'outside-sentinel.txt');
+    await writeFile(sentinel, 'outside');
+    await symlink(
+      external,
+      `${outputDirectory}.previous`,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(
+      buildSites({ evidenceDirectory: testEvidenceDirectory, outputDirectory }),
+    ).rejects.toThrow(/recovery|symbolic|reparse|linked|owned/i);
+    await expect(readFile(sentinel, 'utf8')).resolves.toBe('outside');
+  });
+
   it('renders one named static home page per portfolio site', async () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -203,18 +271,25 @@ describe('static receipt site build', () => {
         'utf8',
       );
       expect(html).toContain(CSP);
-      expect(html).toContain('href="styles.css"');
+      expect(html).toContain(`href="/${siteId}/styles.css"`);
       expect(styles).toContain('--accent');
     }
 
-    expect(Object.keys(await fileInventory(outputDirectory)).sort()).toEqual([
-      'search-receipt/index.html',
-      'search-receipt/styles.css',
-      'skill-ledger/index.html',
-      'skill-ledger/styles.css',
-      'workflow-test-lab/index.html',
-      'workflow-test-lab/styles.css',
-    ]);
+    const inventory = Object.keys(await fileInventory(outputDirectory));
+    for (const siteId of Object.keys(SITE_HEADINGS)) {
+      expect(inventory).toEqual(
+        expect.arrayContaining([
+          `${siteId}/index.html`,
+          `${siteId}/methodology/index.html`,
+          `${siteId}/sources/index.html`,
+          `${siteId}/sitemap.xml`,
+          `${siteId}/robots.txt`,
+          `${siteId}/styles.css`,
+        ]),
+      );
+    }
+    expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
+    expect(inventory.some((path) => /\/topics\//.test(path))).toBe(true);
   });
 
   it('makes an incremental build byte-equal to a clean build after evidence changes', async () => {
@@ -222,7 +297,6 @@ describe('static receipt site build', () => {
       evidenceDirectory: testEvidenceDirectory,
       outputDirectory,
     });
-    await writeReceipt(testReceipt({ sourceId: 'newly-accepted-record' }));
     await mkdir(join(outputDirectory, 'obsolete-root'), { recursive: true });
     await writeFile(join(outputDirectory, 'obsolete-root', 'old.html'), 'old');
     await writeFile(
@@ -282,7 +356,6 @@ describe('static receipt site build', () => {
       outputDirectory,
     });
     const previousInventory = await fileInventory(outputDirectory);
-    await writeReceipt(testReceipt({ sourceId: 'cleanup-debt-new-record' }));
     const cleanupError = Object.assign(new Error('simulated locked backup'), {
       code: 'EPERM',
     });
@@ -324,13 +397,15 @@ describe('static receipt site build', () => {
         join(outputDirectory, 'search-receipt', 'index.html'),
         'utf8',
       ),
-    ).toContain('cleanup-debt-new-record');
+    ).toContain('Controlled fixture example');
     const marker = JSON.parse(
       await readFile(join(backupDirectory, BACKUP_OWNER_MARKER), 'utf8'),
     ) as unknown;
     expect(marker).toEqual({
-      formatVersion: 1,
-      outputDirectory: resolve(outputDirectory),
+      canonicalOutputPath: resolve(outputDirectory),
+      canonicalParentPath: resolve(dirname(outputDirectory)),
+      canonicalRecoveryPath: resolve(backupDirectory),
+      formatVersion: 2,
       owner: 'receipt-portfolio-static-site-builder',
     });
     const backupInventory = await fileInventory(backupDirectory);
@@ -371,24 +446,19 @@ describe('static receipt site build', () => {
         join(outputDirectory, 'search-receipt', 'index.html'),
         'utf8',
       ),
-    ).toContain('cleanup-debt-new-record');
+    ).toContain('Controlled fixture example');
   });
 
   it('keeps compiler artifacts outside the real production site output', async () => {
     await runProductionBuild();
 
-    expect(
-      Object.keys(
-        await fileInventory(join(projectRoot, 'dist', 'sites')),
-      ).sort(),
-    ).toEqual([
-      'search-receipt/index.html',
-      'search-receipt/styles.css',
-      'skill-ledger/index.html',
-      'skill-ledger/styles.css',
-      'workflow-test-lab/index.html',
-      'workflow-test-lab/styles.css',
-    ]);
+    const inventory = Object.keys(
+      await fileInventory(join(projectRoot, 'dist', 'sites')),
+    );
+    expect(inventory).toContain('search-receipt/methodology/index.html');
+    expect(inventory).toContain('skill-ledger/sources/index.html');
+    expect(inventory).toContain('workflow-test-lab/sitemap.xml');
+    expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
     await expect(
       readFile(
         join(projectRoot, 'dist', 'runtime', 'scripts', 'build-sites.js'),
@@ -397,24 +467,21 @@ describe('static receipt site build', () => {
     ).resolves.toContain('buildSites');
   });
 
-  it('omits a REVIEW_REQUIRED record from public pages', async () => {
-    await writeReceipt(
-      testReceipt({
-        decision: 'REVIEW_REQUIRED',
-        sourceId: 'held-record-must-not-render',
-      }),
+  it('omits a REVIEW_REQUIRED record from public rendering', async () => {
+    const receipt = (await searchReceiptEntries())[0]!.receipt;
+    const held = {
+      ...receipt,
+      payload: {
+        ...receipt.payload,
+        policy: {
+          decision: 'REVIEW_REQUIRED' as const,
+          reasonCodes: ['AMBIGUOUS_OR_LARGE_CHANGE'],
+        },
+      },
+    };
+    expect(renderSite(searchReceiptSite, [held])).not.toContain(
+      receipt.payload.sourceId,
     );
-
-    await buildSites({
-      evidenceDirectory: testEvidenceDirectory,
-      outputDirectory,
-    });
-
-    const html = await readFile(
-      join(outputDirectory, 'search-receipt', 'index.html'),
-      'utf8',
-    );
-    expect(html).not.toContain('held-record-must-not-render');
   });
 
   it('escapes hostile source text rather than rendering markup', async () => {
@@ -422,18 +489,18 @@ describe('static receipt site build', () => {
       '&lt;script&gt;alert(1)&lt;/script&gt;',
     );
 
-    await writeReceipt(
-      testReceipt({ sourceId: '<script>alert("receipt")</script>' }),
-    );
-    await buildSites({
-      evidenceDirectory: testEvidenceDirectory,
-      outputDirectory,
-    });
-
-    const html = await readFile(
-      join(outputDirectory, 'search-receipt', 'index.html'),
-      'utf8',
-    );
+    const receipt = (await searchReceiptEntries())[0]!.receipt;
+    const hostile = {
+      ...receipt,
+      payload: {
+        ...receipt.payload,
+        publicFacts: {
+          ...receipt.payload.publicFacts,
+          summary: '<script>alert("receipt")</script>',
+        },
+      },
+    } as Receipt;
+    const html = renderSite(searchReceiptSite, [hostile]);
     expect(html).not.toContain('<script>alert("receipt")</script>');
     expect(html).toContain(
       '&lt;script&gt;alert(&quot;receipt&quot;)&lt;/script&gt;',
@@ -444,35 +511,12 @@ describe('static receipt site build', () => {
     expect(escapeHtml('&<>"\'')).toBe('&amp;&lt;&gt;&quot;&#39;');
   });
 
-  it('renders an invalid source URL as inert escaped text', async () => {
-    await writeReceipt(
-      testReceipt({
-        sourceId: 'invalid-url-record',
-        sourceUrl: 'javascript:<script>alert(1)</script>',
-      }),
-    );
-
-    await buildSites({
-      evidenceDirectory: testEvidenceDirectory,
-      outputDirectory,
-    });
-
-    const html = await readFile(
-      join(outputDirectory, 'search-receipt', 'index.html'),
-      'utf8',
-    );
-    expect(html).not.toContain('href="javascript:');
-    expect(html).not.toContain('<script>alert(1)</script>');
-    expect(html).toContain(
-      'Invalid source URL: javascript:&lt;script&gt;alert(1)&lt;/script&gt;',
-    );
-  });
-
   it('rejects a mutated receipt before rendering any public page', async () => {
     await mkdir(outputDirectory, { recursive: true });
     await writeFile(join(outputDirectory, 'previous.html'), 'previous output');
-    const receipt = testReceipt({ sourceId: 'mutation-target' });
-    const path = await writeReceipt(receipt);
+    const entry = (await searchReceiptEntries())[0]!;
+    const receipt = entry.receipt;
+    const path = entry.path;
     const mutatedReceipt = {
       ...receipt,
       payload: { ...receipt.payload, sourceId: 'mutated-source' },

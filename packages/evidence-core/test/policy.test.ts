@@ -3,6 +3,9 @@ import { evaluatePublication, type Candidate } from '../src/index.js';
 
 const completeCandidate: Candidate = {
   manifestValid: true,
+  enabled: true,
+  publicationMode: 'auto-facts-only',
+  evidenceClass: 'live-source',
   rawSha256: '1'.repeat(64),
   normalizedSha256: '2'.repeat(64),
   ambiguous: false,
@@ -10,6 +13,43 @@ const completeCandidate: Candidate = {
 };
 
 describe('publication policy', () => {
+  it('rejects disabled and hold-only production manifests before policy can pass', () => {
+    expect(
+      evaluatePublication({
+        ...completeCandidate,
+        enabled: false,
+        publicationMode: 'auto-facts-only',
+        evidenceClass: 'live-source',
+      } as unknown as Candidate),
+    ).toEqual({ decision: 'REJECTED', reasonCodes: ['SOURCE_DISABLED'] });
+
+    expect(
+      evaluatePublication({
+        ...completeCandidate,
+        enabled: true,
+        publicationMode: 'hold-only',
+        evidenceClass: 'live-source',
+      } as unknown as Candidate),
+    ).toEqual({
+      decision: 'REVIEW_REQUIRED',
+      reasonCodes: ['PUBLICATION_HOLD'],
+    });
+  });
+
+  it('admits only an enabled authenticated controlled example through fixture-example mode', () => {
+    expect(
+      evaluatePublication({
+        ...completeCandidate,
+        enabled: true,
+        publicationMode: 'fixture-example',
+        evidenceClass: 'controlled-example',
+      } as unknown as Candidate),
+    ).toEqual({
+      decision: 'PASS',
+      reasonCodes: ['CONTROLLED_FIXTURE_EXAMPLE'],
+    });
+  });
+
   it('holds an ambiguous source change instead of publishing it', () => {
     const ambiguousCandidate: Candidate = {
       ...completeCandidate,

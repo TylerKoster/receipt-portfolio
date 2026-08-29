@@ -1,4 +1,4 @@
-export const EVIDENCE_SCHEMA_VERSION = '1.0.0' as const;
+export { EVIDENCE_SCHEMA_VERSION } from './schema-version.js';
 
 export { canonicalJson, sha256 } from './canonical-json.js';
 export type { JsonValue } from './canonical-json.js';
@@ -7,9 +7,15 @@ export type {
   FetchAllowedSourceOptions,
   FetchErrorCode,
   FetchImplementation,
+  HostResolver,
+  PinnedConnectionImplementation,
   RawFetch,
+  ResolvedAddress,
 } from './fetch.js';
 export {
+  MAX_RESPONSE_BYTES,
+  MAX_TIMEOUT_MS,
+  MIN_TIMEOUT_MS,
   SourceManifestSchema,
   manifestSha256,
   safeSourceDisplayUrl,
@@ -17,8 +23,15 @@ export {
 } from './manifest.js';
 export type { SourceManifest } from './manifest.js';
 export { evaluatePublication } from './policy.js';
-export type { Candidate, GateDecision, GateResult } from './policy.js';
+export type {
+  Candidate,
+  EvidenceClass,
+  GateDecision,
+  GateResult,
+} from './policy.js';
 export {
+  ReceiptPayloadSchema,
+  ReceiptSchema,
   ReceiptIntegrityError,
   createReceipt,
   verifyReceipt,
@@ -28,4 +41,6 @@ export type {
   ReceiptInput,
   ReceiptIntegrityErrorCode,
   ReceiptPayload,
+  ReceiptProvenance,
+  ReceiptPublicFacts,
 } from './receipt.js';

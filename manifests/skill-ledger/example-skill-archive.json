@@ -4,11 +4,19 @@
   "kind": "archive-fixture",
   "endpoint": "https://example.invalid/skill-ledger/example-skill-archive.json",
   "allowedHosts": ["example.invalid"],
+  "allowedMediaTypes": ["application/json"],
   "maxBytes": 50000,
   "timeoutMs": 5000,
+  "publisherName": "Receipt Portfolio",
+  "sourceClass": "project-original-fixture",
+  "extractionSelector": "$.inventory",
+  "extractionContractId": "skill-inventory-v1",
+  "cadence": "fixture-only",
+  "noiseExclusions": [],
   "normalizerId": "archive-fixture-v1",
   "diffStrategyId": "inventory-v1",
-  "publicationMode": "hold-only",
-  "licenseNote": "Local non-live placeholder fixture; no external source is fetched.",
-  "enabled": false
+  "schemaId": "skill-inventory-public-v1",
+  "publicationMode": "fixture-example",
+  "licenseNote": "Locally authored controlled package inventory; never fetched, installed, or executed.",
+  "enabled": true
 }

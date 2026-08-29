@@ -20,9 +20,10 @@ provider evidence.
 The repository defines two GitHub Actions workflows:
 
 - `.github/workflows/verify.yml` runs on pushes and pull requests. It installs
-  locked dependencies, runs static checks, the full and integration test suites,
-  verifies stored evidence, and builds the static sites with read-only contents
-  permission.
+  locked dependencies, runs static and formatting checks plus the full and
+  integration suites, collects and verifies the exact nonempty controlled
+  example inventory, runs the mutation gate, and compares two clean build
+  manifests with read-only contents permission.
 - `.github/workflows/collect-dry-run.yml` runs each Monday at 07:17 UTC and by
   manual dispatch. It performs bounded public-source observation, uploads the
   sanitized report even when a source fails, restores the failure status, and
@@ -38,10 +39,11 @@ normalize source bytes, change the evidence ledger, create a receipt, render a
 site, publish content, or use a repository credential.
 
 Each source is reported independently. A timeout, redirect, unsafe media type,
-oversized response, non-success status, invalid boundary, or disabled manifest
-produces a `FAILED` report entry. The run continues to report the remaining
-sources, uploads the report artifact, and finishes with a failure status if any
-source failed.
+oversized response, non-success status, invalid address boundary, or disabled
+manifest produces a `FAILED` report entry. Controlled fixture-example and other
+non-live modes are explicitly `SKIPPED` and never fetched by scheduled live
+collection. The run continues to report remaining sources, uploads the report,
+and finishes with a failure status if any runnable source failed.
 
 ## Publication boundary
 
@@ -70,7 +72,8 @@ directories, and a specifically authenticated recovery sibling:
 - temporary staging: `dist/.sites-stage-*`;
 - recovery sibling: `dist/sites.previous/`, but only when its real,
   non-symbolic `.receipt-portfolio-backup-owner.json` marker exactly identifies
-  this builder, output path, and marker format.
+  this builder, marker format, canonical output parent, canonical output path,
+  and canonical recovery path.
 
 An absent, malformed, symbolic, or mismatched owner marker makes the recovery
 sibling unowned. The builder refuses recursive cleanup and preserves both the

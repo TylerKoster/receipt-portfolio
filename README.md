@@ -1,7 +1,9 @@
 # Receipt Portfolio
 
-Receipt Portfolio is a fixture-backed, local static release candidate for three
-source-bound products that share one evidence engine:
+Receipt Portfolio is a local static release candidate for three source-bound
+products that share one evidence engine. The public build uses authenticated
+controlled examples; scheduled dry-run manifests separately admit approved
+official Search sources without publishing them:
 
 - **Search Receipt** records confirmed source changes for independent site
   owners without claiming that ordinary search movement proves a platform
@@ -23,12 +25,15 @@ npm run build
 npm run build:manifest
 ```
 
-The fixture collection command creates append-only local receipt files. The
-verification command checks their canonical bytes, payload digest, and
-filename contract. The build command compiles runtime code into `dist/runtime/`
-and replaces the complete public tree at `dist/sites/`. The manifest command
-prints one SHA-256 digest for the exact sorted public file inventory; unexpected
-roots, files, or symlinks fail the command.
+The fixture collection command creates append-only raw and normalized objects,
+canonical manifest snapshots, and linked local receipt files. Verification
+checks strict schemas, exact paths and inventory, object bytes, admitted
+manifest bindings, recomputed publication policy, source-local sequence and
+correction semantics, and canonical receipt bytes. The build command compiles
+runtime code into `dist/runtime/` and replaces the complete public tree at
+`dist/sites/` only beneath a verified canonical parent. The manifest command
+prints one SHA-256 digest for the exact sorted public file inventory;
+unexpected, missing, or symbolic entries fail the command.
 
 Run the isolated mutation check after collecting fixtures:
 
@@ -53,17 +58,23 @@ fails. It does not create receipts or rebuild public output.
   live source truth, current source health, deployment proof, or provider
   readiness.
 - `evidence/receipts/` contains generated append-only local receipts.
-  `evidence/objects/` and `evidence/indexes/` are reserved generated evidence
-  locations. Existing receipts are never repaired by rewriting them.
+  `evidence/objects/` contains exact raw bytes and canonical normalized JSON;
+  `evidence/manifests/` contains the canonical admitted manifest snapshots
+  bound by those receipts. Existing objects and receipts are never repaired by
+  rewriting them.
 - `dist/runtime/` contains compiler output and command implementations. It is
   not public site output.
-- `dist/sites/` contains exactly the six static public files for the three
-  sites. The build manifest hashes only this strict public inventory.
+- `dist/sites/` contains each site's home, methodology, source list,
+  receipt-detail, topic, sitemap, robots, and stylesheet surfaces. The build
+  manifest hashes only this strict, nonempty public inventory.
 - `artifacts/` contains internal run reports such as the live-source dry-run;
   those reports are not receipts and are not public site records.
 
-Only source-bound records with an explicit `PASS` gate decision render in the
-static sites. `REVIEW_REQUIRED` and `REJECTED` records stay out of public output.
+Only source-bound records with an explicit recomputed `PASS` gate decision
+render. Controlled fixtures can pass only through authenticated
+`fixture-example` mode and are labeled as non-live examples on every public
+surface. Disabled and hold-only manifests cannot yield production `PASS`
+receipts. `REVIEW_REQUIRED` and `REJECTED` records stay out of public output.
 Fetched material is treated as hostile data, never executed, and never rendered
 as source HTML.
 

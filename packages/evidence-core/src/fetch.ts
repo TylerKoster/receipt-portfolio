@@ -1,9 +1,14 @@
-import { isIP } from 'node:net';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
+import { Readable } from 'node:stream';
 import { sha256 } from './canonical-json.js';
-import type { SourceManifest } from './manifest.js';
-
-const MAX_TIMEOUT_MS = 30_000;
-const MAX_RESPONSE_BYTES = 5_000_000;
+import {
+  MAX_RESPONSE_BYTES,
+  MAX_TIMEOUT_MS,
+  MIN_TIMEOUT_MS,
+  type SourceManifest,
+} from './manifest.js';
 
 export type FetchErrorCode =
   | 'ENDPOINT_INVALID'
@@ -11,6 +16,7 @@ export type FetchErrorCode =
   | 'ENDPOINT_USERINFO_FORBIDDEN'
   | 'ENDPOINT_HOST_NOT_ALLOWED'
   | 'ENDPOINT_IP_FORBIDDEN'
+  | 'ENDPOINT_RESOLUTION_FAILED'
   | 'INVALID_TIMEOUT'
   | 'INVALID_MAX_BYTES'
   | 'REDIRECT_REJECTED'
@@ -37,8 +43,25 @@ export type FetchImplementation = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export interface ResolvedAddress {
+  readonly address: string;
+  readonly family: 4 | 6;
+}
+
+export type HostResolver = (
+  hostname: string,
+) => Promise<readonly ResolvedAddress[]>;
+
+export type PinnedConnectionImplementation = (
+  endpoint: URL,
+  address: ResolvedAddress,
+  init: RequestInit,
+) => Promise<Response>;
+
 export interface FetchAllowedSourceOptions {
   readonly fetchImplementation?: FetchImplementation;
+  readonly resolver?: HostResolver;
+  readonly connectionImplementation?: PinnedConnectionImplementation;
   readonly now?: () => Date;
 }
 
@@ -146,19 +169,14 @@ function isForbiddenIpv6(hostname: string): boolean {
     return true;
   }
 
+  const globalUnicast = isInIpv6Range(value, 0x2n << 124n, 3);
+  if (!globalUnicast) return true;
+
   const ranges = [
-    [0n, 96],
-    [0xffffn << 32n, 96],
-    [0x64ff9bn << 96n, 96],
-    [0x100n << 112n, 64],
-    [0x20010002n << 96n, 48],
-    [0x20010010n << 96n, 28],
-    [0x20010020n << 96n, 28],
+    [0x2001n << 112n, 23],
     [0x20010db8n << 96n, 32],
-    [0xfcn << 120n, 7],
-    [0xfe8n << 116n, 10],
-    [0xfecn << 116n, 10],
-    [0xffn << 120n, 8],
+    [0x2002n << 112n, 16],
+    [0x3fffn << 112n, 20],
   ] as const;
 
   return ranges.some(([prefix, prefixLength]) =>
@@ -192,7 +210,10 @@ function endpointUrl(manifest: SourceManifest): URL {
     );
   }
 
-  if (!manifest.allowedHosts.includes(endpoint.host)) {
+  if (
+    endpoint.port !== '' ||
+    !manifest.allowedHosts.includes(endpoint.hostname)
+  ) {
     throw new FetchBoundaryError(
       'ENDPOINT_HOST_NOT_ALLOWED',
       'Source endpoint host is not allowlisted',
@@ -215,10 +236,161 @@ function endpointUrl(manifest: SourceManifest): URL {
   return endpoint;
 }
 
+function addressForbidden(address: ResolvedAddress): boolean {
+  return address.family === 4
+    ? isIP(address.address) !== 4 || isForbiddenIpv4(address.address)
+    : isIP(address.address) !== 6 || isForbiddenIpv6(address.address);
+}
+
+async function defaultResolver(hostname: string): Promise<ResolvedAddress[]> {
+  const answers = await dnsLookup(hostname, { all: true, verbatim: true });
+  return answers
+    .filter(
+      (answer): answer is { address: string; family: 4 | 6 } =>
+        answer.family === 4 || answer.family === 6,
+    )
+    .map(({ address, family }) => ({ address, family }));
+}
+
+async function resolvedPublicAddress(
+  endpoint: URL,
+  resolver: HostResolver,
+  signal: AbortSignal,
+): Promise<ResolvedAddress> {
+  const hostname = endpoint.hostname.replace(/^\[|\]$/g, '');
+  const literalFamily = isIP(hostname);
+  let addresses: readonly ResolvedAddress[];
+
+  try {
+    addresses =
+      literalFamily === 4 || literalFamily === 6
+        ? [{ address: hostname, family: literalFamily }]
+        : await new Promise<readonly ResolvedAddress[]>(
+            (resolvePromise, rejectPromise) => {
+              const onAbort = () =>
+                rejectPromise(
+                  new FetchBoundaryError(
+                    'FETCH_TIMEOUT',
+                    'Source fetch exceeded the manifest timeout',
+                  ),
+                );
+              if (signal.aborted) {
+                onAbort();
+                return;
+              }
+              signal.addEventListener('abort', onAbort, { once: true });
+              resolver(hostname).then(
+                (value) => {
+                  signal.removeEventListener('abort', onAbort);
+                  resolvePromise(value);
+                },
+                (error: unknown) => {
+                  signal.removeEventListener('abort', onAbort);
+                  rejectPromise(error);
+                },
+              );
+            },
+          );
+  } catch {
+    if (signal.aborted) {
+      throw new FetchBoundaryError(
+        'FETCH_TIMEOUT',
+        'Source fetch exceeded the manifest timeout',
+      );
+    }
+    throw new FetchBoundaryError(
+      'ENDPOINT_RESOLUTION_FAILED',
+      'Source endpoint hostname could not be resolved',
+    );
+  }
+
+  if (addresses.length === 0) {
+    throw new FetchBoundaryError(
+      'ENDPOINT_RESOLUTION_FAILED',
+      'Source endpoint hostname resolved to no addresses',
+    );
+  }
+  if (addresses.some(addressForbidden)) {
+    throw new FetchBoundaryError(
+      'ENDPOINT_IP_FORBIDDEN',
+      'Source endpoint resolves to a forbidden or mixed address set',
+    );
+  }
+
+  return [...addresses].sort((left, right) =>
+    left.address === right.address
+      ? left.family - right.family
+      : left.address.localeCompare(right.address),
+  )[0]!;
+}
+
+function pinnedHttpsConnection(
+  endpoint: URL,
+  address: ResolvedAddress,
+  init: RequestInit,
+): Promise<Response> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    type PinnedLookupCallback = ((
+      error: Error | null,
+      address: string,
+      family: 4 | 6,
+    ) => void) &
+      ((error: Error | null, addresses: readonly ResolvedAddress[]) => void);
+    const pinnedLookup = ((
+      _hostname: string,
+      options: unknown,
+      callback: PinnedLookupCallback,
+    ) => {
+      if (
+        typeof options === 'object' &&
+        options !== null &&
+        'all' in options &&
+        options.all === true
+      ) {
+        callback(null, [address]);
+      } else {
+        callback(null, address.address, address.family);
+      }
+    }) as LookupFunction;
+    const request = httpsRequest(
+      endpoint,
+      {
+        agent: false,
+        family: address.family,
+        lookup: pinnedLookup,
+        method: 'GET',
+        servername: endpoint.hostname,
+        signal: init.signal ?? undefined,
+        headers: { accept: '*/*', 'user-agent': 'receipt-portfolio/0.1' },
+      },
+      (incoming) => {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (Array.isArray(value)) {
+            for (const item of value) headers.append(name, item);
+          } else if (value !== undefined) {
+            headers.set(name, value);
+          }
+        }
+        const status = incoming.statusCode ?? 0;
+        const body =
+          status === 204 || status === 304
+            ? null
+            : (Readable.toWeb(
+                incoming,
+              ) as unknown as ReadableStream<Uint8Array>);
+        resolvePromise(new Response(body, { headers, status }));
+      },
+    );
+    request.once('error', rejectPromise);
+    request.end();
+  });
+}
+
 function validateBounds(manifest: SourceManifest): void {
   if (
     !Number.isInteger(manifest.timeoutMs) ||
-    manifest.timeoutMs <= 0 ||
+    manifest.timeoutMs < MIN_TIMEOUT_MS ||
     manifest.timeoutMs > MAX_TIMEOUT_MS
   ) {
     throw new FetchBoundaryError(
@@ -240,19 +412,7 @@ function validateBounds(manifest: SourceManifest): void {
 }
 
 function configuredMediaTypes(manifest: SourceManifest): readonly string[] {
-  switch (manifest.kind) {
-    case 'json':
-    case 'fixture':
-    case 'archive-fixture':
-      return ['application/json'];
-    case 'rss':
-      return [
-        'application/atom+xml',
-        'application/rss+xml',
-        'application/xml',
-        'text/xml',
-      ];
-  }
+  return manifest.allowedMediaTypes;
 }
 
 function responseMediaType(
@@ -405,12 +565,32 @@ export async function fetchAllowedSource(
   validateBounds(manifest);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), manifest.timeoutMs);
-  const fetchImplementation = options.fetchImplementation ?? globalThis.fetch;
+  const resolver = options.resolver ?? defaultResolver;
+  const connectionImplementation =
+    options.connectionImplementation ??
+    (options.fetchImplementation === undefined
+      ? pinnedHttpsConnection
+      : (
+          connectionEndpoint: URL,
+          _address: ResolvedAddress,
+          init: RequestInit,
+        ) => options.fetchImplementation!(connectionEndpoint, init));
   let response: Response | undefined;
 
   try {
+    const address = await resolvedPublicAddress(
+      endpoint,
+      resolver,
+      controller.signal,
+    );
+    if (controller.signal.aborted) {
+      throw new FetchBoundaryError(
+        'FETCH_TIMEOUT',
+        'Source fetch exceeded the manifest timeout',
+      );
+    }
     try {
-      response = await fetchImplementation(endpoint, {
+      response = await connectionImplementation(endpoint, address, {
         cache: 'no-store',
         redirect: 'error',
         signal: controller.signal,

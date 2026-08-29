@@ -1,0 +1,27 @@
+{
+  "siteId": "search-receipt",
+  "sourceId": "google-search-central-blog",
+  "kind": "rss",
+  "endpoint": "https://developers.google.com/search/blog/rss.xml",
+  "allowedHosts": ["developers.google.com"],
+  "allowedMediaTypes": [
+    "application/atom+xml",
+    "application/rss+xml",
+    "application/xml",
+    "text/xml"
+  ],
+  "maxBytes": 1000000,
+  "timeoutMs": 10000,
+  "publisherName": "Google Search Central",
+  "sourceClass": "official-primary",
+  "extractionSelector": "feed.entry(title,link,published,updated,id)",
+  "extractionContractId": "search-feed-items-v1",
+  "cadence": "daily",
+  "noiseExclusions": ["feed generator metadata"],
+  "normalizerId": "search-feed-v1",
+  "diffStrategyId": "feed-item-v1",
+  "schemaId": "search-feed-public-v1",
+  "publicationMode": "auto-facts-only",
+  "licenseNote": "Official public Google Search Central feed; retain attribution and source link.",
+  "enabled": true
+}

@@ -5,7 +5,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FetchBoundaryError,
-  fetchAllowedSource,
+  fetchAllowedSource as fetchAllowedSourceWithResolver,
+  type FetchAllowedSourceOptions,
   type FetchImplementation,
   type RawFetch,
 } from '../src/fetch.js';
@@ -25,14 +26,34 @@ const baseManifest: SourceManifest = {
   kind: 'json',
   endpoint: 'https://example.invalid/status.json',
   allowedHosts: ['example.invalid'],
+  allowedMediaTypes: ['application/json'],
   maxBytes: 16,
   timeoutMs: 1_000,
+  publisherName: 'Receipt Portfolio Tests',
+  sourceClass: 'official-primary',
+  extractionSelector: '$',
+  extractionContractId: 'search-status-events-v1',
+  cadence: 'daily',
+  noiseExclusions: [],
   normalizerId: 'status-json-v1',
   diffStrategyId: 'event-list-v1',
-  publicationMode: 'hold-only',
+  schemaId: 'search-status-public-v1',
+  publicationMode: 'auto-facts-only',
   licenseNote: 'Controlled test manifest.',
   enabled: true,
 };
+
+function fetchAllowedSource(
+  sourceManifest: SourceManifest,
+  options: FetchAllowedSourceOptions = {},
+): Promise<RawFetch> {
+  return fetchAllowedSourceWithResolver(sourceManifest, {
+    ...options,
+    resolver:
+      options.resolver ??
+      (async () => [{ address: '93.184.216.34', family: 4 as const }]),
+  });
+}
 
 function manifest(
   overrides: Partial<SourceManifest> & Record<string, unknown> = {},

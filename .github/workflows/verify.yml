@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   verify:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,11 +23,40 @@ jobs:
         run: npm ci
       - name: Run static checks
         run: npm run check
+      - name: Check formatting
+        run: >-
+          npx prettier --check
+          ".github/workflows/*.yml"
+          "README.md"
+          "docs/operations/*.md"
+          "manifests/**/*.json"
+          "packages/**/*.ts"
+          "scripts/**/*.ts"
+          "sites/**/*.{ts,css}"
+          "test/**/*.ts"
       - name: Run full unit suite
         run: npm test -- --run
       - name: Run integration suite
         run: npm run test:integration
-      - name: Verify stored evidence
+      - name: Collect deterministic controlled examples
+        run: npm run evidence -- collect-fixtures
+      - name: Verify exact nonempty evidence inventory
         run: npm run evidence -- verify --all
-      - name: Build static sites
-        run: npm run build
+      - name: Run evidence mutation gate
+        run: npm run evidence -- test-mutation
+      - name: Build first clean static tree
+        shell: bash
+        run: |
+          rm -rf dist/sites
+          npm run build
+          mkdir -p artifacts
+          npm run build:manifest > artifacts/build-manifest-first.txt
+      - name: Build second clean static tree
+        shell: bash
+        run: |
+          rm -rf dist/sites
+          npm run build
+          npm run build:manifest > artifacts/build-manifest-second.txt
+      - name: Compare deterministic build manifests
+        shell: bash
+        run: cmp artifacts/build-manifest-first.txt artifacts/build-manifest-second.txt

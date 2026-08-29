@@ -1,0 +1,22 @@
+{
+  "siteId": "search-receipt",
+  "sourceId": "google-search-status-example",
+  "kind": "fixture",
+  "endpoint": "https://example.invalid/search-receipt/google-search-status-example.json",
+  "allowedHosts": ["example.invalid"],
+  "allowedMediaTypes": ["application/json"],
+  "maxBytes": 50000,
+  "timeoutMs": 5000,
+  "publisherName": "Receipt Portfolio",
+  "sourceClass": "project-original-fixture",
+  "extractionSelector": "$.event",
+  "extractionContractId": "search-status-events-v1",
+  "cadence": "fixture-only",
+  "noiseExclusions": [],
+  "normalizerId": "status-json-v1",
+  "diffStrategyId": "event-list-v1",
+  "schemaId": "search-status-public-v1",
+  "publicationMode": "fixture-example",
+  "licenseNote": "Locally authored controlled example; never fetched or represented as a live Google observation.",
+  "enabled": true
+}

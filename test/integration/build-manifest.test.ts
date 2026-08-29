@@ -11,34 +11,34 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { hashPublicBuild, runHashBuildCli } from '../../scripts/hash-build.js';
 
-const EXPECTED_INVENTORY = [
-  {
-    path: 'search-receipt/index.html',
-    sha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
-  },
-  {
-    path: 'search-receipt/styles.css',
-    sha256: '3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d',
-  },
-  {
-    path: 'skill-ledger/index.html',
-    sha256: '2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6',
-  },
-  {
-    path: 'skill-ledger/styles.css',
-    sha256: '18ac3e7343f016890c510e93f935261169d9e3f565436429830faf0934f4f8e4',
-  },
-  {
-    path: 'workflow-test-lab/index.html',
-    sha256: '3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea',
-  },
-  {
-    path: 'workflow-test-lab/styles.css',
-    sha256: '252f10c83610ebca1a059c0bae8255eba2f95be4d1d7bcfa89d7248a82d9f111',
-  },
+const EXPECTED_PATHS = [
+  'search-receipt/index.html',
+  'search-receipt/methodology/index.html',
+  `search-receipt/receipts/${'a'.repeat(64)}/index.html`,
+  'search-receipt/robots.txt',
+  'search-receipt/sitemap.xml',
+  'search-receipt/sources/index.html',
+  'search-receipt/styles.css',
+  'search-receipt/topics/example-topic/index.html',
+  'skill-ledger/index.html',
+  'skill-ledger/methodology/index.html',
+  `skill-ledger/receipts/${'b'.repeat(64)}/index.html`,
+  'skill-ledger/robots.txt',
+  'skill-ledger/sitemap.xml',
+  'skill-ledger/sources/index.html',
+  'skill-ledger/styles.css',
+  'skill-ledger/topics/example-topic/index.html',
+  'workflow-test-lab/index.html',
+  'workflow-test-lab/methodology/index.html',
+  `workflow-test-lab/receipts/${'c'.repeat(64)}/index.html`,
+  'workflow-test-lab/robots.txt',
+  'workflow-test-lab/sitemap.xml',
+  'workflow-test-lab/sources/index.html',
+  'workflow-test-lab/styles.css',
+  'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  'a18e424995cbcd2aeb29804bbf11d0bcb7944560493a1b676e48c20755eb4e73';
+  '87256eaa56bd40f0c97505cb77472823f958131cfae8bb57214b4088f45a88ed';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -50,8 +50,8 @@ async function writePublicFile(path: string, contents: string): Promise<void> {
 }
 
 async function writeValidPublicTree(): Promise<void> {
-  for (const [index, entry] of EXPECTED_INVENTORY.entries()) {
-    await writePublicFile(entry.path, String.fromCharCode(97 + index));
+  for (const [index, path] of EXPECTED_PATHS.entries()) {
+    await writePublicFile(path, `file-${String(index).padStart(2, '0')}`);
   }
 }
 
@@ -72,10 +72,14 @@ afterEach(async () => {
 
 describe('public build manifest', () => {
   it('hashes sorted relative paths and file bytes into the expected aggregate', async () => {
-    await expect(hashPublicBuild(outputDirectory)).resolves.toEqual({
-      digest: EXPECTED_DIGEST,
-      inventory: EXPECTED_INVENTORY,
-    });
+    const manifest = await hashPublicBuild(outputDirectory);
+    expect(manifest.digest).toBe(EXPECTED_DIGEST);
+    expect(manifest.inventory.map((entry) => entry.path)).toEqual(
+      EXPECTED_PATHS,
+    );
+    expect(manifest.inventory[0]?.sha256).toBe(
+      '24d1562a2022b81e26a53f01546bf50f646f747f6a43104d046569199b8f2052',
+    );
   });
 
   it('emits only the stable aggregate digest', async () => {

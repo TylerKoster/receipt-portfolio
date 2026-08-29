@@ -10,7 +10,6 @@ import {
   unlink,
   writeFile,
 } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
 import { tmpdir } from 'node:os';
 import {
   basename,
@@ -20,6 +19,7 @@ import {
   join,
   relative,
   resolve,
+  parse,
   sep,
 } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -40,6 +40,7 @@ import {
   type RawFetch,
   type Receipt,
   type ReceiptIntegrityErrorCode,
+  type ReceiptPublicFacts,
   type SourceManifest,
 } from '../packages/evidence-core/src/index.js';
 
@@ -142,6 +143,7 @@ function normalizeFixture(
       return {
         observedAt: timestamp,
         record: {
+          kind: 'search-status',
           eventId: stringValue(event, 'eventId'),
           service: stringValue(event, 'service'),
           startedAt: stringValue(event, 'startedAt'),
@@ -157,6 +159,7 @@ function normalizeFixture(
       return {
         observedAt: timestamp,
         record: {
+          kind: 'workflow-experiment',
           expectedFields: stringArray(experiment, 'expectedFields'),
           experimentId: stringValue(experiment, 'experimentId'),
           fixtureId: stringValue(experiment, 'fixtureId'),
@@ -172,6 +175,7 @@ function normalizeFixture(
       return {
         observedAt: timestamp,
         record: {
+          kind: 'skill-inventory',
           contentsSha256: stringValue(inventory, 'contentsSha256'),
           declaredDependencies: stringArray(inventory, 'declaredDependencies'),
           declaredLicense: stringValue(inventory, 'declaredLicense'),
@@ -191,7 +195,7 @@ function manifestPath(siteId: SourceManifest['siteId']): string {
         projectRoot(),
         'manifests',
         siteId,
-        'google-search-status.json',
+        'google-search-status-example.json',
       );
     case 'workflow-test-lab':
       return join(
@@ -239,7 +243,13 @@ async function loadFixture(
   siteId: SourceManifest['siteId'],
   fixtureName: string,
   maxBytes: number,
-): Promise<NormalizedFixture & { readonly rawSha256: string }> {
+): Promise<
+  NormalizedFixture & {
+    readonly rawSha256: string;
+    readonly rawBytes: Uint8Array;
+    readonly normalizedBytes: Uint8Array;
+  }
+> {
   const rawBytes = await readFile(fixturePath(siteId, fixtureName));
   const rawSha256 = sha256(rawBytes);
 
@@ -252,7 +262,10 @@ async function loadFixture(
     JSON.parse(rawBytes.toString('utf8')),
   );
 
-  return { ...normalized, rawSha256 };
+  const normalizedBytes = new TextEncoder().encode(
+    canonicalJson(normalized.record),
+  );
+  return { ...normalized, rawSha256, rawBytes, normalizedBytes };
 }
 
 function diffRatio(
@@ -280,17 +293,43 @@ function diffRatio(
   return changedFields / keys.length;
 }
 
-async function persistReceipt(
-  receipt: Receipt,
-  evidenceDirectory: string,
-): Promise<string> {
-  const directory = join(evidenceDirectory, 'receipts', receipt.payload.siteId);
-  const path = join(directory, `${receipt.id}.json`);
-  const canonicalBytes = Buffer.from(canonicalJson(receipt), 'utf8');
-  await mkdir(directory, { recursive: true });
+function missingPath(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
 
+async function ensureRealDirectoryPath(path: string): Promise<string> {
+  const absolute = resolve(path);
+  const root = parse(absolute).root;
+  let current = root;
+
+  for (const segment of absolute
+    .slice(root.length)
+    .split(sep)
+    .filter(Boolean)) {
+    current = join(current, segment);
+    let stats;
+    try {
+      stats = await lstat(current);
+    } catch (error) {
+      if (!missingPath(error)) throw error;
+      await mkdir(current);
+      stats = await lstat(current);
+    }
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      throw new Error(`Evidence path must use real directories: ${current}`);
+    }
+  }
+  return absolute;
+}
+
+async function persistImmutable(
+  path: string,
+  bytes: Uint8Array,
+  collisionCode: string,
+): Promise<void> {
+  await ensureRealDirectoryPath(dirname(path));
   try {
-    await writeFile(path, canonicalBytes, { flag: 'wx' });
+    await writeFile(path, bytes, { flag: 'wx' });
   } catch (error) {
     if (!(
       error instanceof Error &&
@@ -299,33 +338,98 @@ async function persistReceipt(
     )) {
       throw error;
     }
-
+    const stats = await lstat(path);
+    if (stats.isSymbolicLink() || !stats.isFile()) {
+      throw new Error(
+        `${collisionCode}: existing target is not a regular file`,
+      );
+    }
     const existingBytes = await readFile(path);
-
-    if (!existingBytes.equals(canonicalBytes)) {
-      throw new Error(`RECEIPT_COLLISION: ${path}`);
+    if (!existingBytes.equals(Buffer.from(bytes))) {
+      throw new Error(`${collisionCode}: ${path}`);
     }
   }
+}
 
+async function persistReceipt(
+  receipt: Receipt,
+  evidenceDirectory: string,
+): Promise<string> {
+  const path = join(
+    evidenceDirectory,
+    'receipts',
+    receipt.payload.siteId,
+    `${receipt.id}.json`,
+  );
+  await persistImmutable(
+    path,
+    Buffer.from(canonicalJson(receipt), 'utf8'),
+    'RECEIPT_COLLISION',
+  );
   return path;
+}
+
+function fixturePresentation(siteId: SourceManifest['siteId']): {
+  readonly topicSlug: string;
+  readonly interpretation: string;
+  readonly unknowns: readonly string[];
+} {
+  switch (siteId) {
+    case 'search-receipt':
+      return {
+        topicSlug: 'search-status',
+        interpretation:
+          'This controlled example demonstrates a source-status receipt shape; it is not a live Google incident observation.',
+        unknowns: [
+          'No live source was fetched.',
+          'No claim is made about search traffic or rankings.',
+        ],
+      };
+    case 'workflow-test-lab':
+      return {
+        topicSlug: 'structured-extraction',
+        interpretation:
+          'This controlled example records one locally authored workflow fixture and its declared constraints.',
+        unknowns: [
+          'No model run or universal benchmark result is established.',
+          'Performance on other fixtures is unknown.',
+        ],
+      };
+    case 'skill-ledger':
+      return {
+        topicSlug: 'package-metadata',
+        interpretation:
+          'This controlled example records static package metadata without installing or executing the package.',
+        unknowns: [
+          'Runtime behavior and security posture are not established.',
+          'Suitability for adoption remains unknown.',
+        ],
+      };
+  }
 }
 
 function createFixtureReceipt(
   manifest: SourceManifest,
-  fixture: NormalizedFixture & { readonly rawSha256: string },
+  fixture: NormalizedFixture & {
+    readonly rawSha256: string;
+    readonly normalizedBytes: Uint8Array;
+  },
   previousRecord: NormalizedRecord | undefined,
   predecessorReceiptId: string | undefined,
+  sequence: number,
 ): Receipt {
-  const normalizedSha256 = sha256(
-    new TextEncoder().encode(canonicalJson(fixture.record)),
-  );
-  const policy = evaluatePublication({
+  const normalizedSha256 = sha256(fixture.normalizedBytes);
+  const gateInputs = {
     manifestValid: true,
+    enabled: manifest.enabled,
+    publicationMode: manifest.publicationMode,
+    evidenceClass: 'controlled-example' as const,
     rawSha256: fixture.rawSha256,
     normalizedSha256,
     ambiguous: false,
     diffRatio: diffRatio(previousRecord, fixture.record),
-  });
+  };
+  const presentation = fixturePresentation(manifest.siteId);
 
   return createReceipt({
     siteId: manifest.siteId,
@@ -335,9 +439,66 @@ function createFixtureReceipt(
     manifestSha256: manifestSha256(manifest),
     rawSha256: fixture.rawSha256,
     normalizedSha256,
+    rawObjectPath: `objects/raw/${fixture.rawSha256}.bin`,
+    normalizedObjectPath: `objects/normalized/${normalizedSha256}.json`,
+    sequence,
     ...(predecessorReceiptId === undefined ? {} : { predecessorReceiptId }),
-    policy,
+    topicSlug: presentation.topicSlug,
+    provenance: {
+      evidenceClass: 'controlled-example',
+      publicationMode: manifest.publicationMode,
+      publisherName: manifest.publisherName,
+      sourceClass: manifest.sourceClass,
+      extractionSelector: manifest.extractionSelector,
+      extractionContractId: manifest.extractionContractId,
+      normalizerId: manifest.normalizerId,
+      diffStrategyId: manifest.diffStrategyId,
+      schemaId: manifest.schemaId,
+    },
+    publicFacts: fixture.record as ReceiptPublicFacts,
+    interpretation: presentation.interpretation,
+    unknowns: [...presentation.unknowns],
+    correction: { kind: 'original' },
+    gateInputs,
+    policy: (() => {
+      const result = evaluatePublication(gateInputs);
+      return {
+        decision: result.decision,
+        reasonCodes: [...result.reasonCodes],
+      };
+    })(),
   });
+}
+
+async function persistFixtureEvidence(
+  receipt: Receipt,
+  fixture: {
+    readonly rawBytes: Uint8Array;
+    readonly normalizedBytes: Uint8Array;
+  },
+  manifest: SourceManifest,
+  evidenceDirectory: string,
+): Promise<string> {
+  await persistImmutable(
+    join(evidenceDirectory, receipt.payload.rawObjectPath),
+    fixture.rawBytes,
+    'RAW_OBJECT_COLLISION',
+  );
+  await persistImmutable(
+    join(evidenceDirectory, receipt.payload.normalizedObjectPath),
+    fixture.normalizedBytes,
+    'NORMALIZED_OBJECT_COLLISION',
+  );
+  await persistImmutable(
+    join(
+      evidenceDirectory,
+      'manifests',
+      `${receipt.payload.manifestSha256}.json`,
+    ),
+    Buffer.from(canonicalJson(manifest), 'utf8'),
+    'MANIFEST_SNAPSHOT_COLLISION',
+  );
+  return persistReceipt(receipt, evidenceDirectory);
 }
 
 export async function collectFixturePair(
@@ -347,8 +508,16 @@ export async function collectFixturePair(
   options: { evidenceDirectory: string },
 ): Promise<{ receipt: Receipt; path: string }> {
   const manifest = await loadManifest(siteId);
-  let previousFixture:
-    (NormalizedFixture & { readonly rawSha256: string }) | undefined;
+  if (
+    !manifest.enabled ||
+    manifest.publicationMode !== 'fixture-example' ||
+    manifest.sourceClass !== 'project-original-fixture'
+  ) {
+    throw new Error(
+      `Manifest is not admitted for controlled fixture collection: ${siteId}`,
+    );
+  }
+  let previousFixture: Awaited<ReturnType<typeof loadFixture>> | undefined;
   let predecessorReceiptId: string | undefined;
 
   if (previousFixtureName !== undefined) {
@@ -362,8 +531,14 @@ export async function collectFixturePair(
       previousFixture,
       undefined,
       undefined,
+      1,
     );
-    await persistReceipt(previousReceipt, options.evidenceDirectory);
+    await persistFixtureEvidence(
+      previousReceipt,
+      previousFixture,
+      manifest,
+      options.evidenceDirectory,
+    );
     predecessorReceiptId = previousReceipt.id;
   }
 
@@ -377,39 +552,92 @@ export async function collectFixturePair(
     currentFixture,
     previousFixture?.record,
     predecessorReceiptId,
+    previousFixture === undefined ? 1 : 2,
   );
-  const path = await persistReceipt(receipt, options.evidenceDirectory);
+  const path = await persistFixtureEvidence(
+    receipt,
+    currentFixture,
+    manifest,
+    options.evidenceDirectory,
+  );
 
   return { receipt, path };
 }
 
+const SITE_IDS = [
+  'search-receipt',
+  'workflow-test-lab',
+  'skill-ledger',
+] as const;
+
+async function requireIntegrityDirectory(
+  path: string,
+  label: string,
+): Promise<void> {
+  const stats = await lstat(path);
+  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+    throw new EvidenceIntegrityError(
+      'SYMBOLIC_EVIDENCE_ENTRY',
+      `${label} must be a real regular directory: ${path}`,
+    );
+  }
+}
+
+async function requireRegularFile(path: string, label: string): Promise<void> {
+  const stats = await lstat(path);
+  if (stats.isSymbolicLink() || !stats.isFile()) {
+    throw new EvidenceIntegrityError(
+      'SYMBOLIC_EVIDENCE_ENTRY',
+      `${label} must be a regular non-symbolic file: ${path}`,
+    );
+  }
+}
+
 async function receiptFiles(directory: string): Promise<string[]> {
-  let entries: Dirent[];
-
   try {
-    entries = await readdir(directory, { withFileTypes: true });
+    await requireIntegrityDirectory(directory, 'Receipt root');
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return [];
-    }
-
+    if (missingPath(error)) return [];
     throw error;
   }
 
   const files: string[] = [];
-
-  for (const entry of entries.sort((left, right) =>
+  const siteEntries = await readdir(directory, { withFileTypes: true });
+  for (const siteEntry of siteEntries.sort((left, right) =>
     left.name.localeCompare(right.name),
   )) {
-    const path = join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...(await receiptFiles(path)));
-    } else if (entry.isFile()) {
+    const sitePath = join(directory, siteEntry.name);
+    if (
+      siteEntry.isSymbolicLink() ||
+      !siteEntry.isDirectory() ||
+      !SITE_IDS.includes(siteEntry.name as (typeof SITE_IDS)[number])
+    ) {
+      throw new EvidenceIntegrityError(
+        'RECEIPT_PATH_MISMATCH',
+        `Receipt root contains a linked, non-directory, or unknown site path: ${sitePath}`,
+      );
+    }
+    await requireIntegrityDirectory(sitePath, 'Receipt site root');
+    const entries = await readdir(sitePath, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      const path = join(sitePath, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new EvidenceIntegrityError(
+          'SYMBOLIC_EVIDENCE_ENTRY',
+          `Receipt entry must not be symbolic or linked: ${path}`,
+        );
+      }
+      if (!entry.isFile()) {
+        throw new EvidenceIntegrityError(
+          'RECEIPT_PATH_MISMATCH',
+          `Receipt must use the exact receipts/<siteId>/<id>.json path: ${path}`,
+        );
+      }
       files.push(path);
     }
   }
-
   return files;
 }
 
@@ -419,7 +647,16 @@ export type EvidenceIntegrityErrorCode =
   | 'RECEIPT_JSON_INVALID'
   | 'RECEIPT_FILENAME_MISMATCH'
   | 'UNAUTHENTICATED_RECEIPT_FIELDS'
-  | 'NON_CANONICAL_RECEIPT_BYTES';
+  | 'NON_CANONICAL_RECEIPT_BYTES'
+  | 'EMPTY_EVIDENCE'
+  | 'SYMBOLIC_EVIDENCE_ENTRY'
+  | 'RECEIPT_PATH_MISMATCH'
+  | 'DUPLICATE_RECEIPT_ID'
+  | 'MANIFEST_NOT_ADMITTED'
+  | 'MANIFEST_BINDING_MISMATCH'
+  | 'OBJECT_INTEGRITY_MISMATCH'
+  | 'PREDECESSOR_INTEGRITY_MISMATCH'
+  | 'CORRECTION_INTEGRITY_MISMATCH';
 
 export class EvidenceIntegrityError extends Error {
   readonly code: EvidenceIntegrityErrorCode;
@@ -435,10 +672,157 @@ export class EvidenceIntegrityError extends Error {
   }
 }
 
-export async function verifyEvidenceTree(
+export interface VerifyEvidenceTreeOptions {
+  readonly manifestDirectory?: string;
+  readonly requireNonEmpty?: boolean;
+  readonly expectedReceiptCount?: number;
+  readonly expectedSiteIds?: readonly SourceManifest['siteId'][];
+}
+
+async function admittedManifests(
+  manifestDirectory: string,
+): Promise<Map<string, SourceManifest>> {
+  await requireIntegrityDirectory(
+    manifestDirectory,
+    'Configured manifest root',
+  );
+  const admitted = new Map<string, SourceManifest>();
+  const siteEntries = await readdir(manifestDirectory, { withFileTypes: true });
+  for (const siteEntry of siteEntries) {
+    const sitePath = join(manifestDirectory, siteEntry.name);
+    if (
+      siteEntry.isSymbolicLink() ||
+      !siteEntry.isDirectory() ||
+      !SITE_IDS.includes(siteEntry.name as (typeof SITE_IDS)[number])
+    ) {
+      throw new EvidenceIntegrityError(
+        'MANIFEST_NOT_ADMITTED',
+        `Configured manifest root contains an invalid entry: ${sitePath}`,
+      );
+    }
+    await requireIntegrityDirectory(sitePath, 'Configured manifest site root');
+    for (const entry of await readdir(sitePath, { withFileTypes: true })) {
+      const path = join(sitePath, entry.name);
+      if (
+        entry.isSymbolicLink() ||
+        !entry.isFile() ||
+        !entry.name.endsWith('.json')
+      ) {
+        throw new EvidenceIntegrityError(
+          'MANIFEST_NOT_ADMITTED',
+          `Configured manifest must be a regular JSON file: ${path}`,
+        );
+      }
+      const manifest = validateManifest(
+        JSON.parse(await readFile(path, 'utf8')),
+      );
+      if (manifest.siteId !== siteEntry.name) {
+        throw new EvidenceIntegrityError(
+          'MANIFEST_NOT_ADMITTED',
+          `Configured manifest site does not match its path: ${path}`,
+        );
+      }
+      const digest = manifestSha256(manifest);
+      if (admitted.has(digest)) {
+        throw new EvidenceIntegrityError(
+          'MANIFEST_NOT_ADMITTED',
+          `Configured manifest digest is duplicated: ${digest}`,
+        );
+      }
+      admitted.set(digest, manifest);
+    }
+  }
+  return admitted;
+}
+
+async function verifyObject(
   evidenceDirectory: string,
+  objectPath: string,
+  expectedSha256: string,
+  expectedCanonicalValue?: unknown,
 ): Promise<void> {
+  const path = join(evidenceDirectory, ...objectPath.split('/'));
+  await requireIntegrityDirectory(
+    join(evidenceDirectory, 'objects'),
+    'Object root',
+  );
+  await requireIntegrityDirectory(dirname(path), 'Object namespace');
+  await requireRegularFile(path, 'Content-addressed object');
+  const bytes = await readFile(path);
+  if (sha256(bytes) !== expectedSha256) {
+    throw new EvidenceIntegrityError(
+      'OBJECT_INTEGRITY_MISMATCH',
+      `Object bytes do not match the receipt hash: ${path}`,
+    );
+  }
+  if (
+    expectedCanonicalValue !== undefined &&
+    !bytes.equals(
+      Buffer.from(canonicalJson(expectedCanonicalValue as JsonValue), 'utf8'),
+    )
+  ) {
+    throw new EvidenceIntegrityError(
+      'OBJECT_INTEGRITY_MISMATCH',
+      `Normalized object does not match authenticated public facts: ${path}`,
+    );
+  }
+}
+
+async function verifyExactRegularInventory(
+  directory: string,
+  expectedNames: ReadonlySet<string>,
+  errorCode: 'OBJECT_INTEGRITY_MISMATCH' | 'MANIFEST_BINDING_MISMATCH',
+): Promise<void> {
+  await requireIntegrityDirectory(directory, 'Content-addressed namespace');
+  const entries = await readdir(directory, { withFileTypes: true });
+  const actualNames = new Set<string>();
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isSymbolicLink() || !entry.isFile()) {
+      throw new EvidenceIntegrityError(
+        errorCode,
+        `Content-addressed namespace contains a linked or non-file entry: ${path}`,
+      );
+    }
+    actualNames.add(entry.name);
+  }
+  if (
+    actualNames.size !== expectedNames.size ||
+    [...expectedNames].some((name) => !actualNames.has(name))
+  ) {
+    throw new EvidenceIntegrityError(
+      errorCode,
+      `Content-addressed namespace inventory does not exactly match receipt bindings: ${directory}`,
+    );
+  }
+}
+
+async function verifyEvidenceTreeInternal(
+  evidenceDirectory: string,
+  options: VerifyEvidenceTreeOptions = {},
+): Promise<Receipt[]> {
+  await requireIntegrityDirectory(evidenceDirectory, 'Evidence root');
   const files = await receiptFiles(join(evidenceDirectory, 'receipts'));
+  if ((options.requireNonEmpty ?? true) && files.length === 0) {
+    throw new EvidenceIntegrityError(
+      'EMPTY_EVIDENCE',
+      'Evidence verification requires at least one receipt',
+    );
+  }
+  if (
+    options.expectedReceiptCount !== undefined &&
+    files.length !== options.expectedReceiptCount
+  ) {
+    throw new EvidenceIntegrityError(
+      'EMPTY_EVIDENCE',
+      `Evidence receipt inventory mismatch: expected ${options.expectedReceiptCount}, found ${files.length}`,
+    );
+  }
+  const manifests = await admittedManifests(
+    options.manifestDirectory ?? join(projectRoot(), 'manifests'),
+  );
+  const receipts: Receipt[] = [];
+  const receiptById = new Map<string, Receipt>();
 
   for (const path of files) {
     if (!path.endsWith('.json')) {
@@ -449,10 +833,10 @@ export async function verifyEvidenceTree(
     }
 
     const bytes = await readFile(path);
-    let receipt: Receipt;
+    let parsed: unknown;
 
     try {
-      receipt = JSON.parse(bytes.toString('utf8')) as Receipt;
+      parsed = JSON.parse(bytes.toString('utf8'));
     } catch (error) {
       throw new EvidenceIntegrityError(
         'RECEIPT_JSON_INVALID',
@@ -462,7 +846,7 @@ export async function verifyEvidenceTree(
     }
 
     try {
-      verifyReceipt(receipt);
+      parsed = verifyReceipt(parsed);
     } catch (error) {
       if (error instanceof ReceiptIntegrityError) {
         throw new EvidenceIntegrityError(error.code, error.message, {
@@ -473,10 +857,23 @@ export async function verifyEvidenceTree(
       throw error;
     }
 
+    const receipt = parsed as Receipt;
+    if (receiptById.has(receipt.id)) {
+      throw new EvidenceIntegrityError(
+        'DUPLICATE_RECEIPT_ID',
+        `Duplicate receipt ID occurs more than once: ${receipt.id}`,
+      );
+    }
     if (basename(path) !== `${receipt.id}.json`) {
       throw new EvidenceIntegrityError(
         'RECEIPT_FILENAME_MISMATCH',
-        `Receipt filename does not match receipt ID: ${path}`,
+        `Receipt filename does not match its authenticated ID: ${path}`,
+      );
+    }
+    if (basename(dirname(path)) !== receipt.payload.siteId) {
+      throw new EvidenceIntegrityError(
+        'RECEIPT_PATH_MISMATCH',
+        `Receipt path does not match its authenticated site and ID: ${path}`,
       );
     }
 
@@ -497,7 +894,184 @@ export async function verifyEvidenceTree(
         `Receipt does not contain exact canonical bytes: ${path}`,
       );
     }
+
+    const manifest = manifests.get(receipt.payload.manifestSha256);
+    if (manifest === undefined) {
+      throw new EvidenceIntegrityError(
+        'MANIFEST_NOT_ADMITTED',
+        `Receipt manifest digest is not admitted: ${receipt.payload.manifestSha256}`,
+      );
+    }
+    const manifestSnapshotPath = join(
+      evidenceDirectory,
+      'manifests',
+      `${receipt.payload.manifestSha256}.json`,
+    );
+    await requireIntegrityDirectory(
+      join(evidenceDirectory, 'manifests'),
+      'Manifest snapshot root',
+    );
+    await requireRegularFile(manifestSnapshotPath, 'Manifest snapshot');
+    const manifestSnapshot = await readFile(manifestSnapshotPath);
+    if (
+      !manifestSnapshot.equals(Buffer.from(canonicalJson(manifest), 'utf8'))
+    ) {
+      throw new EvidenceIntegrityError(
+        'MANIFEST_BINDING_MISMATCH',
+        `Manifest snapshot is not the admitted canonical manifest: ${manifestSnapshotPath}`,
+      );
+    }
+    const evidenceClass =
+      manifest.publicationMode === 'fixture-example'
+        ? 'controlled-example'
+        : 'live-source';
+    const bindings = [
+      receipt.payload.siteId === manifest.siteId,
+      receipt.payload.sourceId === manifest.sourceId,
+      receipt.payload.sourceUrl === manifest.endpoint,
+      receipt.payload.provenance.publisherName === manifest.publisherName,
+      receipt.payload.provenance.sourceClass === manifest.sourceClass,
+      receipt.payload.provenance.publicationMode === manifest.publicationMode,
+      receipt.payload.provenance.evidenceClass === evidenceClass,
+      receipt.payload.provenance.extractionSelector ===
+        manifest.extractionSelector,
+      receipt.payload.provenance.extractionContractId ===
+        manifest.extractionContractId,
+      receipt.payload.provenance.normalizerId === manifest.normalizerId,
+      receipt.payload.provenance.diffStrategyId === manifest.diffStrategyId,
+      receipt.payload.provenance.schemaId === manifest.schemaId,
+      receipt.payload.gateInputs.enabled === manifest.enabled,
+    ];
+    if (bindings.includes(false)) {
+      throw new EvidenceIntegrityError(
+        'MANIFEST_BINDING_MISMATCH',
+        `Receipt provenance does not match its admitted manifest: ${receipt.id}`,
+      );
+    }
+    await verifyObject(
+      evidenceDirectory,
+      receipt.payload.rawObjectPath,
+      receipt.payload.rawSha256,
+    );
+    await verifyObject(
+      evidenceDirectory,
+      receipt.payload.normalizedObjectPath,
+      receipt.payload.normalizedSha256,
+      receipt.payload.publicFacts,
+    );
+    receiptById.set(receipt.id, receipt);
+    receipts.push(receipt);
   }
+
+  const successorByPredecessor = new Set<string>();
+  const sequenceKeys = new Set<string>();
+  for (const receipt of receipts) {
+    const sequenceKey = `${receipt.payload.siteId}\0${receipt.payload.sourceId}\0${receipt.payload.sequence}`;
+    if (sequenceKeys.has(sequenceKey)) {
+      throw new EvidenceIntegrityError(
+        'PREDECESSOR_INTEGRITY_MISMATCH',
+        `Receipt sequence is duplicated for one source: ${receipt.id}`,
+      );
+    }
+    sequenceKeys.add(sequenceKey);
+    const predecessorId = receipt.payload.predecessorReceiptId;
+    if (predecessorId !== undefined) {
+      const predecessor = receiptById.get(predecessorId);
+      if (
+        predecessor === undefined ||
+        predecessor.payload.siteId !== receipt.payload.siteId ||
+        predecessor.payload.sourceId !== receipt.payload.sourceId ||
+        predecessor.payload.sequence + 1 !== receipt.payload.sequence ||
+        predecessor.payload.observedAt > receipt.payload.observedAt ||
+        successorByPredecessor.has(predecessorId)
+      ) {
+        throw new EvidenceIntegrityError(
+          'PREDECESSOR_INTEGRITY_MISMATCH',
+          `Receipt predecessor is missing, cross-source, branched, or out of sequence: ${receipt.id}`,
+        );
+      }
+      successorByPredecessor.add(predecessorId);
+    }
+    if (receipt.payload.correction.kind === 'correction') {
+      const corrected = receiptById.get(
+        receipt.payload.correction.correctsReceiptId,
+      );
+      if (
+        corrected === undefined ||
+        corrected.payload.siteId !== receipt.payload.siteId ||
+        corrected.payload.sourceId !== receipt.payload.sourceId ||
+        corrected.payload.sequence >= receipt.payload.sequence
+      ) {
+        throw new EvidenceIntegrityError(
+          'CORRECTION_INTEGRITY_MISMATCH',
+          `Correction target is missing, cross-source, or not older: ${receipt.id}`,
+        );
+      }
+    }
+  }
+  if (
+    options.expectedSiteIds !== undefined &&
+    options.expectedSiteIds.some(
+      (siteId) =>
+        !receipts.some((receipt) => receipt.payload.siteId === siteId),
+    )
+  ) {
+    throw new EvidenceIntegrityError(
+      'EMPTY_EVIDENCE',
+      'Evidence inventory is missing an expected portfolio site',
+    );
+  }
+  const objectRoot = join(evidenceDirectory, 'objects');
+  await requireIntegrityDirectory(objectRoot, 'Object root');
+  const objectNamespaces = await readdir(objectRoot, { withFileTypes: true });
+  if (
+    objectNamespaces.length !== 2 ||
+    objectNamespaces.some(
+      (entry) =>
+        entry.isSymbolicLink() ||
+        !entry.isDirectory() ||
+        !['normalized', 'raw'].includes(entry.name),
+    )
+  ) {
+    throw new EvidenceIntegrityError(
+      'OBJECT_INTEGRITY_MISMATCH',
+      'Object root must contain exactly the real raw and normalized namespaces',
+    );
+  }
+  await verifyExactRegularInventory(
+    join(objectRoot, 'raw'),
+    new Set(receipts.map((receipt) => `${receipt.payload.rawSha256}.bin`)),
+    'OBJECT_INTEGRITY_MISMATCH',
+  );
+  await verifyExactRegularInventory(
+    join(objectRoot, 'normalized'),
+    new Set(
+      receipts.map((receipt) => `${receipt.payload.normalizedSha256}.json`),
+    ),
+    'OBJECT_INTEGRITY_MISMATCH',
+  );
+  await verifyExactRegularInventory(
+    join(evidenceDirectory, 'manifests'),
+    new Set(
+      receipts.map((receipt) => `${receipt.payload.manifestSha256}.json`),
+    ),
+    'MANIFEST_BINDING_MISMATCH',
+  );
+  return receipts.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export async function verifyEvidenceTree(
+  evidenceDirectory: string,
+  options: VerifyEvidenceTreeOptions = {},
+): Promise<void> {
+  await verifyEvidenceTreeInternal(evidenceDirectory, options);
+}
+
+export async function loadVerifiedReceipts(
+  evidenceDirectory: string,
+  options: VerifyEvidenceTreeOptions = {},
+): Promise<Receipt[]> {
+  return verifyEvidenceTreeInternal(evidenceDirectory, options);
 }
 
 const MUTATION_NAMES = ['byte-content', 'predecessor', 'filename'] as const;
@@ -670,6 +1244,16 @@ interface DryRunSourceFailure {
   readonly message: string;
 }
 
+interface DryRunSkipped {
+  readonly manifestId: string;
+  readonly siteId: SourceManifest['siteId'];
+  readonly sourceId: string;
+  readonly sourceUrl?: string;
+  readonly status: 'SKIPPED';
+  readonly reasonCode: 'NOT_LIVE_COLLECTION_MODE';
+  readonly message: string;
+}
+
 interface DryRunManifestFailure {
   readonly manifestId: string;
   readonly sourceUrl?: string;
@@ -681,7 +1265,8 @@ interface DryRunManifestFailure {
   readonly message: string;
 }
 
-type DryRunResult = DryRunSuccess | DryRunSourceFailure | DryRunManifestFailure;
+type DryRunResult =
+  DryRunSuccess | DryRunSourceFailure | DryRunManifestFailure | DryRunSkipped;
 
 interface DryRunReport {
   readonly reportType: 'LIVE_SOURCE_DRY_RUN';
@@ -711,7 +1296,9 @@ const SAFE_FETCH_MESSAGES: Readonly<Record<string, string>> = {
   ENDPOINT_USERINFO_FORBIDDEN:
     'Source endpoint must not contain user information',
   ENDPOINT_HOST_NOT_ALLOWED: 'Source endpoint host is not allowlisted',
-  ENDPOINT_IP_FORBIDDEN: 'Source endpoint uses a forbidden IP literal',
+  ENDPOINT_IP_FORBIDDEN:
+    'Source endpoint uses or resolves to a forbidden address',
+  ENDPOINT_RESOLUTION_FAILED: 'Source endpoint hostname could not be resolved',
   INVALID_TIMEOUT: 'Manifest timeout must be a bounded positive integer',
   INVALID_MAX_BYTES: 'Manifest maxBytes must be a bounded positive integer',
   REDIRECT_REJECTED: 'Source redirect was rejected',
@@ -1019,6 +1606,19 @@ export async function runDryRunLive(
       continue;
     }
 
+    if (manifest.publicationMode !== 'auto-facts-only') {
+      results.push({
+        manifestId,
+        siteId: manifest.siteId,
+        sourceId: manifest.sourceId,
+        ...sourceUrlField(sourceUrl),
+        status: 'SKIPPED',
+        reasonCode: 'NOT_LIVE_COLLECTION_MODE',
+        message: 'Manifest mode is excluded from scheduled live collection',
+      });
+      continue;
+    }
+
     try {
       const fetched = await fetchSource(manifest);
       results.push({
@@ -1104,7 +1704,10 @@ export async function runCli(
     arguments_[0] === 'verify' &&
     arguments_[1] === '--all'
   ) {
-    await verifyEvidenceTree(evidenceDirectory);
+    await verifyEvidenceTree(evidenceDirectory, {
+      expectedReceiptCount: 4,
+      expectedSiteIds: [...SITE_IDS],
+    });
     return 0;
   }
 

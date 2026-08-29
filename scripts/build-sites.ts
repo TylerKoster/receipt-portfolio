@@ -5,190 +5,59 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  parse,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   canonicalJson,
-  verifyReceipt,
   type Receipt,
 } from '../packages/evidence-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
-import { renderSite, type SiteId } from '../sites/shared/render.js';
+import {
+  renderMethodology,
+  renderReceiptDetail,
+  renderRobots,
+  renderSite,
+  renderSitemap,
+  renderSources,
+  renderTopic,
+} from '../sites/shared/render.js';
 import { skillLedgerSite } from '../sites/skill-ledger/index.js';
 import { workflowTestLabSite } from '../sites/workflow-test-lab/index.js';
+import { loadVerifiedReceipts } from './evidence-cli.js';
 
 const SITE_DEFINITIONS = [
   searchReceiptSite,
   workflowTestLabSite,
   skillLedgerSite,
 ] as const;
-const SITE_IDS = new Set<SiteId>(
-  SITE_DEFINITIONS.map((definition) => definition.siteId),
-);
 const CLEANUP_RETRY_DELAYS_MS = [25, 100] as const;
 const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 const BACKUP_OWNER = 'receipt-portfolio-static-site-builder';
-const BACKUP_FORMAT_VERSION = 1;
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1;
-  }
-
-  if (left > right) {
-    return 1;
-  }
-
-  return 0;
-}
+const BACKUP_FORMAT_VERSION = 2;
 
 function projectRoot(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const parentDirectory = dirname(moduleDirectory);
-
-  if (basename(parentDirectory) === 'dist') {
-    return dirname(parentDirectory);
-  }
-
+  if (basename(parentDirectory) === 'dist') return dirname(parentDirectory);
   const grandparentDirectory = dirname(parentDirectory);
-
   return basename(grandparentDirectory) === 'dist'
     ? dirname(grandparentDirectory)
     : parentDirectory;
-}
-
-async function receiptFiles(directory: string): Promise<string[]> {
-  let entries: Dirent[];
-
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return [];
-    }
-
-    throw error;
-  }
-
-  const files: string[] = [];
-
-  for (const entry of entries.toSorted((left, right) =>
-    compareText(left.name, right.name),
-  )) {
-    const path = join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...(await receiptFiles(path)));
-    } else if (entry.isFile()) {
-      files.push(path);
-    }
-  }
-
-  return files;
-}
-
-function isSiteId(value: string): value is SiteId {
-  return SITE_IDS.has(value as SiteId);
-}
-
-async function loadVerifiedReceipts(
-  evidenceDirectory: string,
-): Promise<Receipt[]> {
-  const receiptDirectory = join(evidenceDirectory, 'receipts');
-  const files = await receiptFiles(receiptDirectory);
-  const receipts: Receipt[] = [];
-
-  for (const path of files) {
-    if (!path.endsWith('.json')) {
-      throw new Error(`Unexpected receipt filename: ${path}`);
-    }
-
-    const bytes = await readFile(path);
-    const receipt = verifyReceipt(
-      JSON.parse(bytes.toString('utf8')) as Receipt,
-    );
-
-    if (basename(path) !== `${receipt.id}.json`) {
-      throw new Error(`Receipt filename does not match receipt ID: ${path}`);
-    }
-
-    if (!isSiteId(receipt.payload.siteId)) {
-      throw new Error(`Unknown receipt site: ${receipt.payload.siteId}`);
-    }
-
-    if (basename(dirname(path)) !== receipt.payload.siteId) {
-      throw new Error(`Receipt directory does not match site ID: ${path}`);
-    }
-
-    const keys = Object.keys(receipt).sort();
-
-    if (keys.length !== 2 || keys[0] !== 'id' || keys[1] !== 'payload') {
-      throw new Error(`Receipt has unauthenticated top-level fields: ${path}`);
-    }
-
-    if (!bytes.equals(Buffer.from(canonicalJson(receipt), 'utf8'))) {
-      throw new Error(
-        `Receipt does not contain exact canonical bytes: ${path}`,
-      );
-    }
-
-    receipts.push(receipt);
-  }
-
-  return receipts;
-}
-
-function stylesheetPath(): string {
-  return join(projectRoot(), 'sites', 'shared', 'styles.css');
-}
-
-export async function buildSites(options: {
-  evidenceDirectory: string;
-  outputDirectory: string;
-}): Promise<void> {
-  const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
-  const outputDirectory = resolve(options.outputDirectory);
-  const outputParent = dirname(outputDirectory);
-  await mkdir(outputParent, { recursive: true });
-  const stagingDirectory = await mkdtemp(
-    join(outputParent, `.${basename(outputDirectory)}-stage-`),
-  );
-
-  try {
-    await writeSiteTree(stagingDirectory, receipts);
-    await replaceOutput(stagingDirectory, outputDirectory);
-  } catch (error) {
-    await rm(stagingDirectory, { force: true, recursive: true });
-    throw error;
-  }
-}
-
-async function writeSiteTree(
-  outputDirectory: string,
-  receipts: readonly Receipt[],
-): Promise<void> {
-  for (const site of SITE_DEFINITIONS) {
-    const directory = join(outputDirectory, site.siteId);
-    const acceptedReceipts = receipts.filter(
-      (receipt) =>
-        receipt.payload.siteId === site.siteId &&
-        receipt.payload.policy.decision === 'PASS',
-    );
-    await mkdir(directory, { recursive: true });
-    await Promise.all([
-      writeFile(
-        join(directory, 'index.html'),
-        renderSite(site, acceptedReceipts),
-      ),
-      copyFile(stylesheetPath(), join(directory, 'styles.css')),
-    ]);
-  }
 }
 
 function missingPath(error: unknown): boolean {
@@ -203,16 +72,168 @@ function cleanupErrorCode(error: unknown): string {
     : 'UNKNOWN';
 }
 
-function retryableCleanupError(error: unknown): boolean {
-  return ['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM'].includes(
-    cleanupErrorCode(error),
-  );
+function samePath(left: string, right: string): boolean {
+  return process.platform === 'win32'
+    ? resolve(left).toLowerCase() === resolve(right).toLowerCase()
+    : resolve(left) === resolve(right);
+}
+
+async function ensureTrustedRealDirectory(path: string): Promise<string> {
+  const absolute = resolve(path);
+  const root = parse(absolute).root;
+  let current = root;
+  for (const segment of absolute
+    .slice(root.length)
+    .split(sep)
+    .filter(Boolean)) {
+    current = join(current, segment);
+    let stats;
+    try {
+      stats = await lstat(current);
+    } catch (error) {
+      if (!missingPath(error)) throw error;
+      await mkdir(current);
+      stats = await lstat(current);
+    }
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      throw new Error(
+        `Output ancestor must not be symbolic or reparse-linked: ${current}`,
+      );
+    }
+  }
+  const canonical = await realpath(absolute);
+  if (!samePath(canonical, absolute)) {
+    throw new Error(
+      `Output ancestor canonical path changed through a link: ${absolute}`,
+    );
+  }
+  return canonical;
+}
+
+async function inspectOptionalRealDirectory(
+  path: string,
+  label: string,
+): Promise<boolean> {
+  try {
+    const stats = await lstat(path);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      throw new Error(
+        `${label} must not be symbolic, junction-backed, or non-directory: ${path}`,
+      );
+    }
+    const canonical = await realpath(path);
+    if (!samePath(canonical, path)) {
+      throw new Error(
+        `${label} canonical path does not match its requested path: ${path}`,
+      );
+    }
+    return true;
+  } catch (error) {
+    if (missingPath(error)) return false;
+    throw error;
+  }
+}
+
+async function rejectLinkedTree(path: string): Promise<void> {
+  const entries = await readdir(path, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(path, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(
+        `Owned cleanup tree contains a symbolic or reparse entry: ${entryPath}`,
+      );
+    }
+    if (entry.isDirectory()) await rejectLinkedTree(entryPath);
+    else if (!entry.isFile()) {
+      throw new Error(
+        `Owned cleanup tree contains a non-regular entry: ${entryPath}`,
+      );
+    }
+  }
+}
+
+function backupMarker(
+  canonicalParentPath: string,
+  canonicalOutputPath: string,
+  canonicalRecoveryPath: string,
+): object {
+  return {
+    canonicalOutputPath,
+    canonicalParentPath,
+    canonicalRecoveryPath,
+    formatVersion: BACKUP_FORMAT_VERSION,
+    owner: BACKUP_OWNER,
+  };
 }
 
 type BackupOwnership =
   | { readonly status: 'absent' }
   | { readonly status: 'owned' }
   | { readonly status: 'unowned'; readonly reason: string };
+
+async function inspectBackupOwnership(
+  backupDirectory: string,
+  canonicalParentPath: string,
+  canonicalOutputPath: string,
+): Promise<BackupOwnership> {
+  let exists: boolean;
+  try {
+    exists = await inspectOptionalRealDirectory(
+      backupDirectory,
+      'Recovery entry',
+    );
+  } catch (error) {
+    return {
+      status: 'unowned',
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (!exists) return { status: 'absent' };
+
+  const canonicalRecoveryPath = resolve(
+    canonicalParentPath,
+    basename(backupDirectory),
+  );
+  try {
+    if (!samePath(await realpath(backupDirectory), canonicalRecoveryPath)) {
+      return {
+        status: 'unowned',
+        reason: 'recovery real path is outside the trusted parent',
+      };
+    }
+    const markerPath = join(backupDirectory, BACKUP_OWNER_MARKER);
+    const markerStats = await lstat(markerPath);
+    if (markerStats.isSymbolicLink() || !markerStats.isFile()) {
+      return {
+        status: 'unowned',
+        reason: 'owner marker is not a regular file',
+      };
+    }
+    const expected = Buffer.from(
+      canonicalJson(
+        backupMarker(
+          canonicalParentPath,
+          canonicalOutputPath,
+          canonicalRecoveryPath,
+        ),
+      ),
+      'utf8',
+    );
+    if (!(await readFile(markerPath)).equals(expected)) {
+      return {
+        status: 'unowned',
+        reason: 'owner marker does not bind canonical paths',
+      };
+    }
+    await rejectLinkedTree(backupDirectory);
+    return { status: 'owned' };
+  } catch (error) {
+    return {
+      status: 'unowned',
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
 
 type CleanupResult =
   | { readonly cleaned: true }
@@ -222,79 +243,10 @@ type CleanupResult =
       readonly error: unknown;
     };
 
-function backupMarker(outputDirectory: string): object {
-  return {
-    formatVersion: BACKUP_FORMAT_VERSION,
-    outputDirectory,
-    owner: BACKUP_OWNER,
-  };
-}
-
-async function inspectBackupOwnership(
-  backupDirectory: string,
-  outputDirectory: string,
-): Promise<BackupOwnership> {
-  let directoryStats;
-
-  try {
-    directoryStats = await lstat(backupDirectory);
-  } catch (error) {
-    if (missingPath(error)) {
-      return { status: 'absent' };
-    }
-
-    return {
-      status: 'unowned',
-      reason: `cannot inspect recovery path (${cleanupErrorCode(error)})`,
-    };
-  }
-
-  if (!directoryStats.isDirectory() || directoryStats.isSymbolicLink()) {
-    return {
-      status: 'unowned',
-      reason: 'recovery path is not a real directory',
-    };
-  }
-
-  const markerPath = join(backupDirectory, BACKUP_OWNER_MARKER);
-  let markerStats;
-  let markerBytes: Buffer;
-
-  try {
-    markerStats = await lstat(markerPath);
-    markerBytes = await readFile(markerPath);
-  } catch (error) {
-    return {
-      status: 'unowned',
-      reason: `owner marker is unavailable (${cleanupErrorCode(error)})`,
-    };
-  }
-
-  if (!markerStats.isFile() || markerStats.isSymbolicLink()) {
-    return {
-      status: 'unowned',
-      reason: 'owner marker is not a real file',
-    };
-  }
-
-  const expectedMarker = Buffer.from(
-    canonicalJson(backupMarker(outputDirectory)),
-    'utf8',
-  );
-
-  if (!markerBytes.equals(expectedMarker)) {
-    return {
-      status: 'unowned',
-      reason: 'owner marker does not match this output path and format',
-    };
-  }
-
-  return { status: 'owned' };
-}
-
 async function removeOwnedBackupWithRetries(
   backupDirectory: string,
-  outputDirectory: string,
+  canonicalParentPath: string,
+  canonicalOutputPath: string,
 ): Promise<CleanupResult> {
   for (
     let attempt = 0;
@@ -303,13 +255,10 @@ async function removeOwnedBackupWithRetries(
   ) {
     const ownership = await inspectBackupOwnership(
       backupDirectory,
-      outputDirectory,
+      canonicalParentPath,
+      canonicalOutputPath,
     );
-
-    if (ownership.status === 'absent') {
-      return { cleaned: true };
-    }
-
+    if (ownership.status === 'absent') return { cleaned: true };
     if (ownership.status === 'unowned') {
       return {
         cleaned: false,
@@ -317,64 +266,137 @@ async function removeOwnedBackupWithRetries(
         error: new Error(ownership.reason),
       };
     }
-
     try {
       await rm(backupDirectory, { force: true, recursive: true });
       return { cleaned: true };
     } catch (error) {
-      if (missingPath(error)) {
-        return { cleaned: true };
-      }
-
+      if (missingPath(error)) return { cleaned: true };
       const retryDelay = CLEANUP_RETRY_DELAYS_MS[attempt];
-
-      if (retryDelay === undefined || !retryableCleanupError(error)) {
+      if (
+        retryDelay === undefined ||
+        !['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM'].includes(
+          cleanupErrorCode(error),
+        )
+      ) {
         return { cleaned: false, kind: 'cleanup-failed', error };
       }
-
       await delay(retryDelay);
     }
   }
-
   throw new Error('Unreachable cleanup retry state');
+}
+
+async function verifyOwnedStaging(
+  stagingDirectory: string,
+  canonicalParentPath: string,
+): Promise<void> {
+  await inspectOptionalRealDirectory(stagingDirectory, 'Staging entry');
+  if (
+    dirname(resolve(stagingDirectory)) !== resolve(canonicalParentPath) ||
+    !samePath(await realpath(stagingDirectory), stagingDirectory)
+  ) {
+    throw new Error(
+      'Staging entry is outside its trusted canonical output parent',
+    );
+  }
+  await rejectLinkedTree(stagingDirectory);
+}
+
+async function writeSiteTree(
+  outputDirectory: string,
+  receipts: readonly Receipt[],
+): Promise<void> {
+  for (const site of SITE_DEFINITIONS) {
+    const directory = join(outputDirectory, site.siteId);
+    const visible = receipts.filter(
+      (receipt) =>
+        receipt.payload.siteId === site.siteId &&
+        receipt.payload.policy.decision === 'PASS',
+    );
+    if (visible.length === 0) {
+      throw new Error(
+        `Public build requires nonempty accepted evidence for ${site.siteId}`,
+      );
+    }
+    await mkdir(join(directory, 'methodology'), { recursive: true });
+    await mkdir(join(directory, 'sources'), { recursive: true });
+    await copyFile(
+      join(projectRoot(), 'sites', 'shared', 'styles.css'),
+      join(directory, 'styles.css'),
+    );
+    await writeFile(join(directory, 'index.html'), renderSite(site, visible));
+    await writeFile(
+      join(directory, 'methodology', 'index.html'),
+      renderMethodology(site),
+    );
+    await writeFile(
+      join(directory, 'sources', 'index.html'),
+      renderSources(site, visible),
+    );
+    await writeFile(
+      join(directory, 'sitemap.xml'),
+      renderSitemap(site, visible),
+    );
+    await writeFile(join(directory, 'robots.txt'), renderRobots(site));
+
+    for (const receipt of visible) {
+      const receiptDirectory = join(directory, 'receipts', receipt.id);
+      await mkdir(receiptDirectory, { recursive: true });
+      await writeFile(
+        join(receiptDirectory, 'index.html'),
+        renderReceiptDetail(site, receipt),
+      );
+    }
+    const topics = [
+      ...new Set(visible.map((receipt) => receipt.payload.topicSlug)),
+    ].sort();
+    for (const topic of topics) {
+      const topicDirectory = join(directory, 'topics', topic);
+      await mkdir(topicDirectory, { recursive: true });
+      await writeFile(
+        join(topicDirectory, 'index.html'),
+        renderTopic(site, topic, visible),
+      );
+    }
+  }
 }
 
 async function replaceOutput(
   stagingDirectory: string,
   outputDirectory: string,
+  canonicalParentPath: string,
 ): Promise<void> {
-  const backupDirectory = `${outputDirectory}.previous`;
-  const staleBackupCleanup = await removeOwnedBackupWithRetries(
-    backupDirectory,
-    outputDirectory,
+  const canonicalOutputPath = resolve(
+    canonicalParentPath,
+    basename(outputDirectory),
   );
-
-  if (!staleBackupCleanup.cleaned) {
-    if (staleBackupCleanup.kind === 'unowned') {
-      throw new Error(
-        `Recovery sibling is not builder-owned: ${backupDirectory}`,
-        { cause: staleBackupCleanup.error },
-      );
-    }
-
+  const backupDirectory = `${outputDirectory}.previous`;
+  await inspectOptionalRealDirectory(outputDirectory, 'Output root');
+  const staleCleanup = await removeOwnedBackupWithRetries(
+    backupDirectory,
+    canonicalParentPath,
+    canonicalOutputPath,
+  );
+  if (!staleCleanup.cleaned) {
     throw new Error(
-      `Cannot clear prior site output cleanup debt at ${backupDirectory}`,
-      { cause: staleBackupCleanup.error },
+      staleCleanup.kind === 'unowned'
+        ? `Recovery sibling is not builder-owned: ${backupDirectory}`
+        : `Cannot clear prior site output cleanup debt at ${backupDirectory}`,
+      { cause: staleCleanup.error },
     );
   }
+  await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
 
   let previousOutputMoved = false;
-
   try {
     await rename(outputDirectory, backupDirectory);
     previousOutputMoved = true;
   } catch (error) {
-    if (!missingPath(error)) {
-      throw error;
-    }
+    if (!missingPath(error)) throw error;
   }
 
   try {
+    await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
     await rename(stagingDirectory, outputDirectory);
   } catch (replacementError) {
     if (previousOutputMoved) {
@@ -387,16 +409,26 @@ async function replaceOutput(
         );
       }
     }
-
     throw replacementError;
   }
 
   if (previousOutputMoved) {
+    const canonicalRecoveryPath = resolve(
+      canonicalParentPath,
+      basename(backupDirectory),
+    );
     try {
+      await inspectOptionalRealDirectory(backupDirectory, 'Recovery entry');
       await writeFile(
         join(backupDirectory, BACKUP_OWNER_MARKER),
-        canonicalJson(backupMarker(outputDirectory)),
-        'utf8',
+        canonicalJson(
+          backupMarker(
+            canonicalParentPath,
+            canonicalOutputPath,
+            canonicalRecoveryPath,
+          ),
+        ),
+        { encoding: 'utf8', flag: 'wx' },
       );
     } catch (error) {
       console.warn(
@@ -404,17 +436,79 @@ async function replaceOutput(
       );
       return;
     }
-
     const cleanup = await removeOwnedBackupWithRetries(
       backupDirectory,
-      outputDirectory,
+      canonicalParentPath,
+      canonicalOutputPath,
     );
-
     if (!cleanup.cleaned) {
       console.warn(
         `SITE_OUTPUT_CLEANUP_DEBT: published ${outputDirectory}; retained previous tree at ${backupDirectory}; cleanup failed with ${cleanupErrorCode(cleanup.error)}`,
       );
     }
+  }
+}
+
+export async function buildSites(options: {
+  evidenceDirectory: string;
+  outputDirectory: string;
+  trustedWorkspaceDirectory?: string;
+}): Promise<void> {
+  const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
+  const outputDirectory = resolve(options.outputDirectory);
+  const trustedWorkspaceDirectory = await ensureTrustedRealDirectory(
+    options.trustedWorkspaceDirectory ??
+      dirname(resolve(options.evidenceDirectory)),
+  );
+  const workspaceRelativeOutput = relative(
+    trustedWorkspaceDirectory,
+    outputDirectory,
+  );
+  if (
+    workspaceRelativeOutput === '' ||
+    workspaceRelativeOutput === '..' ||
+    workspaceRelativeOutput.startsWith(`..${sep}`) ||
+    isAbsolute(workspaceRelativeOutput)
+  ) {
+    throw new Error(
+      'Output root must be a strict descendant within the trusted workspace contract',
+    );
+  }
+  const canonicalParentPath = await ensureTrustedRealDirectory(
+    dirname(outputDirectory),
+  );
+  await inspectOptionalRealDirectory(outputDirectory, 'Output root');
+  const backupDirectory = `${outputDirectory}.previous`;
+  try {
+    const backupStats = await lstat(backupDirectory);
+    if (backupStats.isSymbolicLink()) {
+      throw new Error(
+        `Recovery entry must not be symbolic or reparse-linked: ${backupDirectory}`,
+      );
+    }
+  } catch (error) {
+    if (!missingPath(error)) throw error;
+  }
+  const stagingDirectory = await mkdtemp(
+    join(canonicalParentPath, `.${basename(outputDirectory)}-stage-`),
+  );
+  try {
+    await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
+    await writeSiteTree(stagingDirectory, receipts);
+    await replaceOutput(stagingDirectory, outputDirectory, canonicalParentPath);
+  } catch (error) {
+    try {
+      await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
+      await rm(stagingDirectory, { force: true, recursive: true });
+    } catch (cleanupError) {
+      if (!missingPath(cleanupError)) {
+        throw new AggregateError(
+          [error, cleanupError],
+          'Site build failed and owned staging cleanup could not be verified',
+        );
+      }
+    }
+    throw error;
   }
 }
 
@@ -427,7 +521,6 @@ async function runBuild(): Promise<void> {
 }
 
 const invokedPath = process.argv[1];
-
 if (
   invokedPath !== undefined &&
   pathToFileURL(resolve(invokedPath)).href === import.meta.url

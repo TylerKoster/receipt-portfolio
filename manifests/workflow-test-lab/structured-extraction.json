@@ -4,11 +4,19 @@
   "kind": "fixture",
   "endpoint": "https://example.invalid/workflow-test-lab/structured-extraction.json",
   "allowedHosts": ["example.invalid"],
+  "allowedMediaTypes": ["application/json"],
   "maxBytes": 50000,
   "timeoutMs": 5000,
+  "publisherName": "Receipt Portfolio",
+  "sourceClass": "project-original-fixture",
+  "extractionSelector": "$.experiment",
+  "extractionContractId": "workflow-experiment-v1",
+  "cadence": "fixture-only",
+  "noiseExclusions": [],
   "normalizerId": "workflow-fixture-v1",
   "diffStrategyId": "fixture-record-v1",
-  "publicationMode": "hold-only",
-  "licenseNote": "Local non-live placeholder fixture; no external source is fetched.",
-  "enabled": false
+  "schemaId": "workflow-experiment-public-v1",
+  "publicationMode": "fixture-example",
+  "licenseNote": "Locally authored rights-cleared controlled example; never scheduled as a live source.",
+  "enabled": true
 }

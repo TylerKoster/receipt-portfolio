@@ -6,4 +6,5 @@ coverage/
 *.tsbuildinfo
 evidence/objects/
 evidence/receipts/
+evidence/manifests/
 evidence/indexes/

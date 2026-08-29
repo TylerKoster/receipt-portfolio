@@ -201,7 +201,7 @@ describe('fixture-backed evidence pipeline', () => {
     );
   });
 
-  it('ignores unrelated JSON outside the receipts tree', async () => {
+  it('rejects an unexpected file in the content-addressed object root', async () => {
     await collectFixturePair(
       'workflow-test-lab',
       undefined,
@@ -216,9 +216,9 @@ describe('fixture-backed evidence pipeline', () => {
     await mkdir(dirname(unrelatedPath), { recursive: true });
     await writeFile(unrelatedPath, canonicalJson({ snapshot: true }));
 
-    await expect(
-      verifyEvidenceTree(testEvidenceDirectory),
-    ).resolves.toBeUndefined();
+    await expect(verifyEvidenceTree(testEvidenceDirectory)).rejects.toThrow(
+      /object root|namespace|inventory/i,
+    );
   });
 
   it.each(['txt', 'JSON'])(
