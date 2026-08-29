@@ -20,6 +20,9 @@ const CONTENT_SECURITY_POLICY =
   "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'";
 
 export function normalizePublicBaseUrl(value: string): string {
+  if (value.includes('?') || value.includes('#')) {
+    throw new Error('Public base URL must not contain a query or fragment');
+  }
   let url: URL;
   try {
     url = new URL(value);

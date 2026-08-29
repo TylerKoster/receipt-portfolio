@@ -255,6 +255,9 @@ describe('static receipt site build', () => {
     'http://tylerkoster.github.io/receipt-portfolio/',
     '/receipt-portfolio/',
     'https://user@tylerkoster.github.io/receipt-portfolio/',
+    'https://tylerkoster.github.io/receipt-portfolio/?',
+    'https://tylerkoster.github.io/receipt-portfolio/#',
+    'https://tylerkoster.github.io/receipt-portfolio/?#',
     'https://tylerkoster.github.io/receipt-portfolio/?preview=true',
     'https://tylerkoster.github.io/receipt-portfolio/#preview',
   ])('rejects the invalid public base URL %s', async (publicBaseUrl) => {
