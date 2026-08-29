@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import {
   mkdir,
   mkdtemp,
@@ -7,7 +8,9 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   canonicalJson,
@@ -27,6 +30,8 @@ const SITE_HEADINGS = {
   'workflow-test-lab': 'Workflow Test Lab',
 } as const;
 
+const execFileAsync = promisify(execFile);
+const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const temporaryDirectories: string[] = [];
 let testEvidenceDirectory: string;
 let outputDirectory: string;
@@ -85,6 +90,43 @@ async function collectAcceptedFixtures(): Promise<void> {
   );
 }
 
+async function fileInventory(
+  directory: string,
+): Promise<Record<string, string>> {
+  const inventory: Record<string, string> = {};
+
+  async function visit(currentDirectory: string): Promise<void> {
+    const entries = await readdir(currentDirectory, { withFileTypes: true });
+
+    for (const entry of entries.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      const path = join(currentDirectory, entry.name);
+
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile()) {
+        inventory[relative(directory, path).split(sep).join('/')] = (
+          await readFile(path)
+        ).toString('base64');
+      }
+    }
+  }
+
+  await visit(directory);
+  return inventory;
+}
+
+async function runProductionBuild(): Promise<void> {
+  const command =
+    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
+  const arguments_ =
+    process.platform === 'win32'
+      ? ['/d', '/s', '/c', 'npm run build']
+      : ['run', 'build'];
+  await execFileAsync(command, arguments_, { cwd: projectRoot });
+}
+
 beforeEach(async () => {
   const directory = await mkdtemp(join(tmpdir(), 'receipt-sites-'));
   temporaryDirectories.push(directory);
@@ -115,12 +157,14 @@ describe('static receipt site build', () => {
     }
   });
 
-  it('generates exactly three standalone site directories with CSP and local styles', async () => {
-    await mkdir(join(outputDirectory, 'shared'), { recursive: true });
-    await writeFile(
-      join(outputDirectory, 'shared', 'compiler-artifact.js'),
-      '',
-    );
+  it('replaces arbitrary stale roots and files with exactly three standalone sites', async () => {
+    await mkdir(join(outputDirectory, 'obsolete-root'), { recursive: true });
+    await writeFile(join(outputDirectory, 'obsolete-root', 'old.html'), 'old');
+
+    for (const siteId of Object.keys(SITE_HEADINGS)) {
+      await mkdir(join(outputDirectory, siteId), { recursive: true });
+      await writeFile(join(outputDirectory, siteId, 'obsolete.js'), 'old');
+    }
 
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -145,6 +189,67 @@ describe('static receipt site build', () => {
       expect(html).toContain('href="styles.css"');
       expect(styles).toContain('--accent');
     }
+
+    expect(Object.keys(await fileInventory(outputDirectory)).sort()).toEqual([
+      'search-receipt/index.html',
+      'search-receipt/styles.css',
+      'skill-ledger/index.html',
+      'skill-ledger/styles.css',
+      'workflow-test-lab/index.html',
+      'workflow-test-lab/styles.css',
+    ]);
+  });
+
+  it('makes an incremental build byte-equal to a clean build after evidence changes', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    await writeReceipt(testReceipt({ sourceId: 'newly-accepted-record' }));
+    await mkdir(join(outputDirectory, 'obsolete-root'), { recursive: true });
+    await writeFile(join(outputDirectory, 'obsolete-root', 'old.html'), 'old');
+    await writeFile(
+      join(outputDirectory, 'search-receipt', 'obsolete.js'),
+      'old',
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    const incrementalInventory = await fileInventory(outputDirectory);
+    const cleanOutputDirectory = join(dirname(outputDirectory), 'clean-sites');
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory: cleanOutputDirectory,
+    });
+
+    expect(incrementalInventory).toEqual(
+      await fileInventory(cleanOutputDirectory),
+    );
+  });
+
+  it('keeps compiler artifacts outside the real production site output', async () => {
+    await runProductionBuild();
+
+    expect(
+      Object.keys(
+        await fileInventory(join(projectRoot, 'dist', 'sites')),
+      ).sort(),
+    ).toEqual([
+      'search-receipt/index.html',
+      'search-receipt/styles.css',
+      'skill-ledger/index.html',
+      'skill-ledger/styles.css',
+      'workflow-test-lab/index.html',
+      'workflow-test-lab/styles.css',
+    ]);
+    await expect(
+      readFile(
+        join(projectRoot, 'dist', 'runtime', 'scripts', 'build-sites.js'),
+        'utf8',
+      ),
+    ).resolves.toContain('buildSites');
   });
 
   it('omits a REVIEW_REQUIRED record from public pages', async () => {
@@ -219,6 +324,8 @@ describe('static receipt site build', () => {
   });
 
   it('rejects a mutated receipt before rendering any public page', async () => {
+    await mkdir(outputDirectory, { recursive: true });
+    await writeFile(join(outputDirectory, 'previous.html'), 'previous output');
     const receipt = testReceipt({ sourceId: 'mutation-target' });
     const path = await writeReceipt(receipt);
     const mutatedReceipt = {
@@ -233,8 +340,9 @@ describe('static receipt site build', () => {
         outputDirectory,
       }),
     ).rejects.toThrow(/digest/i);
-    await expect(readdir(outputDirectory)).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
+    await expect(
+      readFile(join(outputDirectory, 'previous.html'), 'utf8'),
+    ).resolves.toBe('previous output');
+    expect(await readdir(outputDirectory)).toEqual(['previous.html']);
   });
 });

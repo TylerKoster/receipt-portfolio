@@ -11,11 +11,11 @@
     "sites/*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node dist/scripts/build-sites.js",
+    "build": "tsc -p tsconfig.json && node dist/runtime/scripts/build-sites.js",
     "check": "tsc --noEmit -p tsconfig.json && eslint .",
     "test": "vitest",
     "test:integration": "vitest run test/integration",
-    "evidence": "tsc -p tsconfig.json && node dist/scripts/evidence-cli.js"
+    "evidence": "tsc -p tsconfig.json && node dist/runtime/scripts/evidence-cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

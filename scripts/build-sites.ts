@@ -1,8 +1,10 @@
 import {
   copyFile,
   mkdir,
+  mkdtemp,
   readFile,
   readdir,
+  rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
@@ -44,8 +46,14 @@ function projectRoot(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const parentDirectory = dirname(moduleDirectory);
 
-  return basename(parentDirectory) === 'dist'
-    ? dirname(parentDirectory)
+  if (basename(parentDirectory) === 'dist') {
+    return dirname(parentDirectory);
+  }
+
+  const grandparentDirectory = dirname(parentDirectory);
+
+  return basename(grandparentDirectory) === 'dist'
+    ? dirname(grandparentDirectory)
     : parentDirectory;
 }
 
@@ -139,13 +147,28 @@ export async function buildSites(options: {
   outputDirectory: string;
 }): Promise<void> {
   const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
-  await rm(join(options.outputDirectory, 'shared'), {
-    force: true,
-    recursive: true,
-  });
+  const outputDirectory = resolve(options.outputDirectory);
+  const outputParent = dirname(outputDirectory);
+  await mkdir(outputParent, { recursive: true });
+  const stagingDirectory = await mkdtemp(
+    join(outputParent, `.${basename(outputDirectory)}-stage-`),
+  );
 
+  try {
+    await writeSiteTree(stagingDirectory, receipts);
+    await replaceOutput(stagingDirectory, outputDirectory);
+  } catch (error) {
+    await rm(stagingDirectory, { force: true, recursive: true });
+    throw error;
+  }
+}
+
+async function writeSiteTree(
+  outputDirectory: string,
+  receipts: readonly Receipt[],
+): Promise<void> {
   for (const site of SITE_DEFINITIONS) {
-    const directory = join(options.outputDirectory, site.siteId);
+    const directory = join(outputDirectory, site.siteId);
     const acceptedReceipts = receipts.filter(
       (receipt) =>
         receipt.payload.siteId === site.siteId &&
@@ -159,6 +182,48 @@ export async function buildSites(options: {
       ),
       copyFile(stylesheetPath(), join(directory, 'styles.css')),
     ]);
+  }
+}
+
+function missingPath(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+async function replaceOutput(
+  stagingDirectory: string,
+  outputDirectory: string,
+): Promise<void> {
+  const backupDirectory = `${stagingDirectory}.previous`;
+  let previousOutputMoved = false;
+
+  try {
+    await rename(outputDirectory, backupDirectory);
+    previousOutputMoved = true;
+  } catch (error) {
+    if (!missingPath(error)) {
+      throw error;
+    }
+  }
+
+  try {
+    await rename(stagingDirectory, outputDirectory);
+  } catch (replacementError) {
+    if (previousOutputMoved) {
+      try {
+        await rename(backupDirectory, outputDirectory);
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [replacementError, rollbackError],
+          'Site output replacement and rollback both failed',
+        );
+      }
+    }
+
+    throw replacementError;
+  }
+
+  if (previousOutputMoved) {
+    await rm(backupDirectory, { force: true, recursive: true });
   }
 }
 

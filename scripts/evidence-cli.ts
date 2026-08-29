@@ -28,8 +28,14 @@ function projectRoot(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const parentDirectory = dirname(moduleDirectory);
 
-  return basename(parentDirectory) === 'dist'
-    ? dirname(parentDirectory)
+  if (basename(parentDirectory) === 'dist') {
+    return dirname(parentDirectory);
+  }
+
+  const grandparentDirectory = dirname(parentDirectory);
+
+  return basename(grandparentDirectory) === 'dist'
+    ? dirname(grandparentDirectory)
     : parentDirectory;
 }
 
