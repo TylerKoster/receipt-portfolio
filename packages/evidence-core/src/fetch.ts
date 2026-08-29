@@ -75,6 +75,27 @@ export interface RawFetch {
   readonly bytes: Uint8Array;
 }
 
+const FORBIDDEN_IPV4_CIDRS = [
+  [0x00000000, 8], // 0.0.0.0/8
+  [0x0a000000, 8], // 10.0.0.0/8
+  [0x64400000, 10], // 100.64.0.0/10
+  [0x7f000000, 8], // 127.0.0.0/8
+  [0xa9fe0000, 16], // 169.254.0.0/16
+  [0xac100000, 12], // 172.16.0.0/12
+  [0xc0000000, 24], // 192.0.0.0/24
+  [0xc0000200, 24], // 192.0.2.0/24
+  [0xc0586300, 24], // 192.88.99.0/24
+  [0xc0a80000, 16], // 192.168.0.0/16
+  [0xc6120000, 15], // 198.18.0.0/15
+  [0xc6336400, 24], // 198.51.100.0/24
+  [0xcb007100, 24], // 203.0.113.0/24
+  [0xe0000000, 3], // 224.0.0.0/3
+] as const;
+
+function ipv4Value(octets: readonly number[]): number {
+  return octets.reduce((value, octet) => value * 256 + octet, 0);
+}
+
 function isForbiddenIpv4(hostname: string): boolean {
   const octets = hostname.split('.').map(Number);
 
@@ -85,21 +106,10 @@ function isForbiddenIpv4(hostname: string): boolean {
     return true;
   }
 
-  const [first, second, third] = octets as [number, number, number, number];
-
-  return (
-    first === 0 ||
-    first === 10 ||
-    first === 127 ||
-    (first === 100 && second >= 64 && second <= 127) ||
-    (first === 169 && second === 254) ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 0) ||
-    (first === 192 && second === 168) ||
-    (first === 198 && (second === 18 || second === 19)) ||
-    (first === 198 && second === 51 && third === 100) ||
-    (first === 203 && second === 0 && third === 113) ||
-    first >= 224
+  const value = ipv4Value(octets);
+  return FORBIDDEN_IPV4_CIDRS.some(
+    ([network, prefixLength]) =>
+      value >= network && value < network + 2 ** (32 - prefixLength),
   );
 }
 

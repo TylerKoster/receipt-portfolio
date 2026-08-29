@@ -43,6 +43,42 @@ function options(addresses: readonly { address: string; family: 4 | 6 }[]) {
 }
 
 describe('resolved and pinned fetch boundary', () => {
+  it.each(['192.88.99.0', '192.88.99.1', '192.88.99.2', '192.88.99.255'])(
+    'rejects deprecated 6to4 relay address %s before every connection seam',
+    async (address) => {
+      const connectionImplementation = vi.fn(async () => response());
+      const fetchImplementation = vi.fn(async () => response());
+
+      await expect(
+        fetchAllowedSource(manifest, {
+          resolver: async () => [{ address, family: 4 }],
+          connectionImplementation,
+          fetchImplementation,
+        }),
+      ).rejects.toMatchObject({ code: 'ENDPOINT_IP_FORBIDDEN' });
+      expect(connectionImplementation).not.toHaveBeenCalled();
+      expect(fetchImplementation).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['192.0.1.1', '192.88.98.1', '192.88.100.1'])(
+    'preserves adjacent globally ordinary IPv4 address %s',
+    async (address) => {
+      const connectionImplementation = vi.fn(async () => response());
+      const result = await fetchAllowedSource(manifest, {
+        resolver: async () => [{ address, family: 4 }],
+        connectionImplementation,
+      });
+
+      expect(result.status).toBe(200);
+      expect(connectionImplementation).toHaveBeenCalledWith(
+        new URL(manifest.endpoint),
+        { address, family: 4 },
+        expect.objectContaining({ redirect: 'error' }),
+      );
+    },
+  );
+
   it.each([
     ['loopback', [{ address: '127.0.0.1', family: 4 }]],
     ['private', [{ address: '10.0.0.7', family: 4 }]],
