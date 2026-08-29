@@ -1,0 +1,14 @@
+{
+  "siteId": "workflow-test-lab",
+  "sourceId": "structured-extraction",
+  "kind": "fixture",
+  "endpoint": "https://example.invalid/workflow-test-lab/structured-extraction.json",
+  "allowedHosts": ["example.invalid"],
+  "maxBytes": 50000,
+  "timeoutMs": 5000,
+  "normalizerId": "workflow-fixture-v1",
+  "diffStrategyId": "fixture-record-v1",
+  "publicationMode": "hold-only",
+  "licenseNote": "Local non-live placeholder fixture; no external source is fetched.",
+  "enabled": false
+}

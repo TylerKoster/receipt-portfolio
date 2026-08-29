@@ -1,0 +1,14 @@
+{
+  "siteId": "search-receipt",
+  "sourceId": "google-search-status",
+  "kind": "json",
+  "endpoint": "https://example.invalid/search-receipt/google-search-status.json",
+  "allowedHosts": ["example.invalid"],
+  "maxBytes": 50000,
+  "timeoutMs": 5000,
+  "normalizerId": "status-json-v1",
+  "diffStrategyId": "event-list-v1",
+  "publicationMode": "hold-only",
+  "licenseNote": "Local non-live placeholder fixture; no external source is fetched.",
+  "enabled": false
+}

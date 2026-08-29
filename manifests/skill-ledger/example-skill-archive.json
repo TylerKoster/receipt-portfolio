@@ -1,0 +1,14 @@
+{
+  "siteId": "skill-ledger",
+  "sourceId": "example-skill-archive",
+  "kind": "archive-fixture",
+  "endpoint": "https://example.invalid/skill-ledger/example-skill-archive.json",
+  "allowedHosts": ["example.invalid"],
+  "maxBytes": 50000,
+  "timeoutMs": 5000,
+  "normalizerId": "archive-fixture-v1",
+  "diffStrategyId": "inventory-v1",
+  "publicationMode": "hold-only",
+  "licenseNote": "Local non-live placeholder fixture; no external source is fetched.",
+  "enabled": false
+}
