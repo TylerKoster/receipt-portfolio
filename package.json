@@ -15,7 +15,7 @@
     "check": "tsc --noEmit -p tsconfig.json && eslint .",
     "test": "vitest",
     "test:integration": "vitest run test/integration",
-    "evidence": "node dist/scripts/evidence-cli.js"
+    "evidence": "tsc -p tsconfig.json && node dist/scripts/evidence-cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

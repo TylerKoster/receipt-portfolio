@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-08-29T12:10:00.000Z",
+  "inventory": {
+    "packageId": "example-static-skill-package",
+    "declaredLicense": "MIT",
+    "manifestPresent": true,
+    "declaredDependencies": [],
+    "contentsSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "staticRiskFlags": []
+  }
+}

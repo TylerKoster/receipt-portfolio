@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-08-29T12:00:00.000Z",
+  "event": {
+    "eventId": "example-search-status-event",
+    "service": "Search availability",
+    "status": "resolved",
+    "startedAt": "2026-08-29T11:45:00.000Z",
+    "summary": "Locally authored example status event."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-08-29T12:05:00.000Z",
+  "experiment": {
+    "experimentId": "structured-extraction-example",
+    "taskFamily": "structured field extraction",
+    "fixtureId": "local-rights-cleared-example-v1",
+    "expectedFields": ["item", "category", "confidence"],
+    "negativeConstraints": ["Do not invent missing values"]
+  }
+}
