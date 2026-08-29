@@ -53,18 +53,22 @@ function serialize(value: unknown, ancestors: Set<object>): string {
         );
       }
 
-      const expectedProperties = new Set<string>(['length']);
-
-      for (let index = 0; index < value.length; index += 1) {
-        expectedProperties.add(String(index));
-      }
-
       const ownPropertyNames = Object.getOwnPropertyNames(value);
 
       if (
-        ownPropertyNames.length !== expectedProperties.size ||
-        ownPropertyNames.some((name) => !expectedProperties.has(name)) ||
+        ownPropertyNames.length !== value.length + 1 ||
+        ownPropertyNames.at(-1) !== 'length' ||
         Object.getOwnPropertySymbols(value).length > 0
+      ) {
+        return unsupported(
+          'array properties must be length and ordered numeric indices',
+        );
+      }
+
+      if (
+        ownPropertyNames.some(
+          (name, index) => index < value.length && name !== String(index),
+        )
       ) {
         return unsupported(
           'array properties must be length and ordered numeric indices',

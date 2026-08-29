@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
   canonicalJson,
@@ -9,6 +11,7 @@ import {
 } from '../src/index.js';
 
 const digest = (character: string): string => character.repeat(64);
+const execFileAsync = promisify(execFile);
 
 const receiptInput: ReceiptInput = {
   siteId: 'search-receipt',
@@ -61,6 +64,36 @@ describe('canonical evidence bytes', () => {
     sparse[1] = 2;
 
     expect(() => canonicalJson(sparse)).toThrow(/array properties/i);
+  });
+
+  it('promptly rejects the largest sparse array', async () => {
+    const moduleUrl = new URL('../src/canonical-json.ts', import.meta.url).href;
+    const script = `
+      import { canonicalJson } from ${JSON.stringify(moduleUrl)};
+
+      try {
+        canonicalJson(new Array(4_294_967_295));
+        process.stdout.write('DID_NOT_THROW');
+      } catch (error) {
+        process.stdout.write(error instanceof Error ? error.message : String(error));
+      }
+    `;
+
+    let executionError: unknown;
+    let stdout = '';
+
+    try {
+      ({ stdout } = await execFileAsync(
+        process.execPath,
+        ['--max-old-space-size=32', '--input-type=module', '--eval', script],
+        { encoding: 'utf8', timeout: 1_000, windowsHide: true },
+      ));
+    } catch (error) {
+      executionError = error;
+    }
+
+    expect(executionError).toBeUndefined();
+    expect(stdout).toMatch(/array properties/i);
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
