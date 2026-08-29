@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node dist/runtime/scripts/build-sites.js",
+    "build:manifest": "node dist/runtime/scripts/hash-build.js",
     "check": "tsc --noEmit -p tsconfig.json && eslint .",
     "test": "vitest",
     "test:integration": "vitest run test/integration",

@@ -3,12 +3,13 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -19,6 +20,7 @@ import {
 } from '../../packages/evidence-core/src/index.js';
 import {
   collectFixturePair,
+  runEvidenceMutationCheck,
   verifyEvidenceTree,
 } from '../../scripts/evidence-cli.js';
 
@@ -26,6 +28,34 @@ const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const temporaryDirectories: string[] = [];
 let testEvidenceDirectory: string;
+
+async function receiptTreeInventory(
+  evidenceDirectory: string,
+): Promise<Record<string, string>> {
+  const receiptsDirectory = join(evidenceDirectory, 'receipts');
+  const inventory: Record<string, string> = {};
+
+  async function visit(directory: string): Promise<void> {
+    const entries = await readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      const path = join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile()) {
+        inventory[relative(receiptsDirectory, path).split(sep).join('/')] = (
+          await readFile(path)
+        ).toString('base64');
+      }
+    }
+  }
+
+  await visit(receiptsDirectory);
+  return inventory;
+}
 
 beforeEach(async () => {
   const directory = await mkdtemp(join(tmpdir(), 'receipt-pipeline-'));
@@ -217,6 +247,67 @@ describe('fixture-backed evidence pipeline', () => {
     await writeFile(invalidPath, '{invalid');
 
     await expect(verifyEvidenceTree(testEvidenceDirectory)).rejects.toThrow();
+  });
+
+  it('detects byte, predecessor, and filename mutations without changing canonical evidence', async () => {
+    await collectFixturePair(
+      'search-receipt',
+      'status-v1.json',
+      'status-v2.json',
+      { evidenceDirectory: testEvidenceDirectory },
+    );
+    const canonicalFiles = await receiptTreeInventory(testEvidenceDirectory);
+
+    const result = await runEvidenceMutationCheck(testEvidenceDirectory);
+
+    expect(result).toEqual({
+      detected: ['byte-content', 'predecessor', 'filename'],
+      escaped: [],
+      exitCode: 0,
+      output:
+        'MUTATION_CHECK PASS detected=3/3 byte-content,predecessor,filename canonical=unchanged',
+    });
+    expect(await receiptTreeInventory(testEvidenceDirectory)).toEqual(
+      canonicalFiles,
+    );
+  });
+
+  it('returns failure when a mutation escapes verification', async () => {
+    await collectFixturePair(
+      'search-receipt',
+      'status-v1.json',
+      'status-v2.json',
+      { evidenceDirectory: testEvidenceDirectory },
+    );
+
+    const result = await runEvidenceMutationCheck(testEvidenceDirectory, {
+      verifyTree: async () => undefined,
+    });
+
+    expect(result).toEqual({
+      detected: [],
+      escaped: ['byte-content', 'predecessor', 'filename'],
+      exitCode: 1,
+      output:
+        'MUTATION_CHECK FAIL detected=0/3 escaped=byte-content,predecessor,filename canonical=unchanged',
+    });
+  });
+
+  it('does not count a verifier infrastructure failure as mutation detection', async () => {
+    await collectFixturePair(
+      'search-receipt',
+      'status-v1.json',
+      'status-v2.json',
+      { evidenceDirectory: testEvidenceDirectory },
+    );
+
+    await expect(
+      runEvidenceMutationCheck(testEvidenceDirectory, {
+        verifyTree: async () => {
+          throw new Error('verifier unavailable');
+        },
+      }),
+    ).rejects.toThrow(/verifier unavailable/);
   });
 
   it('fails an unknown CLI command with concise usage', async () => {

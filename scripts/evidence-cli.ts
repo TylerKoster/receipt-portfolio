@@ -1,13 +1,17 @@
 import {
+  cp,
   mkdir,
   lstat,
+  mkdtemp,
   readFile,
   readdir,
   rename,
+  rm,
   unlink,
   writeFile,
 } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
+import { tmpdir } from 'node:os';
 import {
   basename,
   dirname,
@@ -38,7 +42,7 @@ import {
 } from '../packages/evidence-core/src/index.js';
 
 const USAGE =
-  'Usage: evidence <collect-fixtures|verify --all> | evidence dry-run-live [--output <artifacts/*.json>]';
+  'Usage: evidence <collect-fixtures|verify --all> | evidence test-mutation | evidence dry-run-live [--output <artifacts/*.json>]';
 const DEFAULT_DRY_RUN_OUTPUT = 'artifacts/dry-run-live-report.json';
 
 type NormalizedRecord = { readonly [key: string]: JsonValue };
@@ -439,6 +443,115 @@ export async function verifyEvidenceTree(
       );
     }
   }
+}
+
+const MUTATION_NAMES = ['byte-content', 'predecessor', 'filename'] as const;
+
+type MutationName = (typeof MUTATION_NAMES)[number];
+
+export interface EvidenceMutationCheckResult {
+  readonly detected: readonly MutationName[];
+  readonly escaped: readonly MutationName[];
+  readonly exitCode: 0 | 1;
+  readonly output: string;
+}
+
+interface EvidenceMutationCheckOptions {
+  readonly verifyTree?: (evidenceDirectory: string) => Promise<void>;
+}
+
+async function mutateCopiedEvidence(
+  evidenceDirectory: string,
+  mutation: MutationName,
+): Promise<void> {
+  const files = await receiptFiles(join(evidenceDirectory, 'receipts'));
+  const firstPath = files[0];
+
+  if (firstPath === undefined) {
+    throw new Error('Mutation check requires at least one receipt');
+  }
+
+  switch (mutation) {
+    case 'byte-content':
+      await writeFile(firstPath, `${await readFile(firstPath, 'utf8')}\n`);
+      return;
+    case 'filename':
+      await rename(firstPath, join(dirname(firstPath), 'mutated-receipt.json'));
+      return;
+    case 'predecessor': {
+      let predecessorPath: string | undefined;
+      let predecessorReceipt: Receipt | undefined;
+
+      for (const path of files) {
+        const receipt = JSON.parse(await readFile(path, 'utf8')) as Receipt;
+
+        if (receipt.payload.predecessorReceiptId !== undefined) {
+          predecessorPath = path;
+          predecessorReceipt = receipt;
+          break;
+        }
+      }
+
+      if (predecessorPath === undefined || predecessorReceipt === undefined) {
+        throw new Error('Mutation check requires a receipt with a predecessor');
+      }
+
+      const currentPredecessor =
+        predecessorReceipt.payload.predecessorReceiptId;
+      const mutatedPredecessor =
+        currentPredecessor === '0'.repeat(64) ? '1'.repeat(64) : '0'.repeat(64);
+      await writeFile(
+        predecessorPath,
+        canonicalJson({
+          ...predecessorReceipt,
+          payload: {
+            ...predecessorReceipt.payload,
+            predecessorReceiptId: mutatedPredecessor,
+          },
+        }),
+      );
+    }
+  }
+}
+
+export async function runEvidenceMutationCheck(
+  evidenceDirectory: string,
+  options: EvidenceMutationCheckOptions = {},
+): Promise<EvidenceMutationCheckResult> {
+  const verifyTree = options.verifyTree ?? verifyEvidenceTree;
+  const detected: MutationName[] = [];
+  const escaped: MutationName[] = [];
+
+  for (const mutation of MUTATION_NAMES) {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), 'receipt-mutation-'));
+    const copiedEvidenceDirectory = join(temporaryRoot, 'evidence');
+
+    try {
+      await cp(evidenceDirectory, copiedEvidenceDirectory, {
+        errorOnExist: true,
+        recursive: true,
+      });
+      await verifyTree(copiedEvidenceDirectory);
+      await mutateCopiedEvidence(copiedEvidenceDirectory, mutation);
+
+      try {
+        await verifyTree(copiedEvidenceDirectory);
+        escaped.push(mutation);
+      } catch {
+        detected.push(mutation);
+      }
+    } finally {
+      await rm(temporaryRoot, { force: true, recursive: true });
+    }
+  }
+
+  const exitCode = escaped.length === 0 ? 0 : 1;
+  const output =
+    exitCode === 0
+      ? `MUTATION_CHECK PASS detected=${detected.length}/${MUTATION_NAMES.length} ${detected.join(',')} canonical=unchanged`
+      : `MUTATION_CHECK FAIL detected=${detected.length}/${MUTATION_NAMES.length} escaped=${escaped.join(',')} canonical=unchanged`;
+
+  return { detected, escaped, exitCode, output };
 }
 
 async function collectDefaultFixtures(
@@ -923,6 +1036,12 @@ export async function runCli(
   ) {
     await verifyEvidenceTree(evidenceDirectory);
     return 0;
+  }
+
+  if (arguments_.length === 1 && arguments_[0] === 'test-mutation') {
+    const result = await runEvidenceMutationCheck(evidenceDirectory);
+    console.log(result.output);
+    return result.exitCode;
   }
 
   const output = dryRunOutputArgument(arguments_);
