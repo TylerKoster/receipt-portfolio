@@ -56,6 +56,30 @@ export const SourceManifestSchema = z
 
 export type SourceManifest = z.infer<typeof SourceManifestSchema>;
 
+export function safeSourceDisplayUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  try {
+    const endpoint = new URL(value);
+
+    if (
+      endpoint.protocol !== 'https:' ||
+      endpoint.username.length > 0 ||
+      endpoint.password.length > 0
+    ) {
+      return undefined;
+    }
+
+    endpoint.search = '';
+    endpoint.hash = '';
+    return endpoint.href;
+  } catch {
+    return undefined;
+  }
+}
+
 export function validateManifest(input: unknown): SourceManifest {
   const result = SourceManifestSchema.safeParse(input);
 

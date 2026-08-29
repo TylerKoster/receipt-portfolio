@@ -12,6 +12,7 @@ export type {
 export {
   SourceManifestSchema,
   manifestSha256,
+  safeSourceDisplayUrl,
   validateManifest,
 } from './manifest.js';
 export type { SourceManifest } from './manifest.js';

@@ -27,6 +27,7 @@ import {
   FetchBoundaryError,
   fetchAllowedSource,
   manifestSha256,
+  safeSourceDisplayUrl,
   sha256,
   validateManifest,
   verifyReceipt,
@@ -467,7 +468,7 @@ interface DryRunSuccess {
   readonly manifestId: string;
   readonly siteId: SourceManifest['siteId'];
   readonly sourceId: string;
-  readonly sourceUrl: string;
+  readonly sourceUrl?: string;
   readonly status: 'SUCCESS';
   readonly observedAt: string;
   readonly mediaType: string;
@@ -480,7 +481,7 @@ interface DryRunSourceFailure {
   readonly manifestId: string;
   readonly siteId: SourceManifest['siteId'];
   readonly sourceId: string;
-  readonly sourceUrl: string;
+  readonly sourceUrl?: string;
   readonly status: 'FAILED';
   readonly errorCode: string;
   readonly message: string;
@@ -488,6 +489,7 @@ interface DryRunSourceFailure {
 
 interface DryRunManifestFailure {
   readonly manifestId: string;
+  readonly sourceUrl?: string;
   readonly status: 'FAILED';
   readonly errorCode:
     | 'MANIFEST_READ_FAILED'
@@ -549,11 +551,32 @@ interface ValidManifestCandidate {
 interface InvalidManifestCandidate {
   readonly kind: 'INVALID';
   readonly manifestId: string;
+  readonly sourceUrl?: string;
   readonly errorCode: DryRunManifestFailure['errorCode'];
   readonly message: string;
 }
 
 type ManifestCandidate = ValidManifestCandidate | InvalidManifestCandidate;
+
+function manifestDisplayUrl(input: unknown): string | undefined {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return undefined;
+  }
+
+  try {
+    return safeSourceDisplayUrl(
+      (input as { readonly endpoint?: unknown }).endpoint,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function sourceUrlField(sourceUrl: string | undefined): {
+  readonly sourceUrl?: string;
+} {
+  return sourceUrl === undefined ? {} : { sourceUrl };
+}
 
 function manifestIdentifier(projectDirectory: string, path: string): string {
   return relative(projectDirectory, path).split(sep).join('/');
@@ -574,6 +597,7 @@ function injectedManifestCandidate(
     return {
       kind: 'INVALID',
       manifestId: `provided-manifests/${String(index).padStart(3, '0')}.json`,
+      ...sourceUrlField(manifestDisplayUrl(manifest)),
       errorCode: 'MANIFEST_SCHEMA_INVALID',
       message: 'Manifest schema is invalid',
     };
@@ -628,6 +652,7 @@ async function configuredManifestCandidates(
       candidates.push({
         kind: 'INVALID',
         manifestId,
+        ...sourceUrlField(manifestDisplayUrl(input)),
         errorCode: 'MANIFEST_SCHEMA_INVALID',
         message: 'Manifest schema is invalid',
       });
@@ -787,6 +812,7 @@ export async function runDryRunLive(
     if (candidate.kind === 'INVALID') {
       results.push({
         manifestId: candidate.manifestId,
+        ...sourceUrlField(candidate.sourceUrl),
         status: 'FAILED',
         errorCode: candidate.errorCode,
         message: candidate.message,
@@ -795,14 +821,14 @@ export async function runDryRunLive(
     }
 
     const { manifest, manifestId } = candidate;
-    const sourceUrl = manifest.endpoint;
+    const sourceUrl = safeSourceDisplayUrl(manifest.endpoint);
 
     if (!manifest.enabled) {
       results.push({
         manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl,
+        ...sourceUrlField(sourceUrl),
         status: 'FAILED',
         errorCode: 'SOURCE_DISABLED',
         message: SAFE_FETCH_MESSAGES.SOURCE_DISABLED ?? 'Source is disabled',
@@ -816,7 +842,7 @@ export async function runDryRunLive(
         manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl,
+        ...sourceUrlField(sourceUrl),
         status: 'SUCCESS',
         observedAt: fetched.observedAt,
         mediaType: fetched.mediaType,
@@ -829,7 +855,7 @@ export async function runDryRunLive(
         manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl,
+        ...sourceUrlField(sourceUrl),
         status: 'FAILED',
         ...sanitizedFetchFailure(error),
       });

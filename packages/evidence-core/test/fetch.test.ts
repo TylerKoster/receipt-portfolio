@@ -500,6 +500,148 @@ describe('bounded public-source fetch', () => {
 });
 
 describe('live dry-run report', () => {
+  it.each([
+    ['enabled success', true, false, 0, 'SUCCESS'],
+    ['enabled fetch rejection', true, true, 1, 'FAILED'],
+    ['disabled source', false, false, 1, 'FAILED'],
+  ] as const)(
+    'uses a secret-free display URL for %s without changing the request endpoint',
+    async (_name, enabled, rejectFetch, expectedExitCode, expectedStatus) => {
+      const projectDirectory = await mkdtemp(
+        join(tmpdir(), 'receipt-dry-run-'),
+      );
+      temporaryDirectories.push(projectDirectory);
+      const requestEndpoint =
+        'https://example.invalid/status.json?api_key=query-secret-123&public_flag=allowed-value#fragment-secret-456';
+      let observedRequestEndpoint: string | undefined;
+      const sourceManifest = manifest({
+        endpoint: requestEndpoint,
+        enabled,
+      });
+      const result = await runDryRunLive({
+        projectDirectory,
+        manifests: [sourceManifest],
+        fetchSource: async (requestedManifest) => {
+          observedRequestEndpoint = requestedManifest.endpoint;
+
+          if (rejectFetch) {
+            throw new FetchBoundaryError(
+              'ENDPOINT_HOST_NOT_ALLOWED',
+              'sensitive endpoint details must not reach the report',
+            );
+          }
+
+          return successfulRawFetch(
+            requestedManifest,
+            new TextEncoder().encode('abc'),
+          );
+        },
+      });
+      const reportBytes = await readFile(result.outputPath, 'utf8');
+      const report = JSON.parse(reportBytes) as {
+        readonly results: readonly Record<string, unknown>[];
+      };
+
+      expect(result.exitCode).toBe(expectedExitCode);
+      expect(report.results[0]).toMatchObject({
+        sourceUrl: 'https://example.invalid/status.json',
+        status: expectedStatus,
+      });
+      expect(observedRequestEndpoint).toBe(
+        enabled ? requestEndpoint : undefined,
+      );
+      for (const secret of [
+        'api_key',
+        'query-secret-123',
+        'public_flag',
+        'allowed-value',
+        'fragment-secret-456',
+      ]) {
+        expect(reportBytes).not.toContain(secret);
+      }
+    },
+  );
+
+  it('sanitizes the report when the real fetch boundary rejects a literal endpoint', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const result = await runDryRunLive({
+      projectDirectory,
+      manifests: [
+        manifest({
+          endpoint:
+            'https://127.0.0.1/status.json?api_key=boundary-query-secret#boundary-fragment-secret',
+          allowedHosts: ['127.0.0.1'],
+        }),
+      ],
+    });
+    const reportBytes = await readFile(result.outputPath, 'utf8');
+    const report = JSON.parse(reportBytes) as {
+      readonly results: readonly Record<string, unknown>[];
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(report.results[0]).toMatchObject({
+      errorCode: 'ENDPOINT_IP_FORBIDDEN',
+      sourceUrl: 'https://127.0.0.1/status.json',
+      status: 'FAILED',
+    });
+    expect(reportBytes).not.toContain('api_key');
+    expect(reportBytes).not.toContain('boundary-query-secret');
+    expect(reportBytes).not.toContain('boundary-fragment-secret');
+  });
+
+  it('sanitizes a parseable endpoint when another field fails manifest validation', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const manifestDirectory = join(
+      projectDirectory,
+      'manifests',
+      'search-receipt',
+    );
+    await mkdir(manifestDirectory, { recursive: true });
+    const requestEndpoint =
+      'https://example.invalid/status.json?signature=validation-query-secret#validation-fragment-secret';
+    await writeFile(
+      join(manifestDirectory, 'schema-invalid.json'),
+      JSON.stringify(
+        manifest({
+          sourceId: 'INVALID SOURCE',
+          endpoint: requestEndpoint,
+        }),
+      ),
+      'utf8',
+    );
+
+    const exitCode = await runCli(['dry-run-live'], {
+      projectDirectory,
+      fetchSource: async () => {
+        throw new Error('invalid manifest reached fetch');
+      },
+    });
+    const reportBytes = await readFile(
+      join(projectDirectory, 'artifacts', 'dry-run-live-report.json'),
+      'utf8',
+    );
+    const report = JSON.parse(reportBytes) as {
+      readonly results: readonly Record<string, unknown>[];
+    };
+
+    expect(exitCode).toBe(1);
+    expect(report.results).toEqual([
+      {
+        errorCode: 'MANIFEST_SCHEMA_INVALID',
+        manifestId: 'manifests/search-receipt/schema-invalid.json',
+        message: 'Manifest schema is invalid',
+        sourceUrl: 'https://example.invalid/status.json',
+        status: 'FAILED',
+      },
+    ]);
+    expect(reportBytes).not.toContain('signature');
+    expect(reportBytes).not.toContain('validation-query-secret');
+    expect(reportBytes).not.toContain('validation-fragment-secret');
+  });
+
   it('quarantines enabled and disabled credential-bearing manifests without retaining credentials', async () => {
     const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
     temporaryDirectories.push(projectDirectory);
@@ -510,7 +652,7 @@ describe('live dry-run report', () => {
     );
     await mkdir(manifestDirectory, { recursive: true });
     const credentialEndpoint =
-      'https://review-user:review-password@example.invalid/status.json';
+      'https://review-user:review-password@example.invalid/status.json?api_key=query-secret-123#fragment-secret-456';
     await writeFile(
       join(manifestDirectory, '00-enabled-userinfo.json'),
       JSON.stringify(
@@ -565,6 +707,9 @@ describe('live dry-run report', () => {
     ]);
     expect(reportBytes).not.toContain('review-user');
     expect(reportBytes).not.toContain('review-password');
+    expect(reportBytes).not.toContain('api_key');
+    expect(reportBytes).not.toContain('query-secret-123');
+    expect(reportBytes).not.toContain('fragment-secret-456');
     expect(reportBytes).not.toContain(credentialEndpoint);
   });
 
@@ -636,6 +781,7 @@ describe('live dry-run report', () => {
         errorCode: 'MANIFEST_SCHEMA_INVALID',
         manifestId: 'manifests/search-receipt/02-schema-invalid.json',
         message: 'Manifest schema is invalid',
+        sourceUrl: 'https://example.invalid/status.json',
         status: 'FAILED',
       },
     ]);
