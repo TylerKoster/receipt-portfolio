@@ -3,6 +3,7 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 evidence/objects/
 evidence/receipts/
 evidence/indexes/

@@ -1,0 +1,29 @@
+{
+  "name": "receipt-portfolio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "workspaces": [
+    "packages/*",
+    "sites/*"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node dist/scripts/build-sites.js",
+    "check": "tsc --noEmit -p tsconfig.json && eslint .",
+    "test": "vitest",
+    "test:integration": "vitest run test/integration",
+    "evidence": "node dist/scripts/evidence-cli.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.35.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0",
+    "vitest": "^3.2.4"
+  }
+}
