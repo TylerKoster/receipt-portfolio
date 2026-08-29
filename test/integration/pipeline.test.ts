@@ -179,9 +179,12 @@ describe('fixture-backed evidence pipeline', () => {
     );
     await writeFile(result.path, `${await readFile(result.path, 'utf8')}\n`);
 
-    await expect(verifyEvidenceTree(testEvidenceDirectory)).rejects.toThrow(
-      /canonical bytes/i,
-    );
+    await expect(
+      verifyEvidenceTree(testEvidenceDirectory),
+    ).rejects.toMatchObject({
+      code: 'NON_CANONICAL_RECEIPT_BYTES',
+      name: 'EvidenceIntegrityError',
+    });
   });
 
   it('rejects a valid receipt stored under the wrong filename', async () => {
@@ -308,6 +311,35 @@ describe('fixture-backed evidence pipeline', () => {
         },
       }),
     ).rejects.toThrow(/verifier unavailable/);
+  });
+
+  it('propagates an infrastructure failure that occurs only after a clean baseline', async () => {
+    await collectFixturePair(
+      'search-receipt',
+      'status-v1.json',
+      'status-v2.json',
+      { evidenceDirectory: testEvidenceDirectory },
+    );
+    const canonicalFiles = await receiptTreeInventory(testEvidenceDirectory);
+    let verificationCall = 0;
+
+    await expect(
+      runEvidenceMutationCheck(testEvidenceDirectory, {
+        verifyTree: async (evidenceDirectory) => {
+          verificationCall += 1;
+
+          if (verificationCall % 2 === 0) {
+            throw new Error('verifier unavailable after baseline');
+          }
+
+          await verifyEvidenceTree(evidenceDirectory);
+        },
+      }),
+    ).rejects.toThrow(/verifier unavailable after baseline/);
+    expect(verificationCall).toBe(2);
+    expect(await receiptTreeInventory(testEvidenceDirectory)).toEqual(
+      canonicalFiles,
+    );
   });
 
   it('fails an unknown CLI command with concise usage', async () => {

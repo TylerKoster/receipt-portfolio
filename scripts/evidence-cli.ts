@@ -31,6 +31,7 @@ import {
   FetchBoundaryError,
   fetchAllowedSource,
   manifestSha256,
+  ReceiptIntegrityError,
   safeSourceDisplayUrl,
   sha256,
   validateManifest,
@@ -38,6 +39,7 @@ import {
   type JsonValue,
   type RawFetch,
   type Receipt,
+  type ReceiptIntegrityErrorCode,
   type SourceManifest,
 } from '../packages/evidence-core/src/index.js';
 
@@ -411,6 +413,28 @@ async function receiptFiles(directory: string): Promise<string[]> {
   return files;
 }
 
+export type EvidenceIntegrityErrorCode =
+  | ReceiptIntegrityErrorCode
+  | 'UNEXPECTED_RECEIPT_FILENAME'
+  | 'RECEIPT_JSON_INVALID'
+  | 'RECEIPT_FILENAME_MISMATCH'
+  | 'UNAUTHENTICATED_RECEIPT_FIELDS'
+  | 'NON_CANONICAL_RECEIPT_BYTES';
+
+export class EvidenceIntegrityError extends Error {
+  readonly code: EvidenceIntegrityErrorCode;
+
+  constructor(
+    code: EvidenceIntegrityErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'EvidenceIntegrityError';
+    this.code = code;
+  }
+}
+
 export async function verifyEvidenceTree(
   evidenceDirectory: string,
 ): Promise<void> {
@@ -418,27 +442,58 @@ export async function verifyEvidenceTree(
 
   for (const path of files) {
     if (!path.endsWith('.json')) {
-      throw new Error(`Unexpected receipt filename: ${path}`);
+      throw new EvidenceIntegrityError(
+        'UNEXPECTED_RECEIPT_FILENAME',
+        `Unexpected receipt filename: ${path}`,
+      );
     }
 
     const bytes = await readFile(path);
-    const receipt = JSON.parse(bytes.toString('utf8')) as Receipt;
-    verifyReceipt(receipt);
+    let receipt: Receipt;
+
+    try {
+      receipt = JSON.parse(bytes.toString('utf8')) as Receipt;
+    } catch (error) {
+      throw new EvidenceIntegrityError(
+        'RECEIPT_JSON_INVALID',
+        `Receipt JSON is invalid: ${path}`,
+        { cause: error },
+      );
+    }
+
+    try {
+      verifyReceipt(receipt);
+    } catch (error) {
+      if (error instanceof ReceiptIntegrityError) {
+        throw new EvidenceIntegrityError(error.code, error.message, {
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
 
     if (basename(path) !== `${receipt.id}.json`) {
-      throw new Error(`Receipt filename does not match receipt ID: ${path}`);
+      throw new EvidenceIntegrityError(
+        'RECEIPT_FILENAME_MISMATCH',
+        `Receipt filename does not match receipt ID: ${path}`,
+      );
     }
 
     const keys = Object.keys(receipt).sort();
 
     if (keys.length !== 2 || keys[0] !== 'id' || keys[1] !== 'payload') {
-      throw new Error(`Receipt has unauthenticated top-level fields: ${path}`);
+      throw new EvidenceIntegrityError(
+        'UNAUTHENTICATED_RECEIPT_FIELDS',
+        `Receipt has unauthenticated top-level fields: ${path}`,
+      );
     }
 
     const canonicalBytes = Buffer.from(canonicalJson(receipt), 'utf8');
 
     if (!bytes.equals(canonicalBytes)) {
-      throw new Error(
+      throw new EvidenceIntegrityError(
+        'NON_CANONICAL_RECEIPT_BYTES',
         `Receipt does not contain exact canonical bytes: ${path}`,
       );
     }
@@ -448,6 +503,14 @@ export async function verifyEvidenceTree(
 const MUTATION_NAMES = ['byte-content', 'predecessor', 'filename'] as const;
 
 type MutationName = (typeof MUTATION_NAMES)[number];
+
+const EXPECTED_MUTATION_FAILURE: Readonly<
+  Record<MutationName, EvidenceIntegrityErrorCode>
+> = {
+  'byte-content': 'NON_CANONICAL_RECEIPT_BYTES',
+  predecessor: 'RECEIPT_PAYLOAD_DIGEST_MISMATCH',
+  filename: 'RECEIPT_FILENAME_MISMATCH',
+};
 
 export interface EvidenceMutationCheckResult {
   readonly detected: readonly MutationName[];
@@ -537,8 +600,15 @@ export async function runEvidenceMutationCheck(
       try {
         await verifyTree(copiedEvidenceDirectory);
         escaped.push(mutation);
-      } catch {
-        detected.push(mutation);
+      } catch (error) {
+        if (
+          error instanceof EvidenceIntegrityError &&
+          error.code === EXPECTED_MUTATION_FAILURE[mutation]
+        ) {
+          detected.push(mutation);
+        } else {
+          throw error;
+        }
       }
     } finally {
       await rm(temporaryRoot, { force: true, recursive: true });

@@ -18,5 +18,14 @@ export {
 export type { SourceManifest } from './manifest.js';
 export { evaluatePublication } from './policy.js';
 export type { Candidate, GateDecision, GateResult } from './policy.js';
-export { createReceipt, verifyReceipt } from './receipt.js';
-export type { Receipt, ReceiptInput, ReceiptPayload } from './receipt.js';
+export {
+  ReceiptIntegrityError,
+  createReceipt,
+  verifyReceipt,
+} from './receipt.js';
+export type {
+  Receipt,
+  ReceiptInput,
+  ReceiptIntegrityErrorCode,
+  ReceiptPayload,
+} from './receipt.js';

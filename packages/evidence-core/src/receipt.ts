@@ -23,6 +23,22 @@ export interface Receipt {
   readonly payload: ReceiptPayload;
 }
 
+export type ReceiptIntegrityErrorCode =
+  | 'RECEIPT_ID_FORMAT'
+  | 'RECEIPT_SOURCE_HASH_FORMAT'
+  | 'RECEIPT_PREDECESSOR_ID_FORMAT'
+  | 'RECEIPT_PAYLOAD_DIGEST_MISMATCH';
+
+export class ReceiptIntegrityError extends Error {
+  readonly code: ReceiptIntegrityErrorCode;
+
+  constructor(code: ReceiptIntegrityErrorCode, message: string) {
+    super(message);
+    this.name = 'ReceiptIntegrityError';
+    this.code = code;
+  }
+}
+
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 function payloadDigest(payload: ReceiptPayload): string {
@@ -40,7 +56,10 @@ export function createReceipt(input: ReceiptInput): Receipt {
 
 export function verifyReceipt(receipt: Receipt): Receipt {
   if (!SHA256_PATTERN.test(receipt.id)) {
-    throw new Error('Receipt ID must be a SHA-256 digest');
+    throw new ReceiptIntegrityError(
+      'RECEIPT_ID_FORMAT',
+      'Receipt ID must be a SHA-256 digest',
+    );
   }
 
   const sourceHashes = [
@@ -51,7 +70,10 @@ export function verifyReceipt(receipt: Receipt): Receipt {
 
   for (const [name, hash] of sourceHashes) {
     if (!SHA256_PATTERN.test(hash)) {
-      throw new Error(`${name} SHA-256 must be a lowercase hexadecimal digest`);
+      throw new ReceiptIntegrityError(
+        'RECEIPT_SOURCE_HASH_FORMAT',
+        `${name} SHA-256 must be a lowercase hexadecimal digest`,
+      );
     }
   }
 
@@ -59,13 +81,17 @@ export function verifyReceipt(receipt: Receipt): Receipt {
     receipt.payload.predecessorReceiptId !== undefined &&
     !SHA256_PATTERN.test(receipt.payload.predecessorReceiptId)
   ) {
-    throw new Error(
+    throw new ReceiptIntegrityError(
+      'RECEIPT_PREDECESSOR_ID_FORMAT',
       'Predecessor receipt ID must be a lowercase hexadecimal SHA-256 digest',
     );
   }
 
   if (receipt.id !== payloadDigest(receipt.payload)) {
-    throw new Error('Receipt ID does not match canonical payload digest');
+    throw new ReceiptIntegrityError(
+      'RECEIPT_PAYLOAD_DIGEST_MISMATCH',
+      'Receipt ID does not match canonical payload digest',
+    );
   }
 
   return receipt;
