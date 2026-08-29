@@ -9,7 +9,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,6 +43,7 @@ const SITE_HEADINGS = {
   'skill-ledger': 'SkillLedger',
   'workflow-test-lab': 'Workflow Test Lab',
 } as const;
+const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -245,6 +246,36 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('refuses an unrelated recovery sibling without changing either tree', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    const publicInventory = await fileInventory(outputDirectory);
+    const backupDirectory = `${outputDirectory}.previous`;
+    await mkdir(backupDirectory, { recursive: true });
+    await writeFile(
+      join(backupDirectory, 'unrelated-sentinel.txt'),
+      'must remain',
+    );
+    const unrelatedInventory = await fileInventory(backupDirectory);
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+      }),
+    ).rejects.toThrow(/not builder-owned/i);
+
+    expect(await fileInventory(outputDirectory)).toEqual(publicInventory);
+    expect(await fileInventory(backupDirectory)).toEqual(unrelatedInventory);
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.startsWith(`.${basename(outputDirectory)}-stage-`),
+      ),
+    ).toEqual([]);
+  });
+
   it('reports post-install cleanup debt without failing publication and clears it next run', async () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -294,10 +325,36 @@ describe('static receipt site build', () => {
         'utf8',
       ),
     ).toContain('cleanup-debt-new-record');
-    expect(await fileInventory(backupDirectory)).toEqual(previousInventory);
+    const marker = JSON.parse(
+      await readFile(join(backupDirectory, BACKUP_OWNER_MARKER), 'utf8'),
+    ) as unknown;
+    expect(marker).toEqual({
+      formatVersion: 1,
+      outputDirectory: resolve(outputDirectory),
+      owner: 'receipt-portfolio-static-site-builder',
+    });
+    const backupInventory = await fileInventory(backupDirectory);
+    delete backupInventory[BACKUP_OWNER_MARKER];
+    expect(backupInventory).toEqual(previousInventory);
     expect(warning).toHaveBeenCalledWith(
       expect.stringContaining('SITE_OUTPUT_CLEANUP_DEBT'),
     );
+
+    const publishedInventory = await fileInventory(outputDirectory);
+    const recoveryInventory = await fileInventory(backupDirectory);
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+      }),
+    ).rejects.toThrow(/Cannot clear prior site output cleanup debt/);
+    expect(await fileInventory(outputDirectory)).toEqual(publishedInventory);
+    expect(await fileInventory(backupDirectory)).toEqual(recoveryInventory);
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.startsWith(`.${basename(outputDirectory)}-stage-`),
+      ),
+    ).toEqual([]);
 
     mockedRm.mockImplementation(realFileSystem.rm);
     warning.mockRestore();

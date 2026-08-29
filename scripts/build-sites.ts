@@ -1,5 +1,6 @@
 import {
   copyFile,
+  lstat,
   mkdir,
   mkdtemp,
   readFile,
@@ -31,6 +32,9 @@ const SITE_IDS = new Set<SiteId>(
   SITE_DEFINITIONS.map((definition) => definition.siteId),
 );
 const CLEANUP_RETRY_DELAYS_MS = [25, 100] as const;
+const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
+const BACKUP_OWNER = 'receipt-portfolio-static-site-builder';
+const BACKUP_FORMAT_VERSION = 1;
 
 function compareText(left: string, right: string): number {
   if (left < right) {
@@ -205,21 +209,117 @@ function retryableCleanupError(error: unknown): boolean {
   );
 }
 
-interface CleanupResult {
-  readonly cleaned: boolean;
-  readonly error?: unknown;
+type BackupOwnership =
+  | { readonly status: 'absent' }
+  | { readonly status: 'owned' }
+  | { readonly status: 'unowned'; readonly reason: string };
+
+type CleanupResult =
+  | { readonly cleaned: true }
+  | {
+      readonly cleaned: false;
+      readonly kind: 'cleanup-failed' | 'unowned';
+      readonly error: unknown;
+    };
+
+function backupMarker(outputDirectory: string): object {
+  return {
+    formatVersion: BACKUP_FORMAT_VERSION,
+    outputDirectory,
+    owner: BACKUP_OWNER,
+  };
 }
 
-async function removeDirectoryWithRetries(
-  directory: string,
+async function inspectBackupOwnership(
+  backupDirectory: string,
+  outputDirectory: string,
+): Promise<BackupOwnership> {
+  let directoryStats;
+
+  try {
+    directoryStats = await lstat(backupDirectory);
+  } catch (error) {
+    if (missingPath(error)) {
+      return { status: 'absent' };
+    }
+
+    return {
+      status: 'unowned',
+      reason: `cannot inspect recovery path (${cleanupErrorCode(error)})`,
+    };
+  }
+
+  if (!directoryStats.isDirectory() || directoryStats.isSymbolicLink()) {
+    return {
+      status: 'unowned',
+      reason: 'recovery path is not a real directory',
+    };
+  }
+
+  const markerPath = join(backupDirectory, BACKUP_OWNER_MARKER);
+  let markerStats;
+  let markerBytes: Buffer;
+
+  try {
+    markerStats = await lstat(markerPath);
+    markerBytes = await readFile(markerPath);
+  } catch (error) {
+    return {
+      status: 'unowned',
+      reason: `owner marker is unavailable (${cleanupErrorCode(error)})`,
+    };
+  }
+
+  if (!markerStats.isFile() || markerStats.isSymbolicLink()) {
+    return {
+      status: 'unowned',
+      reason: 'owner marker is not a real file',
+    };
+  }
+
+  const expectedMarker = Buffer.from(
+    canonicalJson(backupMarker(outputDirectory)),
+    'utf8',
+  );
+
+  if (!markerBytes.equals(expectedMarker)) {
+    return {
+      status: 'unowned',
+      reason: 'owner marker does not match this output path and format',
+    };
+  }
+
+  return { status: 'owned' };
+}
+
+async function removeOwnedBackupWithRetries(
+  backupDirectory: string,
+  outputDirectory: string,
 ): Promise<CleanupResult> {
   for (
     let attempt = 0;
     attempt <= CLEANUP_RETRY_DELAYS_MS.length;
     attempt += 1
   ) {
+    const ownership = await inspectBackupOwnership(
+      backupDirectory,
+      outputDirectory,
+    );
+
+    if (ownership.status === 'absent') {
+      return { cleaned: true };
+    }
+
+    if (ownership.status === 'unowned') {
+      return {
+        cleaned: false,
+        kind: 'unowned',
+        error: new Error(ownership.reason),
+      };
+    }
+
     try {
-      await rm(directory, { force: true, recursive: true });
+      await rm(backupDirectory, { force: true, recursive: true });
       return { cleaned: true };
     } catch (error) {
       if (missingPath(error)) {
@@ -229,7 +329,7 @@ async function removeDirectoryWithRetries(
       const retryDelay = CLEANUP_RETRY_DELAYS_MS[attempt];
 
       if (retryDelay === undefined || !retryableCleanupError(error)) {
-        return { cleaned: false, error };
+        return { cleaned: false, kind: 'cleanup-failed', error };
       }
 
       await delay(retryDelay);
@@ -244,9 +344,19 @@ async function replaceOutput(
   outputDirectory: string,
 ): Promise<void> {
   const backupDirectory = `${outputDirectory}.previous`;
-  const staleBackupCleanup = await removeDirectoryWithRetries(backupDirectory);
+  const staleBackupCleanup = await removeOwnedBackupWithRetries(
+    backupDirectory,
+    outputDirectory,
+  );
 
   if (!staleBackupCleanup.cleaned) {
+    if (staleBackupCleanup.kind === 'unowned') {
+      throw new Error(
+        `Recovery sibling is not builder-owned: ${backupDirectory}`,
+        { cause: staleBackupCleanup.error },
+      );
+    }
+
     throw new Error(
       `Cannot clear prior site output cleanup debt at ${backupDirectory}`,
       { cause: staleBackupCleanup.error },
@@ -282,7 +392,23 @@ async function replaceOutput(
   }
 
   if (previousOutputMoved) {
-    const cleanup = await removeDirectoryWithRetries(backupDirectory);
+    try {
+      await writeFile(
+        join(backupDirectory, BACKUP_OWNER_MARKER),
+        canonicalJson(backupMarker(outputDirectory)),
+        'utf8',
+      );
+    } catch (error) {
+      console.warn(
+        `SITE_OUTPUT_UNOWNED_RECOVERY: published ${outputDirectory}; retained previous tree at ${backupDirectory}; owner marker failed with ${cleanupErrorCode(error)}`,
+      );
+      return;
+    }
+
+    const cleanup = await removeOwnedBackupWithRetries(
+      backupDirectory,
+      outputDirectory,
+    );
 
     if (!cleanup.cleaned) {
       console.warn(
