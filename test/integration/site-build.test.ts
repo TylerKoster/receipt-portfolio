@@ -1,0 +1,240 @@
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  canonicalJson,
+  createReceipt,
+  type GateDecision,
+  type Receipt,
+} from '../../packages/evidence-core/src/index.js';
+import { buildSites } from '../../scripts/build-sites.js';
+import { collectFixturePair } from '../../scripts/evidence-cli.js';
+import { escapeHtml } from '../../sites/shared/render.js';
+
+const CSP =
+  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'\">";
+const SITE_HEADINGS = {
+  'search-receipt': 'Search Receipt',
+  'skill-ledger': 'SkillLedger',
+  'workflow-test-lab': 'Workflow Test Lab',
+} as const;
+
+const temporaryDirectories: string[] = [];
+let testEvidenceDirectory: string;
+let outputDirectory: string;
+
+async function writeReceipt(receipt: Receipt): Promise<string> {
+  const path = join(
+    testEvidenceDirectory,
+    'receipts',
+    receipt.payload.siteId,
+    `${receipt.id}.json`,
+  );
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, canonicalJson(receipt));
+  return path;
+}
+
+function testReceipt(options: {
+  decision?: GateDecision;
+  siteId?: keyof typeof SITE_HEADINGS;
+  sourceId: string;
+  sourceUrl?: string;
+}): Receipt {
+  return createReceipt({
+    siteId: options.siteId ?? 'search-receipt',
+    sourceId: options.sourceId,
+    observedAt: '2026-08-29T12:30:00.000Z',
+    sourceUrl: options.sourceUrl ?? 'https://example.invalid/source',
+    manifestSha256: 'a'.repeat(64),
+    rawSha256: 'b'.repeat(64),
+    normalizedSha256: 'c'.repeat(64),
+    policy: {
+      decision: options.decision ?? 'PASS',
+      reasonCodes: ['SOURCE_FACTS_ONLY'],
+    },
+  });
+}
+
+async function collectAcceptedFixtures(): Promise<void> {
+  await collectFixturePair(
+    'search-receipt',
+    'status-v1.json',
+    'status-v2.json',
+    { evidenceDirectory: testEvidenceDirectory },
+  );
+  await collectFixturePair(
+    'workflow-test-lab',
+    undefined,
+    'structured-extraction-v1.json',
+    { evidenceDirectory: testEvidenceDirectory },
+  );
+  await collectFixturePair(
+    'skill-ledger',
+    undefined,
+    'skill-inventory-v1.json',
+    { evidenceDirectory: testEvidenceDirectory },
+  );
+}
+
+beforeEach(async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'receipt-sites-'));
+  temporaryDirectories.push(directory);
+  testEvidenceDirectory = join(directory, 'evidence');
+  outputDirectory = join(directory, 'sites');
+  await collectAcceptedFixtures();
+});
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
+describe('static receipt site build', () => {
+  it('renders one named static home page per portfolio site', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    for (const [siteId, heading] of Object.entries(SITE_HEADINGS)) {
+      await expect(
+        readFile(join(outputDirectory, siteId, 'index.html'), 'utf8'),
+      ).resolves.toContain(heading);
+    }
+  });
+
+  it('generates exactly three standalone site directories with CSP and local styles', async () => {
+    await mkdir(join(outputDirectory, 'shared'), { recursive: true });
+    await writeFile(
+      join(outputDirectory, 'shared', 'compiler-artifact.js'),
+      '',
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const entries = await readdir(outputDirectory, { withFileTypes: true });
+    expect(
+      entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    ).toEqual(Object.keys(SITE_HEADINGS).sort());
+
+    for (const siteId of Object.keys(SITE_HEADINGS)) {
+      const html = await readFile(
+        join(outputDirectory, siteId, 'index.html'),
+        'utf8',
+      );
+      const styles = await readFile(
+        join(outputDirectory, siteId, 'styles.css'),
+        'utf8',
+      );
+      expect(html).toContain(CSP);
+      expect(html).toContain('href="styles.css"');
+      expect(styles).toContain('--accent');
+    }
+  });
+
+  it('omits a REVIEW_REQUIRED record from public pages', async () => {
+    await writeReceipt(
+      testReceipt({
+        decision: 'REVIEW_REQUIRED',
+        sourceId: 'held-record-must-not-render',
+      }),
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const html = await readFile(
+      join(outputDirectory, 'search-receipt', 'index.html'),
+      'utf8',
+    );
+    expect(html).not.toContain('held-record-must-not-render');
+  });
+
+  it('escapes hostile source text rather than rendering markup', async () => {
+    expect(escapeHtml('<script>alert(1)</script>')).toBe(
+      '&lt;script&gt;alert(1)&lt;/script&gt;',
+    );
+
+    await writeReceipt(
+      testReceipt({ sourceId: '<script>alert("receipt")</script>' }),
+    );
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const html = await readFile(
+      join(outputDirectory, 'search-receipt', 'index.html'),
+      'utf8',
+    );
+    expect(html).not.toContain('<script>alert("receipt")</script>');
+    expect(html).toContain(
+      '&lt;script&gt;alert(&quot;receipt&quot;)&lt;/script&gt;',
+    );
+  });
+
+  it('escapes all five HTML-sensitive characters', () => {
+    expect(escapeHtml('&<>"\'')).toBe('&amp;&lt;&gt;&quot;&#39;');
+  });
+
+  it('renders an invalid source URL as inert escaped text', async () => {
+    await writeReceipt(
+      testReceipt({
+        sourceId: 'invalid-url-record',
+        sourceUrl: 'javascript:<script>alert(1)</script>',
+      }),
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const html = await readFile(
+      join(outputDirectory, 'search-receipt', 'index.html'),
+      'utf8',
+    );
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain(
+      'Invalid source URL: javascript:&lt;script&gt;alert(1)&lt;/script&gt;',
+    );
+  });
+
+  it('rejects a mutated receipt before rendering any public page', async () => {
+    const receipt = testReceipt({ sourceId: 'mutation-target' });
+    const path = await writeReceipt(receipt);
+    const mutatedReceipt = {
+      ...receipt,
+      payload: { ...receipt.payload, sourceId: 'mutated-source' },
+    };
+    await writeFile(path, canonicalJson(mutatedReceipt));
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+      }),
+    ).rejects.toThrow(/digest/i);
+    await expect(readdir(outputDirectory)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+});
