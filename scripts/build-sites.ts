@@ -10,6 +10,7 @@ import {
 } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   canonicalJson,
@@ -29,6 +30,7 @@ const SITE_DEFINITIONS = [
 const SITE_IDS = new Set<SiteId>(
   SITE_DEFINITIONS.map((definition) => definition.siteId),
 );
+const CLEANUP_RETRY_DELAYS_MS = [25, 100] as const;
 
 function compareText(left: string, right: string): number {
   if (left < right) {
@@ -189,11 +191,68 @@ function missingPath(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
+function cleanupErrorCode(error: unknown): string {
+  return error instanceof Error &&
+    'code' in error &&
+    typeof error.code === 'string'
+    ? error.code
+    : 'UNKNOWN';
+}
+
+function retryableCleanupError(error: unknown): boolean {
+  return ['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM'].includes(
+    cleanupErrorCode(error),
+  );
+}
+
+interface CleanupResult {
+  readonly cleaned: boolean;
+  readonly error?: unknown;
+}
+
+async function removeDirectoryWithRetries(
+  directory: string,
+): Promise<CleanupResult> {
+  for (
+    let attempt = 0;
+    attempt <= CLEANUP_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    try {
+      await rm(directory, { force: true, recursive: true });
+      return { cleaned: true };
+    } catch (error) {
+      if (missingPath(error)) {
+        return { cleaned: true };
+      }
+
+      const retryDelay = CLEANUP_RETRY_DELAYS_MS[attempt];
+
+      if (retryDelay === undefined || !retryableCleanupError(error)) {
+        return { cleaned: false, error };
+      }
+
+      await delay(retryDelay);
+    }
+  }
+
+  throw new Error('Unreachable cleanup retry state');
+}
+
 async function replaceOutput(
   stagingDirectory: string,
   outputDirectory: string,
 ): Promise<void> {
-  const backupDirectory = `${stagingDirectory}.previous`;
+  const backupDirectory = `${outputDirectory}.previous`;
+  const staleBackupCleanup = await removeDirectoryWithRetries(backupDirectory);
+
+  if (!staleBackupCleanup.cleaned) {
+    throw new Error(
+      `Cannot clear prior site output cleanup debt at ${backupDirectory}`,
+      { cause: staleBackupCleanup.error },
+    );
+  }
+
   let previousOutputMoved = false;
 
   try {
@@ -223,7 +282,13 @@ async function replaceOutput(
   }
 
   if (previousOutputMoved) {
-    await rm(backupDirectory, { force: true, recursive: true });
+    const cleanup = await removeDirectoryWithRetries(backupDirectory);
+
+    if (!cleanup.cleaned) {
+      console.warn(
+        `SITE_OUTPUT_CLEANUP_DEBT: published ${outputDirectory}; retained previous tree at ${backupDirectory}; cleanup failed with ${cleanupErrorCode(cleanup.error)}`,
+      );
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import type { PathLike, RmOptions } from 'node:fs';
 import {
   mkdir,
   mkdtemp,
@@ -11,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canonicalJson,
   createReceipt,
@@ -21,6 +22,19 @@ import {
 import { buildSites } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { escapeHtml } from '../../sites/shared/render.js';
+
+vi.mock('node:fs/promises', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises',
+    );
+
+  return { ...actual, rm: vi.fn(actual.rm) };
+});
+
+const realFileSystem =
+  await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+const mockedRm = vi.mocked(rm);
 
 const CSP =
   "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'\">";
@@ -128,6 +142,7 @@ async function runProductionBuild(): Promise<void> {
 }
 
 beforeEach(async () => {
+  mockedRm.mockImplementation(realFileSystem.rm);
   const directory = await mkdtemp(join(tmpdir(), 'receipt-sites-'));
   temporaryDirectories.push(directory);
   testEvidenceDirectory = join(directory, 'evidence');
@@ -136,6 +151,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  mockedRm.mockImplementation(realFileSystem.rm);
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -227,6 +243,78 @@ describe('static receipt site build', () => {
     expect(incrementalInventory).toEqual(
       await fileInventory(cleanOutputDirectory),
     );
+  });
+
+  it('reports post-install cleanup debt without failing publication and clears it next run', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    const previousInventory = await fileInventory(outputDirectory);
+    await writeReceipt(testReceipt({ sourceId: 'cleanup-debt-new-record' }));
+    const cleanupError = Object.assign(new Error('simulated locked backup'), {
+      code: 'EPERM',
+    });
+    mockedRm.mockImplementation(
+      async (path: PathLike, options?: RmOptions): Promise<void> => {
+        if (String(path).endsWith('.previous')) {
+          try {
+            await realFileSystem.stat(path);
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              'code' in error &&
+              error.code === 'ENOENT'
+            ) {
+              return realFileSystem.rm(path, options);
+            }
+
+            throw error;
+          }
+
+          throw cleanupError;
+        }
+
+        return realFileSystem.rm(path, options);
+      },
+    );
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+      }),
+    ).resolves.toBeUndefined();
+
+    const backupDirectory = `${outputDirectory}.previous`;
+    expect(
+      await readFile(
+        join(outputDirectory, 'search-receipt', 'index.html'),
+        'utf8',
+      ),
+    ).toContain('cleanup-debt-new-record');
+    expect(await fileInventory(backupDirectory)).toEqual(previousInventory);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('SITE_OUTPUT_CLEANUP_DEBT'),
+    );
+
+    mockedRm.mockImplementation(realFileSystem.rm);
+    warning.mockRestore();
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    await expect(readdir(backupDirectory)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(
+      await readFile(
+        join(outputDirectory, 'search-receipt', 'index.html'),
+        'utf8',
+      ),
+    ).toContain('cleanup-debt-new-record');
   });
 
   it('keeps compiler artifacts outside the real production site output', async () => {
