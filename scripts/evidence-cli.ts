@@ -347,7 +347,7 @@ export async function collectFixturePair(
   return { receipt, path };
 }
 
-async function receiptJsonFiles(directory: string): Promise<string[]> {
+async function receiptFiles(directory: string): Promise<string[]> {
   let entries: Dirent[];
 
   try {
@@ -368,8 +368,8 @@ async function receiptJsonFiles(directory: string): Promise<string[]> {
     const path = join(directory, entry.name);
 
     if (entry.isDirectory()) {
-      files.push(...(await receiptJsonFiles(path)));
-    } else if (entry.isFile() && entry.name.endsWith('.json')) {
+      files.push(...(await receiptFiles(path)));
+    } else if (entry.isFile()) {
       files.push(path);
     }
   }
@@ -380,9 +380,13 @@ async function receiptJsonFiles(directory: string): Promise<string[]> {
 export async function verifyEvidenceTree(
   evidenceDirectory: string,
 ): Promise<void> {
-  const files = await receiptJsonFiles(evidenceDirectory);
+  const files = await receiptFiles(join(evidenceDirectory, 'receipts'));
 
   for (const path of files) {
+    if (!path.endsWith('.json')) {
+      throw new Error(`Unexpected receipt filename: ${path}`);
+    }
+
     const bytes = await readFile(path);
     const receipt = JSON.parse(bytes.toString('utf8')) as Receipt;
     verifyReceipt(receipt);

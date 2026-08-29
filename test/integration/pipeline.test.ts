@@ -168,6 +168,44 @@ describe('fixture-backed evidence pipeline', () => {
     );
   });
 
+  it('ignores unrelated JSON outside the receipts tree', async () => {
+    await collectFixturePair(
+      'workflow-test-lab',
+      undefined,
+      'structured-extraction-v1.json',
+      { evidenceDirectory: testEvidenceDirectory },
+    );
+    const unrelatedPath = join(
+      testEvidenceDirectory,
+      'objects',
+      'snapshot.json',
+    );
+    await mkdir(dirname(unrelatedPath), { recursive: true });
+    await writeFile(unrelatedPath, canonicalJson({ snapshot: true }));
+
+    await expect(
+      verifyEvidenceTree(testEvidenceDirectory),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each(['txt', 'JSON'])(
+    'rejects a receipt renamed with the unexpected .%s extension',
+    async (extension) => {
+      const result = await collectFixturePair(
+        'workflow-test-lab',
+        undefined,
+        'structured-extraction-v1.json',
+        { evidenceDirectory: testEvidenceDirectory },
+      );
+      const renamedPath = result.path.replace(/\.json$/, `.${extension}`);
+      await rename(result.path, renamedPath);
+
+      await expect(verifyEvidenceTree(testEvidenceDirectory)).rejects.toThrow(
+        /filename/i,
+      );
+    },
+  );
+
   it('rejects invalid JSON found in the evidence tree', async () => {
     const invalidPath = join(
       testEvidenceDirectory,
