@@ -1,0 +1,47 @@
+name: Collect source dry-run report
+
+on:
+  schedule:
+    - cron: '17 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run bounded source collection
+        id: dry_run
+        shell: bash
+        run: |
+          set +e
+          npm run evidence -- dry-run-live
+          dry_run_exit_code=$?
+          echo "exit_code=$dry_run_exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload dry-run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-live-report
+          path: artifacts/dry-run-live-report.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve source-failure status
+        if: always()
+        shell: bash
+        env:
+          DRY_RUN_EXIT_CODE: ${{ steps.dry_run.outputs.exit_code }}
+        run: |
+          exit "${DRY_RUN_EXIT_CODE:-1}"

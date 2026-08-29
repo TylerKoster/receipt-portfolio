@@ -1,21 +1,44 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  lstat,
+  readFile,
+  readdir,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   canonicalJson,
   createReceipt,
   evaluatePublication,
+  FetchBoundaryError,
+  fetchAllowedSource,
   manifestSha256,
   sha256,
   validateManifest,
   verifyReceipt,
   type JsonValue,
+  type RawFetch,
   type Receipt,
   type SourceManifest,
 } from '../packages/evidence-core/src/index.js';
 
-const USAGE = 'Usage: evidence <collect-fixtures|verify --all>';
+const USAGE =
+  'Usage: evidence <collect-fixtures|verify --all> | evidence dry-run-live [--output <artifacts/*.json>]';
+const DEFAULT_DRY_RUN_OUTPUT = 'artifacts/dry-run-live-report.json';
 
 type NormalizedRecord = { readonly [key: string]: JsonValue };
 
@@ -440,12 +463,325 @@ async function collectDefaultFixtures(
   );
 }
 
-async function runCli(arguments_: readonly string[]): Promise<void> {
-  const evidenceDirectory = join(projectRoot(), 'evidence');
+interface DryRunSuccess {
+  readonly siteId: SourceManifest['siteId'];
+  readonly sourceId: string;
+  readonly sourceUrl: string;
+  readonly status: 'SUCCESS';
+  readonly observedAt: string;
+  readonly mediaType: string;
+  readonly responseStatus: number;
+  readonly byteCount: number;
+  readonly rawSha256: string;
+}
+
+interface DryRunFailure {
+  readonly siteId: SourceManifest['siteId'];
+  readonly sourceId: string;
+  readonly sourceUrl: string;
+  readonly status: 'FAILED';
+  readonly errorCode: string;
+  readonly message: string;
+}
+
+interface DryRunReport {
+  readonly reportType: 'LIVE_SOURCE_DRY_RUN';
+  readonly publicationAttempted: false;
+  readonly evidenceMutated: false;
+  readonly results: readonly (DryRunSuccess | DryRunFailure)[];
+}
+
+type FetchSource = (manifest: SourceManifest) => Promise<RawFetch>;
+
+export interface RunDryRunLiveOptions {
+  readonly projectDirectory?: string;
+  readonly output?: string;
+  readonly manifests?: readonly SourceManifest[];
+  readonly fetchSource?: FetchSource;
+}
+
+export interface RunDryRunLiveResult {
+  readonly exitCode: 0 | 1;
+  readonly outputPath: string;
+  readonly report: DryRunReport;
+}
+
+const SAFE_FETCH_MESSAGES: Readonly<Record<string, string>> = {
+  ENDPOINT_INVALID: 'Source endpoint must be an absolute URL',
+  ENDPOINT_HTTPS_REQUIRED: 'Source endpoint must use HTTPS',
+  ENDPOINT_USERINFO_FORBIDDEN:
+    'Source endpoint must not contain user information',
+  ENDPOINT_HOST_NOT_ALLOWED: 'Source endpoint host is not allowlisted',
+  ENDPOINT_IP_FORBIDDEN: 'Source endpoint uses a forbidden IP literal',
+  INVALID_TIMEOUT: 'Manifest timeout must be a bounded positive integer',
+  INVALID_MAX_BYTES: 'Manifest maxBytes must be a bounded positive integer',
+  REDIRECT_REJECTED: 'Source redirect was rejected',
+  FETCH_TIMEOUT: 'Source fetch exceeded the manifest timeout',
+  FETCH_FAILED: 'Source fetch failed',
+  HTTP_STATUS_REJECTED: 'Source response status was outside 200-299',
+  MEDIA_TYPE_REJECTED: 'Response media type is not configured for this source',
+  CONTENT_LENGTH_INVALID: 'Response content-length is invalid',
+  MAX_BYTES_EXCEEDED: 'Response exceeds manifest maxBytes',
+  RESPONSE_BODY_INVALID: 'Response body yielded an invalid byte chunk',
+  SOURCE_DISABLED: 'Source manifest is disabled',
+};
+
+function compareManifests(left: SourceManifest, right: SourceManifest): number {
+  return (
+    left.siteId.localeCompare(right.siteId) ||
+    left.sourceId.localeCompare(right.sourceId) ||
+    left.endpoint.localeCompare(right.endpoint)
+  );
+}
+
+async function configuredManifests(
+  projectDirectory: string,
+): Promise<readonly SourceManifest[]> {
+  const files = (await receiptFiles(join(projectDirectory, 'manifests')))
+    .filter((path) => path.endsWith('.json'))
+    .sort((left, right) => left.localeCompare(right));
+  const manifests: SourceManifest[] = [];
+
+  for (const path of files) {
+    manifests.push(validateManifest(JSON.parse(await readFile(path, 'utf8'))));
+  }
+
+  return manifests.sort(compareManifests);
+}
+
+export function resolveDryRunOutputPath(
+  projectDirectory: string,
+  output = DEFAULT_DRY_RUN_OUTPUT,
+): string {
+  if (isAbsolute(output)) {
+    throw new Error('Dry-run output path must not be absolute');
+  }
+
+  if (output.split(/[\\/]/).includes('..')) {
+    throw new Error('Dry-run output path must not contain traversal');
+  }
+
+  if (extname(output) !== '.json') {
+    throw new Error('Dry-run output must use the .json extension');
+  }
+
+  const artifactsDirectory = resolve(projectDirectory, 'artifacts');
+  const outputPath = resolve(projectDirectory, output);
+  const relativePath = relative(artifactsDirectory, outputPath);
+
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith(`..${sep}`) ||
+    relativePath === '..' ||
+    isAbsolute(relativePath)
+  ) {
+    throw new Error('Dry-run output must stay under the artifacts directory');
+  }
+
+  return outputPath;
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+async function requireRealDirectory(path: string): Promise<void> {
+  let entry;
+
+  try {
+    entry = await lstat(path);
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+
+    await mkdir(path);
+    entry = await lstat(path);
+  }
+
+  if (entry.isSymbolicLink() || !entry.isDirectory()) {
+    throw new Error('Dry-run output directory boundary must not be symbolic');
+  }
+}
+
+async function prepareOutputDirectory(
+  projectDirectory: string,
+  outputPath: string,
+): Promise<void> {
+  const artifactsDirectory = resolve(projectDirectory, 'artifacts');
+  const outputDirectory = dirname(outputPath);
+  await requireRealDirectory(artifactsDirectory);
+  const nestedPath = relative(artifactsDirectory, outputDirectory);
+  let currentPath = artifactsDirectory;
+
+  for (const segment of nestedPath.split(sep).filter(Boolean)) {
+    currentPath = join(currentPath, segment);
+    await requireRealDirectory(currentPath);
+  }
+
+  try {
+    const outputEntry = await lstat(outputPath);
+
+    if (outputEntry.isSymbolicLink() || !outputEntry.isFile()) {
+      throw new Error('Dry-run output target must be a regular file');
+    }
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function writeAtomicJson(
+  path: string,
+  value: JsonValue,
+  projectDirectory: string,
+): Promise<void> {
+  await prepareOutputDirectory(projectDirectory, path);
+  const temporaryPath = join(
+    dirname(path),
+    `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+
+  try {
+    await writeFile(temporaryPath, canonicalJson(value), {
+      encoding: 'utf8',
+      flag: 'wx',
+    });
+    await rename(temporaryPath, path);
+  } catch (error) {
+    try {
+      await unlink(temporaryPath);
+    } catch (cleanupError) {
+      if (!(
+        cleanupError instanceof Error &&
+        'code' in cleanupError &&
+        cleanupError.code === 'ENOENT'
+      )) {
+        throw cleanupError;
+      }
+    }
+
+    throw error;
+  }
+}
+
+function sanitizedFetchFailure(error: unknown): {
+  readonly errorCode: string;
+  readonly message: string;
+} {
+  if (error instanceof FetchBoundaryError) {
+    return {
+      errorCode: error.code,
+      message: SAFE_FETCH_MESSAGES[error.code] ?? 'Source fetch failed',
+    };
+  }
+
+  return { errorCode: 'FETCH_FAILED', message: 'Source fetch failed' };
+}
+
+export async function runDryRunLive(
+  options: RunDryRunLiveOptions = {},
+): Promise<RunDryRunLiveResult> {
+  const projectDirectory = options.projectDirectory ?? projectRoot();
+  const outputPath = resolveDryRunOutputPath(projectDirectory, options.output);
+  const manifests = [
+    ...(options.manifests ?? (await configuredManifests(projectDirectory))),
+  ].sort(compareManifests);
+  const fetchSource =
+    options.fetchSource ??
+    ((sourceManifest: SourceManifest) => fetchAllowedSource(sourceManifest));
+  const results: (DryRunSuccess | DryRunFailure)[] = [];
+
+  for (const manifest of manifests) {
+    if (!manifest.enabled) {
+      results.push({
+        siteId: manifest.siteId,
+        sourceId: manifest.sourceId,
+        sourceUrl: manifest.endpoint,
+        status: 'FAILED',
+        errorCode: 'SOURCE_DISABLED',
+        message: SAFE_FETCH_MESSAGES.SOURCE_DISABLED ?? 'Source is disabled',
+      });
+      continue;
+    }
+
+    try {
+      const fetched = await fetchSource(manifest);
+      results.push({
+        siteId: manifest.siteId,
+        sourceId: manifest.sourceId,
+        sourceUrl: fetched.sourceUrl,
+        status: 'SUCCESS',
+        observedAt: fetched.observedAt,
+        mediaType: fetched.mediaType,
+        responseStatus: fetched.status,
+        byteCount: fetched.byteCount,
+        rawSha256: fetched.rawSha256,
+      });
+    } catch (error) {
+      results.push({
+        siteId: manifest.siteId,
+        sourceId: manifest.sourceId,
+        sourceUrl: manifest.endpoint,
+        status: 'FAILED',
+        ...sanitizedFetchFailure(error),
+      });
+    }
+  }
+
+  const report: DryRunReport = {
+    reportType: 'LIVE_SOURCE_DRY_RUN',
+    publicationAttempted: false,
+    evidenceMutated: false,
+    results,
+  };
+  await writeAtomicJson(
+    outputPath,
+    report as unknown as JsonValue,
+    projectDirectory,
+  );
+
+  return {
+    exitCode: results.some((result) => result.status === 'FAILED') ? 1 : 0,
+    outputPath,
+    report,
+  };
+}
+
+export interface EvidenceCliDependencies {
+  readonly projectDirectory?: string;
+  readonly fetchSource?: FetchSource;
+}
+
+function dryRunOutputArgument(
+  arguments_: readonly string[],
+): string | undefined | null {
+  if (arguments_.length === 1 && arguments_[0] === 'dry-run-live') {
+    return undefined;
+  }
+
+  if (
+    arguments_.length === 3 &&
+    arguments_[0] === 'dry-run-live' &&
+    arguments_[1] === '--output'
+  ) {
+    return arguments_[2] ?? null;
+  }
+
+  return null;
+}
+
+export async function runCli(
+  arguments_: readonly string[],
+  dependencies: EvidenceCliDependencies = {},
+): Promise<0 | 1> {
+  const rootDirectory = dependencies.projectDirectory ?? projectRoot();
+  const evidenceDirectory = join(rootDirectory, 'evidence');
 
   if (arguments_.length === 1 && arguments_[0] === 'collect-fixtures') {
     await collectDefaultFixtures(evidenceDirectory);
-    return;
+    return 0;
   }
 
   if (
@@ -454,11 +790,24 @@ async function runCli(arguments_: readonly string[]): Promise<void> {
     arguments_[1] === '--all'
   ) {
     await verifyEvidenceTree(evidenceDirectory);
-    return;
+    return 0;
+  }
+
+  const output = dryRunOutputArgument(arguments_);
+
+  if (output !== null) {
+    const result = await runDryRunLive({
+      projectDirectory: rootDirectory,
+      ...(output === undefined ? {} : { output }),
+      ...(dependencies.fetchSource === undefined
+        ? {}
+        : { fetchSource: dependencies.fetchSource }),
+    });
+    return result.exitCode;
   }
 
   console.error(USAGE);
-  process.exitCode = 1;
+  return 1;
 }
 
 const invokedPath = process.argv[1];
@@ -467,8 +816,12 @@ if (
   invokedPath !== undefined &&
   pathToFileURL(resolve(invokedPath)).href === import.meta.url
 ) {
-  runCli(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  runCli(process.argv.slice(2))
+    .then((exitCode) => {
+      process.exitCode = exitCode;
+    })
+    .catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
 }
