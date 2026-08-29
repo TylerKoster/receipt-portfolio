@@ -38,6 +38,31 @@ describe('canonical evidence bytes', () => {
     ).toBe('{"alpha":true,"zebra":[{"first":1,"second":2},"last"]}');
   });
 
+  it('rejects arrays with a custom prototype', () => {
+    class PrototypeBearingArray extends Array<number> {}
+
+    expect(() => canonicalJson(new PrototypeBearingArray(1, 2))).toThrow(
+      /array prototype/i,
+    );
+  });
+
+  it('rejects arrays with a non-enumerable non-index property', () => {
+    const array = [1, 2];
+    Object.defineProperty(array, 'hidden', {
+      value: true,
+      enumerable: false,
+    });
+
+    expect(() => canonicalJson(array)).toThrow(/array properties/i);
+  });
+
+  it('rejects sparse arrays', () => {
+    const sparse = new Array<number>(2);
+    sparse[1] = 2;
+
+    expect(() => canonicalJson(sparse)).toThrow(/array properties/i);
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
     'rejects the non-finite canonical JSON value %s',
     (value) => {

@@ -46,14 +46,29 @@ function serialize(value: unknown, ancestors: Set<object>): string {
   try {
     if (Array.isArray(value)) {
       const entries: string[] = [];
-      const enumerableKeys = Object.keys(value);
+
+      if (Object.getPrototypeOf(value) !== Array.prototype) {
+        throw new Error(
+          'Canonical JSON array prototype must be Array.prototype',
+        );
+      }
+
+      const expectedProperties = new Set<string>(['length']);
+
+      for (let index = 0; index < value.length; index += 1) {
+        expectedProperties.add(String(index));
+      }
+
+      const ownPropertyNames = Object.getOwnPropertyNames(value);
 
       if (
-        enumerableKeys.length !== value.length ||
-        enumerableKeys.some((key, index) => key !== String(index)) ||
+        ownPropertyNames.length !== expectedProperties.size ||
+        ownPropertyNames.some((name) => !expectedProperties.has(name)) ||
         Object.getOwnPropertySymbols(value).length > 0
       ) {
-        return unsupported('array holes or non-index properties');
+        return unsupported(
+          'array properties must be length and ordered numeric indices',
+        );
       }
 
       for (let index = 0; index < value.length; index += 1) {
