@@ -10,9 +10,31 @@ export const SourceManifestSchema = z
     endpoint: z
       .string()
       .url()
-      .refine((value) => new URL(value).protocol === 'https:', {
-        message: 'endpoint must use HTTPS',
-      }),
+      .refine(
+        (value) => {
+          try {
+            return new URL(value).protocol === 'https:';
+          } catch {
+            return false;
+          }
+        },
+        {
+          message: 'endpoint must use HTTPS',
+        },
+      )
+      .refine(
+        (value) => {
+          try {
+            const endpoint = new URL(value);
+            return (
+              endpoint.username.length === 0 && endpoint.password.length === 0
+            );
+          } catch {
+            return false;
+          }
+        },
+        { message: 'endpoint must not contain user information' },
+      ),
     allowedHosts: z.array(z.string().min(1)).min(1),
     maxBytes: z.number().int().positive().max(5_000_000),
     timeoutMs: z.number().int().min(100).max(30_000),

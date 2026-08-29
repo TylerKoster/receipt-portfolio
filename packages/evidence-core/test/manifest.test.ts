@@ -49,6 +49,20 @@ describe('source manifests', () => {
     ).toThrow(/allowedHosts/i);
   });
 
+  it.each([true, false])(
+    'rejects endpoint user information when enabled is %s',
+    (enabled) => {
+      expect(() =>
+        validateManifest({
+          ...validManifest,
+          endpoint:
+            'https://review-user:review-password@example.invalid/status.json',
+          enabled,
+        }),
+      ).toThrow(/user information/i);
+    },
+  );
+
   it('creates a stable digest regardless of object key order', () => {
     expect(manifestSha256(validManifest)).toBe(
       manifestSha256({ ...validManifest }),

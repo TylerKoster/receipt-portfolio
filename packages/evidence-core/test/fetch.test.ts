@@ -12,6 +12,7 @@ import {
 import type { SourceManifest } from '../src/index.js';
 import {
   resolveDryRunOutputPath,
+  runCli,
   runDryRunLive,
 } from '../../../scripts/evidence-cli.js';
 
@@ -84,6 +85,24 @@ function streamingResponse(
   );
 }
 
+function nonClosingResponse(options: {
+  readonly contentType?: string;
+  readonly contentLength?: string;
+  readonly status?: number;
+}): { readonly response: Response; readonly wasCanceled: () => boolean } {
+  let canceled = false;
+  const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      canceled = true;
+    },
+  });
+
+  return {
+    response: responseOf(body, options),
+    wasCanceled: () => canceled,
+  };
+}
+
 function successfulRawFetch(
   sourceManifest: SourceManifest,
   bytes: Uint8Array,
@@ -144,6 +163,48 @@ describe('bounded public-source fetch', () => {
     ).rejects.toMatchObject({ code });
   });
 
+  it.each([
+    ['private IPv4', 'https://10.0.0.1/status.json', '10.0.0.1'],
+    ['carrier-grade NAT IPv4', 'https://100.64.0.1/status.json', '100.64.0.1'],
+    ['link-local IPv4', 'https://169.254.1.1/status.json', '169.254.1.1'],
+    ['documentation IPv4', 'https://192.0.2.1/status.json', '192.0.2.1'],
+    ['multicast IPv4', 'https://224.0.0.1/status.json', '224.0.0.1'],
+    ['IPv6 loopback', 'https://[::1]/status.json', '[::1]'],
+    ['IPv6 unique-local', 'https://[fd00::1]/status.json', '[fd00::1]'],
+    ['IPv6 link-local', 'https://[fe80::1]/status.json', '[fe80::1]'],
+    [
+      'IPv4-mapped IPv6 loopback',
+      'https://[::ffff:127.0.0.1]/status.json',
+      '[::ffff:7f00:1]',
+    ],
+    [
+      'integer-form IPv4 loopback normalized by URL',
+      'https://2130706433/status.json',
+      '127.0.0.1',
+    ],
+  ])('rejects %s literal address', async (_name, endpoint, allowedHost) => {
+    await expect(
+      fetchAllowedSource(manifest({ endpoint, allowedHosts: [allowedHost] }), {
+        fetchImplementation: async () => {
+          throw new Error('NETWORK_SHOULD_NOT_BE_CALLED');
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'ENDPOINT_IP_FORBIDDEN' });
+  });
+
+  it.each([
+    ['an unlisted explicit port', 'https://example.invalid:8443/status.json'],
+    ['an unlisted trailing-dot host', 'https://example.invalid./status.json'],
+  ])('rejects %s as a distinct host boundary', async (_name, endpoint) => {
+    await expect(
+      fetchAllowedSource(manifest({ endpoint }), {
+        fetchImplementation: async () => {
+          throw new Error('NETWORK_SHOULD_NOT_BE_CALLED');
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'ENDPOINT_HOST_NOT_ALLOWED' });
+  });
+
   it('rejects a redirect response instead of following it', async () => {
     await expect(
       fetchAllowedSource(baseManifest, {
@@ -152,6 +213,102 @@ describe('bounded public-source fetch', () => {
         ),
       }),
     ).rejects.toMatchObject({ code: 'REDIRECT_REJECTED' });
+  });
+
+  it.each([
+    [
+      'redirect',
+      { status: 302, contentType: 'application/json' },
+      'REDIRECT_REJECTED',
+    ],
+    [
+      'non-success status',
+      { status: 503, contentType: 'application/json' },
+      'HTTP_STATUS_REJECTED',
+    ],
+    [
+      'mismatched media type',
+      { status: 200, contentType: 'text/html' },
+      'MEDIA_TYPE_REJECTED',
+    ],
+    [
+      'invalid content length',
+      {
+        status: 200,
+        contentType: 'application/json',
+        contentLength: 'invalid',
+      },
+      'CONTENT_LENGTH_INVALID',
+    ],
+    [
+      'declared oversized body',
+      {
+        status: 200,
+        contentType: 'application/json',
+        contentLength: '17',
+      },
+      'MAX_BYTES_EXCEEDED',
+    ],
+  ] as const)(
+    'releases the response and timer after %s rejection',
+    async (_name, responseOptions, errorCode) => {
+      vi.useFakeTimers();
+      const controlled = nonClosingResponse(responseOptions);
+      let requestSignal: AbortSignal | null | undefined;
+      const fetchImplementation: FetchImplementation = async (_input, init) => {
+        requestSignal = init?.signal;
+        return controlled.response;
+      };
+
+      await expect(
+        fetchAllowedSource(baseManifest, { fetchImplementation }),
+      ).rejects.toMatchObject({ code: errorCode });
+
+      expect(requestSignal?.aborted).toBe(true);
+      expect(controlled.wasCanceled()).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('does not await a non-settling response cancellation hook', async () => {
+    let canceled = false;
+    let requestSignal: AbortSignal | null | undefined;
+    const response = responseOf(
+      new ReadableStream<Uint8Array>({
+        cancel() {
+          canceled = true;
+          return new Promise<void>(() => undefined);
+        },
+      }),
+      { status: 503, contentType: 'application/json' },
+    );
+    const fetchImplementation: FetchImplementation = async (_input, init) => {
+      requestSignal = init?.signal;
+      return response;
+    };
+    const fetchResult = fetchAllowedSource(baseManifest, {
+      fetchImplementation,
+    }).then(
+      () => ({ settled: true, code: 'UNEXPECTED_SUCCESS' }),
+      (error: unknown) => ({
+        settled: true,
+        code:
+          error instanceof FetchBoundaryError ? error.code : 'UNKNOWN_ERROR',
+      }),
+    );
+    const result = await Promise.race([
+      fetchResult,
+      new Promise<{ readonly settled: false; readonly code: 'STILL_PENDING' }>(
+        (resolvePending) =>
+          setImmediate(() =>
+            resolvePending({ settled: false, code: 'STILL_PENDING' }),
+          ),
+      ),
+    ]);
+
+    expect(result).toEqual({ settled: true, code: 'HTTP_STATUS_REJECTED' });
+    expect(canceled).toBe(true);
+    expect(requestSignal?.aborted).toBe(true);
   });
 
   it('requires a bounded positive timeout', async () => {
@@ -168,6 +325,23 @@ describe('bounded public-source fetch', () => {
           ),
         }),
       ).rejects.toMatchObject({ code: 'INVALID_TIMEOUT' });
+    }
+  });
+
+  it('requires a bounded positive maxBytes value', async () => {
+    for (const maxBytes of [undefined, 0, 5_000_001, Number.NaN]) {
+      const sourceManifest = {
+        ...baseManifest,
+        maxBytes,
+      } as unknown as SourceManifest;
+
+      await expect(
+        fetchAllowedSource(sourceManifest, {
+          fetchImplementation: fetchReturning(
+            responseOf('abc', { contentType: 'application/json' }),
+          ),
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_MAX_BYTES' });
     }
   });
 
@@ -214,6 +388,22 @@ describe('bounded public-source fetch', () => {
     ).rejects.toMatchObject({ code: 'HTTP_STATUS_REJECTED' });
   });
 
+  it.each(['-1', '1.5', '9007199254740992'])(
+    'rejects malformed or overflowing content-length %s',
+    async (contentLength) => {
+      await expect(
+        fetchAllowedSource(baseManifest, {
+          fetchImplementation: fetchReturning(
+            responseOf('abc', {
+              contentLength,
+              contentType: 'application/json',
+            }),
+          ),
+        }),
+      ).rejects.toMatchObject({ code: 'CONTENT_LENGTH_INVALID' });
+    },
+  );
+
   it.each(['application/octet-stream', 'text/html', undefined])(
     'rejects unsafe or mismatched media type %s',
     async (contentType) => {
@@ -253,6 +443,29 @@ describe('bounded public-source fetch', () => {
     ).rejects.toMatchObject({ code: 'MAX_BYTES_EXCEEDED' });
   });
 
+  it('aborts and clears the timer when response streaming fails', async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | null | undefined;
+    const response = responseOf(
+      new ReadableStream<Uint8Array>({
+        pull() {
+          throw new Error('stream failure');
+        },
+      }),
+      { contentType: 'application/json' },
+    );
+    const fetchImplementation: FetchImplementation = async (_input, init) => {
+      requestSignal = init?.signal;
+      return response;
+    };
+
+    await expect(
+      fetchAllowedSource(baseManifest, { fetchImplementation }),
+    ).rejects.toMatchObject({ code: 'FETCH_FAILED' });
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('returns bounded raw bytes and literal digest metadata without parsing', async () => {
     const fetchImplementation: FetchImplementation = async (_input, init) => {
       if (init?.redirect !== 'error' || init.signal === undefined) {
@@ -287,6 +500,150 @@ describe('bounded public-source fetch', () => {
 });
 
 describe('live dry-run report', () => {
+  it('quarantines enabled and disabled credential-bearing manifests without retaining credentials', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const manifestDirectory = join(
+      projectDirectory,
+      'manifests',
+      'search-receipt',
+    );
+    await mkdir(manifestDirectory, { recursive: true });
+    const credentialEndpoint =
+      'https://review-user:review-password@example.invalid/status.json';
+    await writeFile(
+      join(manifestDirectory, '00-enabled-userinfo.json'),
+      JSON.stringify(
+        manifest({
+          sourceId: 'enabled-userinfo',
+          endpoint: credentialEndpoint,
+          enabled: true,
+        }),
+      ),
+      'utf8',
+    );
+    await writeFile(
+      join(manifestDirectory, '01-disabled-userinfo.json'),
+      JSON.stringify(
+        manifest({
+          sourceId: 'disabled-userinfo',
+          endpoint: credentialEndpoint,
+          enabled: false,
+        }),
+      ),
+      'utf8',
+    );
+
+    const exitCode = await runCli(['dry-run-live'], {
+      projectDirectory,
+      fetchSource: async () => {
+        throw new Error('credential-bearing manifest reached fetch');
+      },
+    });
+    const reportBytes = await readFile(
+      join(projectDirectory, 'artifacts', 'dry-run-live-report.json'),
+      'utf8',
+    );
+    const report = JSON.parse(reportBytes) as {
+      readonly results: readonly Record<string, unknown>[];
+    };
+
+    expect(exitCode).toBe(1);
+    expect(report.results).toEqual([
+      {
+        errorCode: 'MANIFEST_SCHEMA_INVALID',
+        manifestId: 'manifests/search-receipt/00-enabled-userinfo.json',
+        message: 'Manifest schema is invalid',
+        status: 'FAILED',
+      },
+      {
+        errorCode: 'MANIFEST_SCHEMA_INVALID',
+        manifestId: 'manifests/search-receipt/01-disabled-userinfo.json',
+        message: 'Manifest schema is invalid',
+        status: 'FAILED',
+      },
+    ]);
+    expect(reportBytes).not.toContain('review-user');
+    expect(reportBytes).not.toContain('review-password');
+    expect(reportBytes).not.toContain(credentialEndpoint);
+  });
+
+  it('quarantines invalid manifest files while observing valid sources', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const manifestDirectory = join(
+      projectDirectory,
+      'manifests',
+      'search-receipt',
+    );
+    await mkdir(manifestDirectory, { recursive: true });
+    await writeFile(
+      join(manifestDirectory, '00-valid.json'),
+      JSON.stringify(manifest({ sourceId: 'valid-source' })),
+      'utf8',
+    );
+    await writeFile(
+      join(manifestDirectory, '01-malformed.json'),
+      '{"sourceId":"malformed-source",',
+      'utf8',
+    );
+    await writeFile(
+      join(manifestDirectory, '02-schema-invalid.json'),
+      JSON.stringify(manifest({ sourceId: 'INVALID SOURCE' })),
+      'utf8',
+    );
+
+    const exitCode = await runCli(
+      ['dry-run-live', '--output', 'artifacts/mixed-manifest-report.json'],
+      {
+        projectDirectory,
+        fetchSource: async (sourceManifest) =>
+          successfulRawFetch(sourceManifest, new TextEncoder().encode('abc')),
+      },
+    );
+    const reportPath = join(
+      projectDirectory,
+      'artifacts',
+      'mixed-manifest-report.json',
+    );
+    const reportBytes = await readFile(reportPath, 'utf8');
+    const report = JSON.parse(reportBytes) as {
+      readonly results: readonly Record<string, unknown>[];
+    };
+
+    expect(exitCode).toBe(1);
+    expect(report.results).toEqual([
+      {
+        byteCount: 3,
+        manifestId: 'manifests/search-receipt/00-valid.json',
+        mediaType: 'application/json',
+        observedAt: '2026-08-29T18:00:00.000Z',
+        rawSha256:
+          'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+        responseStatus: 200,
+        siteId: 'search-receipt',
+        sourceId: 'valid-source',
+        sourceUrl: 'https://example.invalid/status.json',
+        status: 'SUCCESS',
+      },
+      {
+        errorCode: 'MANIFEST_JSON_INVALID',
+        manifestId: 'manifests/search-receipt/01-malformed.json',
+        message: 'Manifest JSON is invalid',
+        status: 'FAILED',
+      },
+      {
+        errorCode: 'MANIFEST_SCHEMA_INVALID',
+        manifestId: 'manifests/search-receipt/02-schema-invalid.json',
+        message: 'Manifest schema is invalid',
+        status: 'FAILED',
+      },
+    ]);
+    expect(await readdir(join(projectDirectory, 'artifacts'))).toEqual([
+      'mixed-manifest-report.json',
+    ]);
+  });
+
   it('continues after failure, sorts results, omits bodies, and changes no evidence bytes', async () => {
     const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
     temporaryDirectories.push(projectDirectory);
@@ -397,6 +754,57 @@ describe('live dry-run report', () => {
       }),
     ).rejects.toThrow(/symbolic|junction|directory boundary/i);
     expect(await readdir(evidenceDirectory)).toEqual([]);
+  });
+
+  it('refuses a nested artifacts directory that redirects writes into evidence', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const evidenceDirectory = join(projectDirectory, 'evidence');
+    await mkdir(evidenceDirectory);
+    await mkdir(join(projectDirectory, 'artifacts'));
+    await symlink(
+      evidenceDirectory,
+      join(projectDirectory, 'artifacts', 'nested'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(
+      runDryRunLive({
+        projectDirectory,
+        output: 'artifacts/nested/report.json',
+        manifests: [baseManifest],
+        fetchSource: async (sourceManifest) =>
+          successfulRawFetch(sourceManifest, new TextEncoder().encode('abc')),
+      }),
+    ).rejects.toThrow(/symbolic|junction|directory boundary/i);
+    expect(await readdir(evidenceDirectory)).toEqual([]);
+  });
+
+  it('refuses an existing linked output target without changing its referent', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    const artifactsDirectory = join(projectDirectory, 'artifacts');
+    const evidenceDirectory = join(projectDirectory, 'evidence');
+    const evidencePath = join(evidenceDirectory, 'sentinel.json');
+    await mkdir(artifactsDirectory);
+    await mkdir(evidenceDirectory);
+    await writeFile(evidencePath, '{"unchanged":true}', 'utf8');
+    await symlink(
+      evidenceDirectory,
+      join(artifactsDirectory, 'report.json'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(
+      runDryRunLive({
+        projectDirectory,
+        output: 'artifacts/report.json',
+        manifests: [baseManifest],
+        fetchSource: async (sourceManifest) =>
+          successfulRawFetch(sourceManifest, new TextEncoder().encode('abc')),
+      }),
+    ).rejects.toThrow(/regular file/i);
+    expect(await readFile(evidencePath, 'utf8')).toBe('{"unchanged":true}');
   });
 
   it('preserves a bounded fetch error code without retaining arbitrary data', async () => {

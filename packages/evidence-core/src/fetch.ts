@@ -321,32 +321,42 @@ async function readBoundedBody(
   const chunks: Uint8Array[] = [];
   let byteCount = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
 
-    if (done) {
-      break;
+      if (done) {
+        break;
+      }
+
+      if (!(value instanceof Uint8Array)) {
+        throw new FetchBoundaryError(
+          'RESPONSE_BODY_INVALID',
+          'Response body yielded an invalid byte chunk',
+        );
+      }
+
+      byteCount += value.byteLength;
+
+      if (byteCount > maxBytes) {
+        throw new FetchBoundaryError(
+          'MAX_BYTES_EXCEEDED',
+          'Response exceeds manifest maxBytes',
+        );
+      }
+
+      chunks.push(value.slice());
+    }
+  } catch (error) {
+    try {
+      void reader.cancel().catch(() => undefined);
+    } catch {
+      // The original bounded-fetch classification remains authoritative.
     }
 
-    if (!(value instanceof Uint8Array)) {
-      await reader.cancel();
-      throw new FetchBoundaryError(
-        'RESPONSE_BODY_INVALID',
-        'Response body yielded an invalid byte chunk',
-      );
-    }
-
-    byteCount += value.byteLength;
-
-    if (byteCount > maxBytes) {
-      await reader.cancel();
-      throw new FetchBoundaryError(
-        'MAX_BYTES_EXCEEDED',
-        'Response exceeds manifest maxBytes',
-      );
-    }
-
-    chunks.push(value.slice());
+    throw error;
+  } finally {
+    reader.releaseLock();
   }
 
   const bytes = new Uint8Array(byteCount);
@@ -358,6 +368,23 @@ async function readBoundedBody(
   }
 
   return bytes;
+}
+
+function abortAndCancelResponse(
+  controller: AbortController,
+  response: Response | undefined,
+): void {
+  controller.abort();
+
+  if (response?.body === null || response?.body.locked === true) {
+    return;
+  }
+
+  try {
+    void response?.body?.cancel().catch(() => undefined);
+  } catch {
+    // Cleanup cannot replace the original sanitized fetch classification.
+  }
 }
 
 function isRedirectFailure(error: unknown): boolean {
@@ -379,10 +406,9 @@ export async function fetchAllowedSource(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), manifest.timeoutMs);
   const fetchImplementation = options.fetchImplementation ?? globalThis.fetch;
+  let response: Response | undefined;
 
   try {
-    let response: Response;
-
     try {
       response = await fetchImplementation(endpoint, {
         cache: 'no-store',
@@ -405,6 +431,13 @@ export async function fetchAllowedSource(
       }
 
       throw new FetchBoundaryError('FETCH_FAILED', 'Source fetch failed');
+    }
+
+    if (controller.signal.aborted) {
+      throw new FetchBoundaryError(
+        'FETCH_TIMEOUT',
+        'Source fetch exceeded the manifest timeout',
+      );
     }
 
     if (response.status >= 300 && response.status <= 399) {
@@ -436,11 +469,14 @@ export async function fetchAllowedSource(
       bytes,
     };
   } catch (error) {
+    const timedOut = controller.signal.aborted;
+    abortAndCancelResponse(controller, response);
+
     if (error instanceof FetchBoundaryError) {
       throw error;
     }
 
-    if (controller.signal.aborted) {
+    if (timedOut) {
       throw new FetchBoundaryError(
         'FETCH_TIMEOUT',
         'Source fetch exceeded the manifest timeout',

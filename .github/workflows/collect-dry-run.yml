@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   collect-dry-run:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

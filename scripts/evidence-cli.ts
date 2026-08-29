@@ -464,6 +464,7 @@ async function collectDefaultFixtures(
 }
 
 interface DryRunSuccess {
+  readonly manifestId: string;
   readonly siteId: SourceManifest['siteId'];
   readonly sourceId: string;
   readonly sourceUrl: string;
@@ -475,7 +476,8 @@ interface DryRunSuccess {
   readonly rawSha256: string;
 }
 
-interface DryRunFailure {
+interface DryRunSourceFailure {
+  readonly manifestId: string;
   readonly siteId: SourceManifest['siteId'];
   readonly sourceId: string;
   readonly sourceUrl: string;
@@ -484,11 +486,23 @@ interface DryRunFailure {
   readonly message: string;
 }
 
+interface DryRunManifestFailure {
+  readonly manifestId: string;
+  readonly status: 'FAILED';
+  readonly errorCode:
+    | 'MANIFEST_READ_FAILED'
+    | 'MANIFEST_JSON_INVALID'
+    | 'MANIFEST_SCHEMA_INVALID';
+  readonly message: string;
+}
+
+type DryRunResult = DryRunSuccess | DryRunSourceFailure | DryRunManifestFailure;
+
 interface DryRunReport {
   readonly reportType: 'LIVE_SOURCE_DRY_RUN';
   readonly publicationAttempted: false;
   readonly evidenceMutated: false;
-  readonly results: readonly (DryRunSuccess | DryRunFailure)[];
+  readonly results: readonly DryRunResult[];
 }
 
 type FetchSource = (manifest: SourceManifest) => Promise<RawFetch>;
@@ -526,27 +540,101 @@ const SAFE_FETCH_MESSAGES: Readonly<Record<string, string>> = {
   SOURCE_DISABLED: 'Source manifest is disabled',
 };
 
-function compareManifests(left: SourceManifest, right: SourceManifest): number {
-  return (
-    left.siteId.localeCompare(right.siteId) ||
-    left.sourceId.localeCompare(right.sourceId) ||
-    left.endpoint.localeCompare(right.endpoint)
-  );
+interface ValidManifestCandidate {
+  readonly kind: 'VALID';
+  readonly manifestId: string;
+  readonly manifest: SourceManifest;
 }
 
-async function configuredManifests(
+interface InvalidManifestCandidate {
+  readonly kind: 'INVALID';
+  readonly manifestId: string;
+  readonly errorCode: DryRunManifestFailure['errorCode'];
+  readonly message: string;
+}
+
+type ManifestCandidate = ValidManifestCandidate | InvalidManifestCandidate;
+
+function manifestIdentifier(projectDirectory: string, path: string): string {
+  return relative(projectDirectory, path).split(sep).join('/');
+}
+
+function injectedManifestCandidate(
+  manifest: SourceManifest,
+  index: number,
+): ManifestCandidate {
+  try {
+    const validated = validateManifest(manifest);
+    return {
+      kind: 'VALID',
+      manifestId: `manifests/${validated.siteId}/${validated.sourceId}.json`,
+      manifest: validated,
+    };
+  } catch {
+    return {
+      kind: 'INVALID',
+      manifestId: `provided-manifests/${String(index).padStart(3, '0')}.json`,
+      errorCode: 'MANIFEST_SCHEMA_INVALID',
+      message: 'Manifest schema is invalid',
+    };
+  }
+}
+
+async function configuredManifestCandidates(
   projectDirectory: string,
-): Promise<readonly SourceManifest[]> {
+): Promise<readonly ManifestCandidate[]> {
   const files = (await receiptFiles(join(projectDirectory, 'manifests')))
     .filter((path) => path.endsWith('.json'))
     .sort((left, right) => left.localeCompare(right));
-  const manifests: SourceManifest[] = [];
+  const candidates: ManifestCandidate[] = [];
 
   for (const path of files) {
-    manifests.push(validateManifest(JSON.parse(await readFile(path, 'utf8'))));
+    const manifestId = manifestIdentifier(projectDirectory, path);
+    let bytes: string;
+
+    try {
+      bytes = await readFile(path, 'utf8');
+    } catch {
+      candidates.push({
+        kind: 'INVALID',
+        manifestId,
+        errorCode: 'MANIFEST_READ_FAILED',
+        message: 'Manifest file could not be read',
+      });
+      continue;
+    }
+
+    let input: unknown;
+
+    try {
+      input = JSON.parse(bytes);
+    } catch {
+      candidates.push({
+        kind: 'INVALID',
+        manifestId,
+        errorCode: 'MANIFEST_JSON_INVALID',
+        message: 'Manifest JSON is invalid',
+      });
+      continue;
+    }
+
+    try {
+      candidates.push({
+        kind: 'VALID',
+        manifestId,
+        manifest: validateManifest(input),
+      });
+    } catch {
+      candidates.push({
+        kind: 'INVALID',
+        manifestId,
+        errorCode: 'MANIFEST_SCHEMA_INVALID',
+        message: 'Manifest schema is invalid',
+      });
+    }
   }
 
-  return manifests.sort(compareManifests);
+  return candidates;
 }
 
 export function resolveDryRunOutputPath(
@@ -685,20 +773,36 @@ export async function runDryRunLive(
 ): Promise<RunDryRunLiveResult> {
   const projectDirectory = options.projectDirectory ?? projectRoot();
   const outputPath = resolveDryRunOutputPath(projectDirectory, options.output);
-  const manifests = [
-    ...(options.manifests ?? (await configuredManifests(projectDirectory))),
-  ].sort(compareManifests);
+  const candidates = [
+    ...(options.manifests === undefined
+      ? await configuredManifestCandidates(projectDirectory)
+      : options.manifests.map(injectedManifestCandidate)),
+  ].sort((left, right) => left.manifestId.localeCompare(right.manifestId));
   const fetchSource =
     options.fetchSource ??
     ((sourceManifest: SourceManifest) => fetchAllowedSource(sourceManifest));
-  const results: (DryRunSuccess | DryRunFailure)[] = [];
+  const results: DryRunResult[] = [];
 
-  for (const manifest of manifests) {
+  for (const candidate of candidates) {
+    if (candidate.kind === 'INVALID') {
+      results.push({
+        manifestId: candidate.manifestId,
+        status: 'FAILED',
+        errorCode: candidate.errorCode,
+        message: candidate.message,
+      });
+      continue;
+    }
+
+    const { manifest, manifestId } = candidate;
+    const sourceUrl = manifest.endpoint;
+
     if (!manifest.enabled) {
       results.push({
+        manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl: manifest.endpoint,
+        sourceUrl,
         status: 'FAILED',
         errorCode: 'SOURCE_DISABLED',
         message: SAFE_FETCH_MESSAGES.SOURCE_DISABLED ?? 'Source is disabled',
@@ -709,9 +813,10 @@ export async function runDryRunLive(
     try {
       const fetched = await fetchSource(manifest);
       results.push({
+        manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl: fetched.sourceUrl,
+        sourceUrl,
         status: 'SUCCESS',
         observedAt: fetched.observedAt,
         mediaType: fetched.mediaType,
@@ -721,9 +826,10 @@ export async function runDryRunLive(
       });
     } catch (error) {
       results.push({
+        manifestId,
         siteId: manifest.siteId,
         sourceId: manifest.sourceId,
-        sourceUrl: manifest.endpoint,
+        sourceUrl,
         status: 'FAILED',
         ...sanitizedFetchFailure(error),
       });
