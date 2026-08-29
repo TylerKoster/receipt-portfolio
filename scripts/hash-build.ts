@@ -8,6 +8,7 @@ const PUBLIC_SITE_ROOTS = [
   'skill-ledger',
   'workflow-test-lab',
 ] as const;
+const ROOT_SHELL_FILES = ['index.html', 'portfolio.css'] as const;
 const FIXED_SITE_FILES = [
   'index.html',
   'methodology/index.html',
@@ -70,22 +71,33 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
     if (entry.isSymbolicLink()) {
       throw new Error(`Public output root must not be symbolic: ${entry.name}`);
     }
-    if (
-      !entry.isDirectory() ||
-      !PUBLIC_SITE_ROOTS.includes(
+    const allowedProductDirectory =
+      entry.isDirectory() &&
+      PUBLIC_SITE_ROOTS.includes(
         entry.name as (typeof PUBLIC_SITE_ROOTS)[number],
-      )
-    ) {
+      );
+    const allowedRootFile =
+      entry.isFile() &&
+      ROOT_SHELL_FILES.includes(
+        entry.name as (typeof ROOT_SHELL_FILES)[number],
+      );
+    if (!allowedProductDirectory && !allowedRootFile) {
       throw new Error(`Unexpected public output root: ${entry.name}`);
     }
   }
-  if (roots.length !== PUBLIC_SITE_ROOTS.length) {
+  const productDirectories = roots.filter((entry) => entry.isDirectory());
+  if (productDirectories.length !== PUBLIC_SITE_ROOTS.length) {
     throw new Error(
       'Incomplete public output: expected exactly three site roots',
     );
   }
+  for (const rootFile of ROOT_SHELL_FILES) {
+    if (!roots.some((entry) => entry.isFile() && entry.name === rootFile)) {
+      throw new Error(`Incomplete public output: missing ${rootFile}`);
+    }
+  }
 
-  const files: string[] = [];
+  const files = ROOT_SHELL_FILES.map((path) => join(outputDirectory, path));
   async function visit(siteRoot: string, directory: string): Promise<void> {
     await requireRealDirectory(directory, `Public ${siteRoot} directory`);
     for (const entry of await readdir(directory, { withFileTypes: true })) {

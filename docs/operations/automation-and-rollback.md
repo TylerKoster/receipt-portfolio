@@ -17,7 +17,7 @@ that GitHub Actions ran, that a hosting provider received a build, or that a
 public site is available. Those systems require their own run records and
 provider evidence.
 
-The repository defines two GitHub Actions workflows:
+The repository defines three GitHub Actions workflows:
 
 - `.github/workflows/verify.yml` runs on pushes and pull requests. It installs
   locked dependencies, runs static and formatting checks plus the full and
@@ -29,6 +29,13 @@ The repository defines two GitHub Actions workflows:
   sanitized report even when a source fails, restores the failure status, and
   has read-only contents permission. It does not commit, push, deploy, or change
   evidence.
+- `.github/workflows/deploy-pages.yml` is the separate production adapter. It
+  runs only on a push to `main` or manual dispatch, repeats the locked install,
+  static check, full test, controlled collection, exact verification, mutation,
+  production-base build, and build-manifest gates, then uploads only
+  `dist/sites/`. Its build job is read-only; its dependent deploy job receives
+  only the GitHub Pages and identity permissions required to deploy the
+  artifact.
 
 ## Collection boundary
 
@@ -49,9 +56,18 @@ and finishes with a failure status if any runnable source failed.
 
 Automated public output may come only from locally verified, append-only
 receipts that pass the evidence and publication gates. Hosting is a separate
-release path and is not part of scheduled collection. The current external
-prerequisite is human setup and verification of the intended host and account;
-until that exists, the repository has no deployment path or credential.
+release path and is not part of scheduled collection. The Pages workflow is a
+code-level adapter, not proof that its host, repository settings, workflow run,
+artifact, deployment, or public response has been verified.
+
+The planned production paths are:
+
+- `https://tylerkoster.github.io/receipt-portfolio/search-receipt/`;
+- `https://tylerkoster.github.io/receipt-portfolio/workflow-test-lab/`;
+- `https://tylerkoster.github.io/receipt-portfolio/skill-ledger/`.
+
+They remain pending until an authorized push and independent hosted
+verification produce provider and public-response evidence.
 
 ## Failure containment
 
@@ -99,8 +115,9 @@ review and controller validation authorize tagging.
 
 ## External hosting prerequisite
 
-No hosting provider, deployment remote, account, or deployment credential is
-configured in this repository. Human selection and verification of the host,
-account, remote, least-privilege credential, and rollback mechanism are required
-before any static deployment may be attempted. Local builds, Codex heartbeats,
-and GitHub verification do not satisfy that prerequisite.
+The GitHub Pages artifact workflow is prepared, but this task did not create or
+configure a GitHub repository, enable Pages, push `main`, call the Pages API, or
+observe a deployment. Independent review and controller validation must approve
+those external actions and the rollback mechanism first. Local builds, Codex
+heartbeats, workflow source checks, and GitHub verification do not satisfy
+hosted verification.

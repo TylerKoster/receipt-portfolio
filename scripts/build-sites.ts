@@ -28,7 +28,10 @@ import {
 } from '../packages/evidence-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
 import {
+  DEFAULT_PUBLIC_BASE_URL,
+  normalizePublicBaseUrl,
   renderMethodology,
+  renderPortfolioHub,
   renderReceiptDetail,
   renderRobots,
   renderSite,
@@ -49,6 +52,7 @@ const CLEANUP_RETRY_DELAYS_MS = [25, 100] as const;
 const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 const BACKUP_OWNER = 'receipt-portfolio-static-site-builder';
 const BACKUP_FORMAT_VERSION = 2;
+export const PUBLIC_BASE_URL_ENV = 'RECEIPT_PORTFOLIO_BASE_URL';
 
 function projectRoot(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
@@ -305,7 +309,16 @@ async function verifyOwnedStaging(
 async function writeSiteTree(
   outputDirectory: string,
   receipts: readonly Receipt[],
+  publicBaseUrl: string,
 ): Promise<void> {
+  await copyFile(
+    join(projectRoot(), 'sites', 'shared', 'styles.css'),
+    join(outputDirectory, 'portfolio.css'),
+  );
+  await writeFile(
+    join(outputDirectory, 'index.html'),
+    renderPortfolioHub(publicBaseUrl),
+  );
   for (const site of SITE_DEFINITIONS) {
     const directory = join(outputDirectory, site.siteId);
     const visible = receipts.filter(
@@ -324,27 +337,33 @@ async function writeSiteTree(
       join(projectRoot(), 'sites', 'shared', 'styles.css'),
       join(directory, 'styles.css'),
     );
-    await writeFile(join(directory, 'index.html'), renderSite(site, visible));
+    await writeFile(
+      join(directory, 'index.html'),
+      renderSite(site, visible, publicBaseUrl),
+    );
     await writeFile(
       join(directory, 'methodology', 'index.html'),
-      renderMethodology(site),
+      renderMethodology(site, publicBaseUrl),
     );
     await writeFile(
       join(directory, 'sources', 'index.html'),
-      renderSources(site, visible),
+      renderSources(site, visible, publicBaseUrl),
     );
     await writeFile(
       join(directory, 'sitemap.xml'),
-      renderSitemap(site, visible),
+      renderSitemap(site, visible, publicBaseUrl),
     );
-    await writeFile(join(directory, 'robots.txt'), renderRobots(site));
+    await writeFile(
+      join(directory, 'robots.txt'),
+      renderRobots(site, publicBaseUrl),
+    );
 
     for (const receipt of visible) {
       const receiptDirectory = join(directory, 'receipts', receipt.id);
       await mkdir(receiptDirectory, { recursive: true });
       await writeFile(
         join(receiptDirectory, 'index.html'),
-        renderReceiptDetail(site, receipt),
+        renderReceiptDetail(site, receipt, publicBaseUrl),
       );
     }
     const topics = [
@@ -355,7 +374,7 @@ async function writeSiteTree(
       await mkdir(topicDirectory, { recursive: true });
       await writeFile(
         join(topicDirectory, 'index.html'),
-        renderTopic(site, topic, visible),
+        renderTopic(site, topic, visible, publicBaseUrl),
       );
     }
   }
@@ -452,8 +471,12 @@ async function replaceOutput(
 export async function buildSites(options: {
   evidenceDirectory: string;
   outputDirectory: string;
+  publicBaseUrl?: string;
   trustedWorkspaceDirectory?: string;
 }): Promise<void> {
+  const publicBaseUrl = normalizePublicBaseUrl(
+    options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+  );
   const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
   const outputDirectory = resolve(options.outputDirectory);
   const trustedWorkspaceDirectory = await ensureTrustedRealDirectory(
@@ -494,7 +517,7 @@ export async function buildSites(options: {
   );
   try {
     await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
-    await writeSiteTree(stagingDirectory, receipts);
+    await writeSiteTree(stagingDirectory, receipts, publicBaseUrl);
     await replaceOutput(stagingDirectory, outputDirectory, canonicalParentPath);
   } catch (error) {
     try {
@@ -517,6 +540,7 @@ async function runBuild(): Promise<void> {
   await buildSites({
     evidenceDirectory: join(root, 'evidence'),
     outputDirectory: join(root, 'dist', 'sites'),
+    publicBaseUrl: process.env[PUBLIC_BASE_URL_ENV],
   });
 }
 

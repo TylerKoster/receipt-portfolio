@@ -25,6 +25,19 @@ npm run build
 npm run build:manifest
 ```
 
+The build defaults to the local placeholder base
+`https://receipt-portfolio.example/`. A production-shaped local build uses the
+strict CLI environment adapter:
+
+```powershell
+$env:RECEIPT_PORTFOLIO_BASE_URL='https://tylerkoster.github.io/receipt-portfolio/'
+npm run build
+```
+
+The adapter accepts only an absolute HTTPS URL without userinfo, query, or
+fragment and normalizes it to one trailing slash. It is a build input; source
+and receipt data cannot select or alter it.
+
 The fixture collection command creates append-only raw and normalized objects,
 canonical manifest snapshots, and linked local receipt files. Verification
 checks strict schemas, exact paths and inventory, object bytes, admitted
@@ -64,9 +77,11 @@ fails. It does not create receipts or rebuild public output.
   rewriting them.
 - `dist/runtime/` contains compiler output and command implementations. It is
   not public site output.
-- `dist/sites/` contains each site's home, methodology, source list,
-  receipt-detail, topic, sitemap, robots, and stylesheet surfaces. The build
-  manifest hashes only this strict, nonempty public inventory.
+- `dist/sites/` contains a root portfolio hub plus each product's home,
+  methodology, source list, receipt-detail, topic, sitemap, robots, and
+  stylesheet surfaces. The hub is a deployment shell, not a fourth evidence
+  product. The build manifest hashes only this strict, nonempty public
+  inventory and still requires exactly three product directories.
 - `artifacts/` contains internal run reports such as the live-source dry-run;
   those reports are not receipts and are not public site records.
 
@@ -80,5 +95,13 @@ as source HTML.
 
 ## Release status
 
-This is a validated local release candidate. It is not publicly hosted: no
-hosting provider, deployment remote, or deployment credential is configured.
+The repository now contains a gated GitHub Pages production adapter with these
+planned paths:
+
+- `https://tylerkoster.github.io/receipt-portfolio/search-receipt/`
+- `https://tylerkoster.github.io/receipt-portfolio/workflow-test-lab/`
+- `https://tylerkoster.github.io/receipt-portfolio/skill-ledger/`
+
+All three paths remain **pending hosted verification**. This task did not push
+the workflow, call GitHub Pages, configure a repository, or verify a public
+response. A local production-base build is not deployment evidence.

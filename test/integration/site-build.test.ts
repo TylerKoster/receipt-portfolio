@@ -113,14 +113,23 @@ async function fileInventory(
   return inventory;
 }
 
-async function runProductionBuild(): Promise<void> {
+async function runProductionBuild(publicBaseUrl?: string): Promise<void> {
   const command =
     process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
   const arguments_ =
     process.platform === 'win32'
       ? ['/d', '/s', '/c', 'npm run build']
       : ['run', 'build'];
-  await execFileAsync(command, arguments_, { cwd: projectRoot });
+  await execFileAsync(command, arguments_, {
+    cwd: projectRoot,
+    env:
+      publicBaseUrl === undefined
+        ? process.env
+        : {
+            ...process.env,
+            RECEIPT_PORTFOLIO_BASE_URL: publicBaseUrl,
+          },
+  });
 }
 
 beforeEach(async () => {
@@ -242,6 +251,147 @@ describe('static receipt site build', () => {
     }
   });
 
+  it.each([
+    'http://tylerkoster.github.io/receipt-portfolio/',
+    '/receipt-portfolio/',
+    'https://user@tylerkoster.github.io/receipt-portfolio/',
+    'https://tylerkoster.github.io/receipt-portfolio/?preview=true',
+    'https://tylerkoster.github.io/receipt-portfolio/#preview',
+  ])('rejects the invalid public base URL %s', async (publicBaseUrl) => {
+    const options = {
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+      publicBaseUrl,
+    };
+
+    await expect(buildSites(options)).rejects.toThrow(/public base|https/i);
+  });
+
+  it('uses the local placeholder base by default', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const home = await readFile(
+      join(outputDirectory, 'search-receipt', 'index.html'),
+      'utf8',
+    );
+    expect(home).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/search-receipt/">',
+    );
+    expect(home).toContain('href="/search-receipt/styles.css"');
+  });
+
+  it('normalizes a production base and includes its project path exactly once on every URL surface', async () => {
+    const publicBaseUrl = 'https://tylerkoster.github.io/receipt-portfolio////';
+    const productionBase = 'https://tylerkoster.github.io/receipt-portfolio/';
+    const projectPath = '/receipt-portfolio/';
+    const options = {
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+      publicBaseUrl,
+    };
+    await buildSites(options);
+
+    for (const siteId of Object.keys(SITE_HEADINGS)) {
+      const siteBase = `${productionBase}${siteId}/`;
+      const home = await readFile(
+        join(outputDirectory, siteId, 'index.html'),
+        'utf8',
+      );
+      const sitemap = await readFile(
+        join(outputDirectory, siteId, 'sitemap.xml'),
+        'utf8',
+      );
+      const robots = await readFile(
+        join(outputDirectory, siteId, 'robots.txt'),
+        'utf8',
+      );
+      const receiptIds = await readdir(
+        join(outputDirectory, siteId, 'receipts'),
+      );
+      const receiptId = receiptIds[0]!;
+      const detail = await readFile(
+        join(outputDirectory, siteId, 'receipts', receiptId, 'index.html'),
+        'utf8',
+      );
+      const topicSlugs = await readdir(join(outputDirectory, siteId, 'topics'));
+      const nestedPages = await Promise.all([
+        readFile(
+          join(outputDirectory, siteId, 'methodology', 'index.html'),
+          'utf8',
+        ),
+        readFile(
+          join(outputDirectory, siteId, 'sources', 'index.html'),
+          'utf8',
+        ),
+        readFile(
+          join(outputDirectory, siteId, 'topics', topicSlugs[0]!, 'index.html'),
+          'utf8',
+        ),
+        Promise.resolve(detail),
+      ]);
+
+      expect(home).toContain(`<link rel="canonical" href="${siteBase}">`);
+      expect(home).toContain(`href="${projectPath}${siteId}/styles.css"`);
+      expect(sitemap).toContain(`<loc>${siteBase}receipts/${receiptId}/</loc>`);
+      expect(robots).toContain(`Sitemap: ${siteBase}sitemap.xml`);
+      expect(detail).toContain(`"url":"${siteBase}receipts/${receiptId}/"`);
+      expect(detail).toContain(`href="${projectPath}${siteId}/methodology/"`);
+      expect(detail).toContain(`href="${projectPath}${siteId}/styles.css"`);
+      for (const nestedPage of nestedPages) {
+        expect(nestedPage).toContain(
+          `href="${projectPath}${siteId}/methodology/"`,
+        );
+        expect(nestedPage).toContain(
+          `href="${projectPath}${siteId}/styles.css"`,
+        );
+        expect(nestedPage).not.toContain(
+          '/receipt-portfolio/receipt-portfolio/',
+        );
+      }
+      for (const href of detail.matchAll(/href="(\/[^"#]*)"/g)) {
+        expect(href[1]).toMatch(/^\/receipt-portfolio\//);
+      }
+      expect(`${home}\n${sitemap}\n${robots}\n${detail}`).not.toContain(
+        '/receipt-portfolio/receipt-portfolio/',
+      );
+    }
+  });
+
+  it('renders one root portfolio hub alongside exactly three product directories', async () => {
+    const options = {
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+      publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
+    };
+    await buildSites(options);
+
+    const entries = await readdir(outputDirectory, { withFileTypes: true });
+    expect(
+      entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    ).toEqual(Object.keys(SITE_HEADINGS).sort());
+    expect(
+      entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+    ).toEqual(['index.html', 'portfolio.css']);
+
+    const hub = await readFile(join(outputDirectory, 'index.html'), 'utf8');
+    expect(hub).toContain('Evidence receipt portfolio');
+    expect(hub).toContain(
+      'Controlled examples are not live or current source evidence.',
+    );
+    expect(hub).toContain(
+      '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/">',
+    );
+    expect(hub).toContain('href="/receipt-portfolio/portfolio.css"');
+    for (const siteId of Object.keys(SITE_HEADINGS)) {
+      expect(hub).toContain(`href="/receipt-portfolio/${siteId}/"`);
+    }
+    expect(hub).toContain('Content-Security-Policy');
+    expect(hub).not.toMatch(/<script\b|<img\b|https?:\/\/[^"']+\.(?:css|js)/i);
+  });
+
   it('replaces arbitrary stale roots and files with exactly three standalone sites', async () => {
     await mkdir(join(outputDirectory, 'obsolete-root'), { recursive: true });
     await writeFile(join(outputDirectory, 'obsolete-root', 'old.html'), 'old');
@@ -260,6 +410,9 @@ describe('static receipt site build', () => {
     expect(
       entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
     ).toEqual(Object.keys(SITE_HEADINGS).sort());
+    expect(
+      entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+    ).toEqual(['index.html', 'portfolio.css']);
 
     for (const siteId of Object.keys(SITE_HEADINGS)) {
       const html = await readFile(
@@ -465,6 +618,23 @@ describe('static receipt site build', () => {
         'utf8',
       ),
     ).resolves.toContain('buildSites');
+  });
+
+  it('uses the CLI environment adapter for the production Pages base', async () => {
+    await runProductionBuild(
+      'https://tylerkoster.github.io/receipt-portfolio/',
+    );
+
+    const home = await readFile(
+      join(projectRoot, 'dist', 'sites', 'search-receipt', 'index.html'),
+      'utf8',
+    );
+    expect(home).toContain(
+      '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/search-receipt/">',
+    );
+    expect(home).toContain(
+      'href="/receipt-portfolio/search-receipt/styles.css"',
+    );
   });
 
   it('omits a REVIEW_REQUIRED record from public rendering', async () => {

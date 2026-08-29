@@ -20,12 +20,33 @@
       response-boundary, and non-execution paths.
 - [x] Byte/content, predecessor, and filename mutations are detected in an
       isolated copy, and canonical `evidence/` remains unchanged.
-- [x] Both workflow files declare read-only contents permission; the prohibited
-      deployment, push, release, publish, write-permission, and provider-command
-      scan found 0 matches.
+- [x] Both pre-deployment workflow files declare read-only contents permission;
+      the prohibited deployment, push, release, publish, write-permission, and
+      provider-command scan found 0 matches.
 - [x] All three sites build from the controlled fixture evidence without a
       network request; the strict public inventory contains 6 files.
 - [ ] Release rollback restores a prior tagged release without rewriting receipts.
+
+## GitHub Pages adapter release checklist
+
+- [x] The local build defaults to the placeholder base and rejects production
+      bases that are not absolute HTTPS URLs or contain userinfo, query, or
+      fragment components.
+- [x] A production-base build includes `/receipt-portfolio/` exactly once in
+      canonical, sitemap, robots, JSON-LD, navigation, and stylesheet URLs.
+- [x] The root deployment hub is hashed with the public inventory while the
+      inventory still requires exactly three product directories.
+- [x] The Pages workflow source contract requires the complete local gate order,
+      least-privilege job permissions, supported action majors, and an artifact
+      rooted only at `dist/sites/`.
+- [ ] Independent review and controller validation authorize the external
+      repository and Pages actions.
+- [ ] The `main` workflow run completes and records its artifact, manifest, and
+      deployment evidence.
+- [ ] Hosted checks verify the root hub and each planned product path:
+      `search-receipt/`, `workflow-test-lab/`, and `skill-ledger/` beneath
+      `https://tylerkoster.github.io/receipt-portfolio/`.
+- [ ] The hosted rollback path is exercised without changing receipt evidence.
 
 ## Validation record
 
@@ -57,8 +78,9 @@
 - `npm ci` reported 0 known vulnerabilities but warned that the resolved ESLint
   `9.39.5` release is no longer supported. Dependency maintenance is a separate
   bounded task; Task 7 does not change the locked dependency graph.
-- No hosting provider, deployment remote, account, or credential is configured.
-  Deployment status is **not attempted / not hosted**.
+- A GitHub Pages workflow adapter is present, but no repository creation, push,
+  Pages API call, provider run, or public-response check occurred in this task.
+  Deployment status remains **not attempted / pending hosted verification**.
 - The hourly Codex heartbeat states local orchestration intent only. It does not
   prove GitHub Actions or provider execution.
 - No release tag exists. The rollback check remains open, and `v0.1.0` is
