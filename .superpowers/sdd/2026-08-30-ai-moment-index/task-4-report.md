@@ -195,3 +195,60 @@ Result: exit 0; 1 file and 15 tests passed. The exact shipped payload now proves
 - The deterministic `node:vm` harness validates shipped payload behavior but is not a real-browser, assistive-technology, usability, or WCAG-conformance result.
 - All original fixture-only, no-live-library, no-permission, no-deploy, no-demand, and no-revenue limits remain unchanged.
 - After the executable-fix commit, the local remote-tracking comparison showed the branch `ahead 2, behind 1`; no fetch, rebase, merge, or reconciliation was performed because those actions are outside this task's authority.
+
+## Independent-review fix round 2
+
+### Heads and exact paths
+
+- Old round-2 head: `d3c33860600416b09f7617373fabc11cf3cc838c`
+- Passing round-2 executable head: `78354cdb5f26bc87d08590afa33c2bbe7f81e4e8`
+- Exact executable/test paths changed:
+  - `sites/video-moment-search/search-client.ts`
+  - `sites/video-moment-search/site.test.ts`
+- This report is the only additional documentation path changed after the executable commit.
+
+The accepted core/fixture blobs, builder, route renderer, rights data, query-privacy contract, timestamps, and server-rendered fallback were not changed.
+
+### Round-2 RED evidence
+
+Command:
+
+`npm test -- --run sites/video-moment-search/site.test.ts`
+
+Result: expected exit 1; 17 tests passed and the new immediate-recovery assertion failed. After an early pre-load submit followed by valid deferred loading, the fallback element was hidden but the always-visible status incorrectly remained `Search could not load. The initial reviewed moments remain available below.` instead of the expected truthful ready state.
+
+The additional exact-payload regression coverage for equal-score tie breakers, invalid source/timestamp indexes, rejected fetches, and non-OK fetches passed against the old head and now protects the independently confirmed behavior from future regression.
+
+### Round-2 GREEN behavior evidence
+
+Focused command:
+
+`npm test -- --run sites/video-moment-search/site.test.ts`
+
+Result: exit 0; 1 file and 18 tests passed.
+
+The exact `VIDEO_MOMENT_SEARCH_CLIENT` payload now proves:
+
+- Immediately after valid deferred loading, before a second submit, the fallback is hidden and the `aria-live` status says `Search is ready. Enter a phrase such as “agent evaluation”.`
+- A later `agent evaluation` submission still renders `moment-agent-evals` and `https://video.example/watch/agent-evals?t=132`.
+- A bounded equal-score fixture compares shipped-IIFE order to `searchPublicIndex` and proves video-slug, then start-second, then moment-ID tie breaks with the literal order `moment-a`, `moment-b`, `moment-c`, `moment-z`.
+- Loaded indexes with a `javascript:` source or timestamp mismatch are rejected by the shipped IIFE into the actionable fallback.
+- Rejected and non-OK index fetches enter the same fallback while the server-rendered initial-result sentinel remains unchanged.
+- Existing phrase-bonus, malformed-shape/field, transient-load, submit-error, query-privacy, rights, and exact-timestamp regressions remain green.
+
+### Round-2 final gates
+
+- Focused shipped-payload site suite: `npm test -- --run sites/video-moment-search/site.test.ts` → exit 0; 18/18 passed.
+- Focused atomic integration: `npm test -- --run test/integration/video-moment-search-build.test.ts` → exit 0; 2/2 passed.
+- Static check: `npm run check` → exit 0; TypeScript and ESLint passed.
+- Full suite: `npm test -- --run` → exit 0; 28 files and 306 tests passed.
+- Production build: `npm run build` → exit 0.
+- Emitted syntax: `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Emitted/tested equality: built `search-client.js` was byte-equal to `VIDEO_MOMENT_SEARCH_CLIENT`, and the emitted ready-status probe was true.
+- Diff gate: `git diff --check` → exit 0 before the executable commit, with only Git LF-to-CRLF warnings.
+
+### Round-2 residuals
+
+- The deterministic `node:vm` payload tests remain regression evidence, not a real-browser, assistive-technology, usability, demand, or WCAG-conformance result.
+- All controlled-fixture, no-live-library, no-permission, no-deploy, no-demand, and no-revenue limits remain unchanged.
+- Independent-main drift is a repository-state residual only: after the executable commit the branch reported `ahead 4, behind 1`. No fetch, merge, rebase, push, tag, deploy, or reconciliation was performed.
