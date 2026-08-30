@@ -18,7 +18,12 @@ import {
   canonicalJson,
   type Receipt,
 } from '../../packages/evidence-core/src/index.js';
-import { buildSites } from '../../scripts/build-sites.js';
+import {
+  buildSites,
+  EVIDENCE_DIRECTORY_ENV,
+  OUTPUT_DIRECTORY_ENV,
+  PUBLIC_BASE_URL_ENV,
+} from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { searchReceiptSite } from '../../sites/search-receipt/index.js';
 import { escapeHtml, renderSite } from '../../sites/shared/render.js';
@@ -113,72 +118,29 @@ async function fileInventory(
   return inventory;
 }
 
-async function runProductionBuild(publicBaseUrl?: string): Promise<void> {
-  const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
-  const evidenceBackupDirectory = join(
-    dirname(testEvidenceDirectory),
-    'canonical-evidence-backup',
-  );
-  const canonicalEvidenceExisted = await realFileSystem
-    .lstat(canonicalEvidenceDirectory)
-    .then(() => true)
-    .catch((error: unknown) => {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return false;
-      }
-      throw error;
-    });
-
-  if (canonicalEvidenceExisted) {
-    await realFileSystem.cp(
-      canonicalEvidenceDirectory,
-      evidenceBackupDirectory,
-      { recursive: true },
-    );
-  }
-
-  try {
-    await realFileSystem.rm(canonicalEvidenceDirectory, {
-      recursive: true,
-      force: true,
-    });
-    await realFileSystem.cp(testEvidenceDirectory, canonicalEvidenceDirectory, {
-      recursive: true,
-    });
-
-    const command =
-      process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
-    const arguments_ =
-      process.platform === 'win32'
-        ? ['/d', '/s', '/c', 'npm run build']
-        : ['run', 'build'];
-    await execFileAsync(command, arguments_, {
-      cwd: projectRoot,
-      env:
-        publicBaseUrl === undefined
-          ? process.env
-          : {
-              ...process.env,
-              RECEIPT_PORTFOLIO_BASE_URL: publicBaseUrl,
-            },
-    });
-  } finally {
-    await realFileSystem.rm(canonicalEvidenceDirectory, {
-      recursive: true,
-      force: true,
-    });
-    if (canonicalEvidenceExisted) {
-      await realFileSystem.cp(
-        evidenceBackupDirectory,
-        canonicalEvidenceDirectory,
-        { recursive: true },
-      );
-    }
-  }
+async function runProductionBuild(options?: {
+  readonly evidenceDirectory?: string;
+  readonly outputDirectory?: string;
+  readonly publicBaseUrl?: string;
+}): Promise<void> {
+  const command =
+    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
+  const arguments_ =
+    process.platform === 'win32'
+      ? ['/d', '/s', '/c', 'npm run build']
+      : ['run', 'build'];
+  await execFileAsync(command, arguments_, {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      [EVIDENCE_DIRECTORY_ENV]:
+        options?.evidenceDirectory ?? testEvidenceDirectory,
+      [OUTPUT_DIRECTORY_ENV]: options?.outputDirectory ?? outputDirectory,
+      ...(options?.publicBaseUrl === undefined
+        ? {}
+        : { [PUBLIC_BASE_URL_ENV]: options.publicBaseUrl }),
+    },
+  });
 }
 
 beforeEach(async () => {
@@ -663,9 +625,7 @@ describe('static receipt site build', () => {
       originalEvidence,
     );
 
-    const inventory = Object.keys(
-      await fileInventory(join(projectRoot, 'dist', 'sites')),
-    );
+    const inventory = Object.keys(await fileInventory(outputDirectory));
     expect(inventory).toContain('search-receipt/methodology/index.html');
     expect(inventory).toContain('skill-ledger/sources/index.html');
     expect(inventory).toContain('workflow-test-lab/sitemap.xml');
@@ -679,12 +639,12 @@ describe('static receipt site build', () => {
   });
 
   it('uses the CLI environment adapter for the production Pages base', async () => {
-    await runProductionBuild(
-      'https://tylerkoster.github.io/receipt-portfolio/',
-    );
+    await runProductionBuild({
+      publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
+    });
 
     const home = await readFile(
-      join(projectRoot, 'dist', 'sites', 'search-receipt', 'index.html'),
+      join(outputDirectory, 'search-receipt', 'index.html'),
       'utf8',
     );
     expect(home).toContain(
@@ -693,6 +653,28 @@ describe('static receipt site build', () => {
     expect(home).toContain(
       'href="/receipt-portfolio/search-receipt/styles.css"',
     );
+  });
+
+  it('keeps canonical evidence byte-equal across concurrent production-build processes', async () => {
+    const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
+    const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
+    const firstOutput = join(dirname(outputDirectory), 'concurrent-sites-a');
+    const secondOutput = join(dirname(outputDirectory), 'concurrent-sites-b');
+
+    await Promise.all([
+      runProductionBuild({ outputDirectory: firstOutput }),
+      runProductionBuild({ outputDirectory: secondOutput }),
+    ]);
+
+    expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
+      originalEvidence,
+    );
+    await expect(
+      readFile(join(firstOutput, 'search-receipt', 'index.html'), 'utf8'),
+    ).resolves.toContain('Search Receipt');
+    await expect(
+      readFile(join(secondOutput, 'skill-ledger', 'index.html'), 'utf8'),
+    ).resolves.toContain('SkillLedger');
   });
 
   it('omits a REVIEW_REQUIRED record from public rendering', async () => {

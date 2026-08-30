@@ -53,6 +53,8 @@ const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 const BACKUP_OWNER = 'receipt-portfolio-static-site-builder';
 const BACKUP_FORMAT_VERSION = 2;
 export const PUBLIC_BASE_URL_ENV = 'RECEIPT_PORTFOLIO_BASE_URL';
+export const EVIDENCE_DIRECTORY_ENV = 'RECEIPT_PORTFOLIO_EVIDENCE_DIR';
+export const OUTPUT_DIRECTORY_ENV = 'RECEIPT_PORTFOLIO_OUTPUT_DIR';
 
 function projectRoot(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
@@ -538,8 +540,14 @@ export async function buildSites(options: {
 async function runBuild(): Promise<void> {
   const root = projectRoot();
   await buildSites({
-    evidenceDirectory: join(root, 'evidence'),
-    outputDirectory: join(root, 'dist', 'sites'),
+    evidenceDirectory: resolve(
+      root,
+      process.env[EVIDENCE_DIRECTORY_ENV] ?? 'evidence',
+    ),
+    outputDirectory: resolve(
+      root,
+      process.env[OUTPUT_DIRECTORY_ENV] ?? join('dist', 'sites'),
+    ),
     publicBaseUrl: process.env[PUBLIC_BASE_URL_ENV],
   });
 }

@@ -6,7 +6,6 @@ import {
   mkdir,
   readFile,
   realpath,
-  rmdir,
   rm,
   writeFile,
 } from 'node:fs/promises';
@@ -38,37 +37,60 @@ async function missing(path: string): Promise<boolean> {
 async function createSentinel(
   root: string,
   owner: string,
-): Promise<boolean> {
+  writer: (
+    path: string,
+    data: string,
+    encoding: 'utf8',
+  ) => Promise<unknown> = writeFile,
+): Promise<void> {
   const parent = dirname(root);
-  const parentWasMissing = await missing(parent);
-  await mkdir(parent, { recursive: true });
-  const parentStats = await lstat(parent);
-  if (parentStats.isSymbolicLink() || !parentStats.isDirectory()) {
-    throw new Error(
-      `Discovery sentinel parent must be a real directory: ${parent}`,
-    );
-  }
-  if (resolve(await realpath(parent)) !== resolve(parent)) {
-    throw new Error(
-      `Discovery sentinel parent changed through a link: ${parent}`,
-    );
-  }
+  let rootCreated = false;
+  try {
+    await mkdir(parent, { recursive: true });
+    const parentStats = await lstat(parent);
+    if (parentStats.isSymbolicLink() || !parentStats.isDirectory()) {
+      throw new Error(
+        `Discovery sentinel parent must be a real directory: ${parent}`,
+      );
+    }
+    if (resolve(await realpath(parent)) !== resolve(parent)) {
+      throw new Error(
+        `Discovery sentinel parent changed through a link: ${parent}`,
+      );
+    }
 
-  await mkdir(root);
-  await writeFile(join(root, '.sentinel-owner'), owner, 'utf8');
-  await mkdir(join(root, 'sites'));
-  await mkdir(join(root, 'test', 'integration'), { recursive: true });
-  await writeFile(
-    join(root, 'sites', 'sentinel-invalid.ts'),
-    'export const deliberatelyInvalid = ;\n',
-    'utf8',
-  );
-  await writeFile(
-    join(root, 'test', 'integration', 'sentinel-failure.test.ts'),
-    `import { expect, it } from 'vitest';\nit('must never discover a nested worktree test', () => { expect('nested').toBe('active-root'); });\n`,
-    'utf8',
-  );
-  return parentWasMissing;
+    await mkdir(root);
+    rootCreated = true;
+    await writer(join(root, '.sentinel-owner'), owner, 'utf8');
+    await mkdir(join(root, 'sites'));
+    await mkdir(join(root, 'test', 'integration'), { recursive: true });
+    await writer(
+      join(root, 'sites', 'sentinel-invalid.ts'),
+      'export const deliberatelyInvalid = ;\n',
+      'utf8',
+    );
+    await writer(
+      join(root, 'test', 'integration', 'sentinel-failure.test.ts'),
+      `import { expect, it } from 'vitest';\nit('must never discover a nested worktree test', () => { expect('nested').toBe('active-root'); });\n`,
+      'utf8',
+    );
+  } catch (error) {
+    const cleanupErrors: unknown[] = [];
+    if (rootCreated) {
+      try {
+        await rm(root, { force: true, recursive: true });
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        'Discovery sentinel setup and cleanup both failed',
+      );
+    }
+    throw error;
+  }
 }
 
 async function removeSentinel(root: string, owner: string): Promise<void> {
@@ -95,21 +117,6 @@ async function removeSentinel(root: string, owner: string): Promise<void> {
     throw new Error(`Refusing unowned discovery sentinel cleanup: ${root}`);
   }
   await rm(root, { force: true, recursive: true });
-}
-
-async function removeEmptyParent(path: string): Promise<void> {
-  try {
-    await rmdir(path);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      (error.code === 'ENOENT' || error.code === 'ENOTEMPTY')
-    ) {
-      return;
-    }
-    throw error;
-  }
 }
 
 describe('nested development worktree discovery boundary', () => {
@@ -151,6 +158,28 @@ describe('nested development worktree discovery boundary', () => {
     ).toBe(true);
   });
 
+  it('self-cleans a sentinel root after partial setup failure', async () => {
+    const invocationToken = `${process.pid}-${randomUUID()}`;
+    const owner = `receipt-portfolio-tool-discovery-sentinel-v2:${invocationToken}`;
+    const root = join(
+      projectRoot,
+      'worktrees',
+      `sentinel-worktree-${invocationToken}`,
+    );
+    const failingWriter = async (): Promise<never> => {
+      throw new Error('synthetic sentinel setup failure');
+    };
+
+    try {
+      await expect(
+        createSentinel(root, owner, failingWriter),
+      ).rejects.toThrow('synthetic sentinel setup failure');
+      await expect(missing(root)).resolves.toBe(true);
+    } finally {
+      if (!(await missing(root))) await removeSentinel(root, owner);
+    }
+  });
+
   it('keeps bounded ESLint, Vitest, and TypeScript discovery inside the active root', async () => {
     const invocationToken = `${process.pid}-${randomUUID()}`;
     const owner = `receipt-portfolio-tool-discovery-sentinel-v2:${invocationToken}`;
@@ -159,13 +188,10 @@ describe('nested development worktree discovery boundary', () => {
       join(projectRoot, 'worktrees', `sentinel-worktree-${invocationToken}`),
     ] as const;
     const createdRoots: string[] = [];
-    const createdParents = new Set<string>();
 
     try {
       for (const root of sentinelRoots) {
-        if (await createSentinel(root, owner)) {
-          createdParents.add(dirname(root));
-        }
+        await createSentinel(root, owner);
         createdRoots.push(root);
       }
 
@@ -191,20 +217,23 @@ describe('nested development worktree discovery boundary', () => {
       ).toBe(false);
 
       const vitestBin = require.resolve('vitest/vitest.mjs');
-      const result = await execFileAsync(process.execPath, [vitestBin, 'list'], {
-        cwd: projectRoot,
-        timeout: 30_000,
-        maxBuffer: 2 * 1024 * 1024,
-      });
+      const sentinelTestPaths = sentinelRoots.map((root) =>
+        join(root, 'test', 'integration', 'sentinel-failure.test.ts'),
+      );
+      const result = await execFileAsync(
+        process.execPath,
+        [vitestBin, 'run', ...sentinelTestPaths, '--passWithNoTests'],
+        {
+          cwd: projectRoot,
+          timeout: 30_000,
+          maxBuffer: 2 * 1024 * 1024,
+        },
+      );
       const output = `${result.stdout}\n${result.stderr}`;
-      expect(output).toContain('worktree-discovery.test.ts');
-      expect(output).not.toContain('sentinel-failure.test.ts');
+      expect(output).toMatch(/no test files found/i);
     } finally {
       for (const root of createdRoots.toReversed()) {
         await removeSentinel(root, owner);
-      }
-      for (const parent of [...createdParents].toReversed()) {
-        await removeEmptyParent(parent);
       }
     }
   }, 45_000);

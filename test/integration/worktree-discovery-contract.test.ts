@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const discoveryTestPath = fileURLToPath(
@@ -7,10 +8,47 @@ const discoveryTestPath = fileURLToPath(
 );
 
 describe('worktree discovery regression-test contract', () => {
-  it('does not recursively launch the full or integration test suites', async () => {
+  it('allows one child probe limited to explicit excluded sentinels', async () => {
     const source = await readFile(discoveryTestPath, 'utf8');
+    const sourceFile = ts.createSourceFile(
+      discoveryTestPath,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const childCalls: ts.CallExpression[] = [];
 
-    expect(source).not.toContain("['test', '--', '--run']");
-    expect(source).not.toContain("['run', 'test:integration']");
+    function visit(node: ts.Node): void {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'execFileAsync'
+      ) {
+        childCalls.push(node);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(sourceFile);
+
+    expect(childCalls).toHaveLength(1);
+    const [executable, arguments_] = childCalls[0]!.arguments;
+    expect(executable?.getText(sourceFile)).toBe('process.execPath');
+    expect(ts.isArrayLiteralExpression(arguments_!)).toBe(true);
+    if (!ts.isArrayLiteralExpression(arguments_!)) return;
+
+    const [binary, command, sentinels, emptyPass] = arguments_.elements;
+    expect(ts.isIdentifier(binary!) && binary.text === 'vitestBin').toBe(true);
+    expect(ts.isStringLiteral(command!) && command.text === 'run').toBe(true);
+    expect(
+      ts.isSpreadElement(sentinels!) &&
+        ts.isIdentifier(sentinels.expression) &&
+        sentinels.expression.text === 'sentinelTestPaths',
+    ).toBe(true);
+    expect(
+      ts.isStringLiteral(emptyPass!) && emptyPass.text === '--passWithNoTests',
+    ).toBe(true);
+
+    expect(arguments_.elements).toHaveLength(4);
   });
 });
