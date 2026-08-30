@@ -126,7 +126,7 @@ export function initializeSearchReceipt(root) {
     offer.disabled = true;
     if (offerStatus) {
       offerStatus.textContent =
-        'Interest noted in this page only. No data was sent and no alert was created.';
+        'Preview confirmed on this page only. No data was sent or stored, and no alert or report was created.';
     }
   });
   apply();

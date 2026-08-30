@@ -206,6 +206,50 @@ describe('Search Receipt query and offer adapter', () => {
     expect(status.textContent).toBe('Showing 1 of 2 records.');
   });
 
+  it('confirms the offer preview locally without implying retained interest', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    const element = () => ({
+      addEventListener(type: string, listener: Listener) {
+        this.listeners.set(type, listener);
+      },
+      disabled: false,
+      hidden: false,
+      listeners: new Map<string, Listener>(),
+      textContent: '',
+      value: '',
+    });
+    const form = element();
+    const query = element();
+    const topic = element();
+    const status = element();
+    const empty = element();
+    const error = element();
+    const offer = element();
+    const offerStatus = element();
+    const elements = new Map([
+      ['[data-search-controls]', form],
+      ['[data-search-query]', query],
+      ['[data-search-topic-filter]', topic],
+      ['[data-search-status]', status],
+      ['[data-search-empty]', empty],
+      ['[data-search-error]', error],
+      ['[data-measurement-action]', offer],
+      ['[data-offer-status]', offerStatus],
+    ]);
+    const root = {
+      querySelector: (selector: string) => elements.get(selector) ?? null,
+      querySelectorAll: () => [],
+    } as unknown as SearchRoot;
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    offer.listeners.get('click')?.({ preventDefault() {} });
+
+    expect(offer.disabled).toBe(true);
+    expect(offerStatus.textContent).toBe(
+      'Preview confirmed on this page only. No data was sent or stored, and no alert or report was created.',
+    );
+  });
+
   it('adds a visible clear-filters recovery action after a no-match without retaining or sending input', () => {
     type Listener = (event: { preventDefault(): void }) => void;
     interface FakeElement {

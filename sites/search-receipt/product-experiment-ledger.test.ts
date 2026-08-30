@@ -118,4 +118,28 @@ describe('Search Receipt product experiment ledger', () => {
         'Keep the header search-scope disclosure under bounded observation only; no data means no demand or revenue conclusion.',
     });
   });
+
+  it('records offer-preview clarity without claiming retained interest or measurement', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(
+      ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(ledger.experiments[6]).toMatchObject({
+      id: 'offer-preview-clarity-v1',
+      rank: 7,
+      status: 'ACTIVE_NO_MEASUREMENT',
+      hypothesis:
+        'An explicit local-only preview outcome may help a visitor understand that activating the preview does not retain interest or create a service.',
+      firstUserOutcome:
+        'Recognize that a preview click is confirmed locally only and does not send/store data or create an alert/report.',
+      metric:
+        'Unmeasured offer-preview limit comprehension after 10 observed non-synthetic sessions.',
+      target: '>=60% after 10 observed non-synthetic sessions',
+      stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+      noDataBoundary: 'No data means no demand or revenue conclusion.',
+      nextSafeAction:
+        'Keep the local-only preview outcome under bounded observation only; no data means no demand or revenue conclusion.',
+    });
+  });
 });
