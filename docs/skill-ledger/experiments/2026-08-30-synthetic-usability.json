@@ -6,11 +6,11 @@
     {
       "area": "searchable-filterable-discovery",
       "rank": 1,
-      "experiment": "declared-metadata-taxonomy-facets",
+      "experiment": "source-bound-record-quality-gate",
       "status": "in-progress",
-      "metric": "controlled-record facet coverage",
-      "target": "Exact deterministic facet counts for declared license, dependency state, and static-signal presence.",
-      "stopRule": "No public discoverability, demand, safety, or public UI integration claim from controlled records. This does not establish adoption, revenue, demand, or safety."
+      "metric": "controlled invalid-record rejection coverage",
+      "target": "Every controlled record with a missing source binding, invalid observed time, or malformed hash is excluded and disclosed deterministically.",
+      "stopRule": "Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness."
     },
     {
       "area": "source-bound-comparison",
@@ -65,6 +65,13 @@
       "metric": "authorized payment evidence",
       "target": "Requires actual users, pricing authority, and payment capability.",
       "stopRule": "Not started without actual users and authority; no adoption, revenue, demand, or safety claim."
+    }
+  ],
+  "experimentHistory": [
+    {
+      "experiment": "declared-metadata-taxonomy-facets",
+      "status": "completed-internal",
+      "boundary": "Declared metadata taxonomy facets remain controlled-record-only and do not establish safety, adoption, demand, or provenance."
     }
   ],
   "baseline": {

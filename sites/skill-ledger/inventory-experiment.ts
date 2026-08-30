@@ -59,6 +59,33 @@ export type SkillInventoryFilters = Readonly<{
 export const DECLARED_METADATA_FACET_BOUNDARY =
   'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.' as const;
 
+export const SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY =
+  'Field validation does not establish real provenance, safety, adoption, demand, or suitability.' as const;
+
+export type SourceBoundSkillReceiptQualityIssue =
+  | 'missing-receipt-id'
+  | 'missing-source-id'
+  | 'invalid-source-url'
+  | 'invalid-observed-at'
+  | 'missing-package-id'
+  | 'missing-provenance'
+  | 'invalid-manifest-sha256'
+  | 'invalid-raw-sha256'
+  | 'invalid-normalized-sha256'
+  | 'invalid-contents-sha256';
+
+export type SourceBoundSkillReceiptQualityAssessment =
+  | Readonly<{
+      kind: 'ready';
+      issues: readonly [];
+      boundary: typeof SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY;
+    }>
+  | Readonly<{
+      kind: 'not-ready';
+      issues: readonly SourceBoundSkillReceiptQualityIssue[];
+      boundary: typeof SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY;
+    }>;
+
 export type DeclaredMetadataFacetSummaryRow = Readonly<{
   facet: 'declared-license' | 'dependency-state' | 'static-signal-presence';
   value: string;
@@ -105,29 +132,90 @@ function isAcceptedSkillLedgerReceipt(
   );
 }
 
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isSha256(value: string): boolean {
+  return /^[0-9a-f]{64}$/.test(value);
+}
+
+export function assessSourceBoundSkillReceiptQuality(
+  receipt: SourceBoundSkillReceipt,
+): SourceBoundSkillReceiptQualityAssessment {
+  const issues: SourceBoundSkillReceiptQualityIssue[] = [];
+
+  if (receipt.receipt.id.trim() === '') issues.push('missing-receipt-id');
+  if (receipt.source.sourceId.trim() === '') issues.push('missing-source-id');
+  if (!isHttpsUrl(receipt.source.url)) issues.push('invalid-source-url');
+  if (Number.isNaN(Date.parse(receipt.source.observedAt))) {
+    issues.push('invalid-observed-at');
+  }
+  if (receipt.publicFacts.packageId.trim() === '') {
+    issues.push('missing-package-id');
+  }
+  if (Object.keys(receipt.provenance).length === 0) {
+    issues.push('missing-provenance');
+  }
+  if (!isSha256(receipt.hashes.manifestSha256)) {
+    issues.push('invalid-manifest-sha256');
+  }
+  if (!isSha256(receipt.hashes.rawSha256)) issues.push('invalid-raw-sha256');
+  if (!isSha256(receipt.hashes.normalizedSha256)) {
+    issues.push('invalid-normalized-sha256');
+  }
+  if (!isSha256(receipt.publicFacts.contentsSha256)) {
+    issues.push('invalid-contents-sha256');
+  }
+
+  if (issues.length === 0) {
+    return {
+      kind: 'ready',
+      issues: [],
+      boundary: SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY,
+    };
+  }
+
+  return {
+    kind: 'not-ready',
+    issues,
+    boundary: SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY,
+  };
+}
+
 export function sourceBoundSkillInventory(
   receipts: readonly SourceBoundSkillReceipt[],
 ): readonly SkillInventoryRecord[] {
-  return receipts.filter(isAcceptedSkillLedgerReceipt).map((receipt) => ({
-    receiptId: receipt.receipt.id,
-    receipt: receipt.receipt,
-    source: receipt.source,
-    hashes: receipt.hashes,
-    provenance: receipt.provenance,
-    declaredMetadata: {
-      packageId: receipt.publicFacts.packageId,
-      sourceId: receipt.source.sourceId,
-      license: receipt.publicFacts.declaredLicense,
-      manifestPresent: receipt.publicFacts.manifestPresent,
-      dependencies: receipt.publicFacts.declaredDependencies,
-      dependencyState:
-        receipt.publicFacts.declaredDependencies.length === 0
-          ? 'none'
-          : 'declared',
-      contentsSha256: receipt.publicFacts.contentsSha256,
-    },
-    staticRiskFlags: receipt.publicFacts.staticRiskFlags,
-  }));
+  return receipts
+    .filter(
+      (receipt) =>
+        isAcceptedSkillLedgerReceipt(receipt) &&
+        assessSourceBoundSkillReceiptQuality(receipt).kind === 'ready',
+    )
+    .map((receipt) => ({
+      receiptId: receipt.receipt.id,
+      receipt: receipt.receipt,
+      source: receipt.source,
+      hashes: receipt.hashes,
+      provenance: receipt.provenance,
+      declaredMetadata: {
+        packageId: receipt.publicFacts.packageId,
+        sourceId: receipt.source.sourceId,
+        license: receipt.publicFacts.declaredLicense,
+        manifestPresent: receipt.publicFacts.manifestPresent,
+        dependencies: receipt.publicFacts.declaredDependencies,
+        dependencyState:
+          receipt.publicFacts.declaredDependencies.length === 0
+            ? 'none'
+            : 'declared',
+        contentsSha256: receipt.publicFacts.contentsSha256,
+      },
+      staticRiskFlags: receipt.publicFacts.staticRiskFlags,
+    }));
 }
 
 export function filterSkillInventory(

@@ -4,6 +4,7 @@ import {
   compareSkillInventory,
   declaredMetadataFacetSummary,
   filterSkillInventory,
+  assessSourceBoundSkillReceiptQuality,
   recordSyntheticOfferEvent,
   sourceBoundSkillInventory,
   summarizeSyntheticOfferEvents,
@@ -78,6 +79,68 @@ const receiptB = {
 } satisfies SourceBoundSkillReceipt;
 
 describe('source-bound SkillLedger inventory experiment', () => {
+  it('assesses a complete controlled source-bound receipt as ready without issues', () => {
+    expect(assessSourceBoundSkillReceiptQuality(receiptA)).toEqual({
+      kind: 'ready',
+      issues: [],
+      boundary:
+        'Field validation does not establish real provenance, safety, adoption, demand, or suitability.',
+    });
+  });
+
+  it('reports source-bound receipt quality issues in fixed field order', () => {
+    const malformedReceipt = {
+      ...receiptA,
+      receipt: { ...receiptA.receipt, id: '' },
+      source: {
+        ...receiptA.source,
+        sourceId: '',
+        url: 'http://example.invalid/archive',
+        observedAt: 'not-a-time',
+      },
+      hashes: {
+        manifestSha256: 'A'.repeat(64),
+        rawSha256: 'short',
+        normalizedSha256: 'f'.repeat(63),
+      },
+      provenance: {},
+      publicFacts: {
+        ...receiptA.publicFacts,
+        packageId: '',
+        contentsSha256: '0'.repeat(65),
+      },
+    } satisfies SourceBoundSkillReceipt;
+
+    expect(assessSourceBoundSkillReceiptQuality(malformedReceipt)).toEqual({
+      kind: 'not-ready',
+      issues: [
+        'missing-receipt-id',
+        'missing-source-id',
+        'invalid-source-url',
+        'invalid-observed-at',
+        'missing-package-id',
+        'missing-provenance',
+        'invalid-manifest-sha256',
+        'invalid-raw-sha256',
+        'invalid-normalized-sha256',
+        'invalid-contents-sha256',
+      ],
+      boundary:
+        'Field validation does not establish real provenance, safety, adoption, demand, or suitability.',
+    });
+  });
+
+  it('excludes an otherwise accepted receipt when source-bound quality is not ready', () => {
+    const malformedReceipt = {
+      ...receiptA,
+      source: { ...receiptA.source, url: 'http://example.invalid/archive' },
+    } satisfies SourceBoundSkillReceipt;
+
+    expect(sourceBoundSkillInventory([receiptA, malformedReceipt])).toEqual([
+      expect.objectContaining({ receiptId: 'receipt-a' }),
+    ]);
+  });
+
   it('keeps receipt, source, hashes, provenance, declared metadata, and static signals distinct', () => {
     const records = sourceBoundSkillInventory([
       receiptA,

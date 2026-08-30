@@ -13,6 +13,11 @@ interface SyntheticUsabilityLedger {
     target: string;
     stopRule: string;
   }>;
+  experimentHistory: Array<{
+    experiment: string;
+    status: string;
+    boundary: string;
+  }>;
   baseline: {
     fullCompletion: number;
     partialCompletion: number;
@@ -41,7 +46,7 @@ interface SyntheticUsabilityLedger {
 }
 
 describe('SkillLedger synthetic usability ledger', () => {
-  it('keeps a ranked portfolio with a controlled-record taxonomy experiment at the top', () => {
+  it('keeps a seven-area ranked portfolio with the active source-bound record quality gate at the top', () => {
     const ledgerPath = resolve(
       process.cwd(),
       'docs/skill-ledger/experiments/2026-08-30-synthetic-usability.json',
@@ -54,13 +59,13 @@ describe('SkillLedger synthetic usability ledger', () => {
       {
         area: 'searchable-filterable-discovery',
         rank: 1,
-        experiment: 'declared-metadata-taxonomy-facets',
+        experiment: 'source-bound-record-quality-gate',
         status: 'in-progress',
-        metric: 'controlled-record facet coverage',
+        metric: 'controlled invalid-record rejection coverage',
         target:
-          'Exact deterministic facet counts for declared license, dependency state, and static-signal presence.',
+          'Every controlled record with a missing source binding, invalid observed time, or malformed hash is excluded and disclosed deterministically.',
         stopRule:
-          'No public discoverability, demand, safety, or public UI integration claim from controlled records. This does not establish adoption, revenue, demand, or safety.',
+          'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
       },
       {
         area: 'source-bound-comparison',
@@ -127,6 +132,12 @@ describe('SkillLedger synthetic usability ledger', () => {
           'Not started without actual users and authority; no adoption, revenue, demand, or safety claim.',
       },
     ]);
+    expect(ledger.experimentHistory).toContainEqual({
+      experiment: 'declared-metadata-taxonomy-facets',
+      status: 'completed-internal',
+      boundary:
+        'Declared metadata taxonomy facets remain controlled-record-only and do not establish safety, adoption, demand, or provenance.',
+    });
   });
 
   it('preserves the supplied synthetic-only baseline and its evidence boundary', () => {
