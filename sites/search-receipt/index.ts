@@ -5,7 +5,7 @@ export const searchReceiptSite: SiteDefinition = {
   name: 'Search Receipt',
   title: 'Search Receipt · Source-bound status records',
   description:
-    'Source-bound controlled examples, not current incident evidence, for search-service status records.',
+    'Search source-bound controlled examples by phrase or topic. They are not current incident evidence and do not explain a change on your own site.',
   proposition:
     'Search source-bound controlled examples by phrase or topic. They do not establish the cause of a change on your own site; check a verified official source before investigating.',
   audience:

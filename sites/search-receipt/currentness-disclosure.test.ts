@@ -18,9 +18,6 @@ describe('Search Receipt currentness disclosure', () => {
         experiment.id === 'retrieval-filter-offer-v1',
     );
 
-    expect(searchReceiptSite.description).toContain(
-      'controlled examples, not current incident evidence',
-    );
     expect(searchReceiptSite.proposition).toContain(
       'do not establish the cause of a change on your own site',
     );
@@ -30,12 +27,20 @@ describe('Search Receipt currentness disclosure', () => {
     const header = renderSite(searchReceiptSite, []).match(
       /<header class="site-header">[\s\S]*?<\/header>/,
     )?.[0];
+    const page = renderSite(searchReceiptSite, []);
+
+    expect(page).toContain(
+      '<meta name="description" content="Search source-bound controlled examples by phrase or topic. They are not current incident evidence and do not explain a change on your own site.">',
+    );
 
     expect(header).toContain(
       'Search source-bound controlled examples by phrase or topic.',
     );
     expect(header).toContain(
       'do not establish the cause of a change on your own site',
+    );
+    expect(header).toContain(
+      'check a verified official source before investigating',
     );
     expect(retrievalFilterOffer).toMatchObject({
       id: 'retrieval-filter-offer-v1',
