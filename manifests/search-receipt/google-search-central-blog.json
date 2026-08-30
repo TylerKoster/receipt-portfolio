@@ -2,8 +2,8 @@
   "siteId": "search-receipt",
   "sourceId": "google-search-central-blog",
   "kind": "rss",
-  "endpoint": "https://developers.google.com/search/blog/rss.xml",
-  "allowedHosts": ["developers.google.com"],
+  "endpoint": "https://feeds.feedburner.com/blogspot/amDG",
+  "allowedHosts": ["feeds.feedburner.com"],
   "allowedMediaTypes": [
     "application/atom+xml",
     "application/rss+xml",
