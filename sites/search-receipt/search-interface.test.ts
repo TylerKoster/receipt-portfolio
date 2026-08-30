@@ -357,7 +357,7 @@ describe('Search Receipt query and offer adapter', () => {
     const reset = elements.get('[data-search-reset]');
     expect(reset?.textContent).toBe('Clear filters');
     expect(initializeSearchReceipt(root)).toBe(true);
-    expect(form.appendCount).toBe(2);
+    expect(form.appendCount).toBe(3);
     expect(reset?.listeners.get('click')).toHaveLength(1);
     reset?.listeners
       .get('click')
@@ -461,8 +461,16 @@ describe('Search Receipt query and offer adapter', () => {
     );
     expect(appended.filter((child) => child === boundary)).toHaveLength(0);
 
+    const guidance = elements.get('[data-search-query-guidance]');
+    expect(guidance?.textContent).toBe(
+      'Search the source, topic, publisher, status, service, interpretation, or stated unknowns in a record, then refine by topic.',
+    );
+    expect(guidance?.textContent).not.toContain(query.value);
+    expect(appended.filter((child) => child === guidance)).toHaveLength(1);
+
     expect(initializeSearchReceipt(root)).toBe(true);
     expect(appended.filter((child) => child === boundary)).toHaveLength(0);
+    expect(appended.filter((child) => child === guidance)).toHaveLength(1);
     expect(query.attributes.get('aria-describedby')).toBe(
       'query-help search-interaction-boundary',
     );

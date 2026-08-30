@@ -124,7 +124,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -140,6 +140,30 @@ describe('Search Receipt product experiment ledger', () => {
       noDataBoundary: 'No data means no demand or revenue conclusion.',
       nextSafeAction:
         'Keep the local-only preview outcome under bounded observation only; no data means no demand or revenue conclusion.',
+    });
+  });
+
+  it('records source-bound query formulation guidance without claiming measurement', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(
+      ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(ledger.experiments[7]).toMatchObject({
+      id: 'query-formulation-guidance-v1',
+      rank: 8,
+      status: 'ACTIVE_NO_MEASUREMENT',
+      hypothesis:
+        'Naming the indexed source, topic, publisher, status, service, interpretation, and stated unknowns as source-bound query inputs may help visitors formulate a retrieval query and refine it by topic without treating a match as current evidence or a causal explanation.',
+      firstUserOutcome:
+        'Formulate a source-bound query using the source, topic, publisher, status, service, interpretation, or stated unknowns in a record, then refine it by topic.',
+      metric:
+        'Unmeasured query-formulation completion after 10 observed non-synthetic sessions.',
+      target: '>=60% after 10 observed non-synthetic sessions',
+      stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+      noDataBoundary: 'No data means no demand or revenue conclusion.',
+      nextSafeAction:
+        'Keep the source-bound query guidance under bounded observation only; no data means no demand or revenue conclusion.',
     });
   });
 });

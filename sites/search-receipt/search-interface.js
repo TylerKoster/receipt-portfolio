@@ -81,6 +81,23 @@ function findOrCreateInteractionBoundary(root, form) {
   return boundary;
 }
 
+function findOrCreateQueryGuidance(root, form) {
+  const existing = root.querySelector('[data-search-query-guidance]');
+  if (existing) return existing;
+
+  const document = form.ownerDocument;
+  if (!document?.createElement || typeof form.append !== 'function')
+    return null;
+
+  const guidance = document.createElement('p');
+  guidance.setAttribute('class', 'search-query-guidance');
+  guidance.setAttribute('data-search-query-guidance', '');
+  guidance.textContent =
+    'Search the source, topic, publisher, status, service, interpretation, or stated unknowns in a record, then refine by topic.';
+  form.append(guidance);
+  return guidance;
+}
+
 function describeWithInteractionBoundary(control) {
   if (typeof control.setAttribute !== 'function') return;
   const describedBy =
@@ -108,6 +125,7 @@ export function initializeSearchReceipt(root) {
   if (form.dataset?.searchInterfaceBound === 'true') return true;
 
   findOrCreateInteractionBoundary(root, form);
+  findOrCreateQueryGuidance(root, form);
   describeWithInteractionBoundary(query);
   describeWithInteractionBoundary(topic);
   const reset = findOrCreateResetControl(root, form);
