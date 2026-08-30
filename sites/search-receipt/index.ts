@@ -5,9 +5,9 @@ export const searchReceiptSite: SiteDefinition = {
   name: 'Search Receipt',
   title: 'Search Receipt · Source-bound status records',
   description:
-    'Source-bound evidence receipts for observed search-service status changes.',
+    'Source-bound controlled examples, not current incident evidence, for search-service status records.',
   proposition:
-    'Inspect source-bound records of observed search-service status changes without turning them into claims about search performance.',
+    'Source-bound records do not establish the cause of a change on your own site; check a verified official source before investigating.',
   interpretationBoundary:
     'A receipt records fields present in one accepted source observation. It can support a decision to investigate, but it does not identify the cause of changes on a particular site.',
   unknowns:
