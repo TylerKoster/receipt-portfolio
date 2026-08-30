@@ -18,6 +18,8 @@ const EXPECTED_PATHS = [
   'search-receipt/methodology/index.html',
   `search-receipt/receipts/${'a'.repeat(64)}/index.html`,
   'search-receipt/robots.txt',
+  'search-receipt/search-interface.css',
+  'search-receipt/search-interface.js',
   'search-receipt/sitemap.xml',
   'search-receipt/sources/index.html',
   'search-receipt/styles.css',
@@ -40,7 +42,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  'e43ced5bbe19c8711e27f58d661612323493fb5e570f74a7f55e173c8934905b';
+  '6572235f63a9c90285f5b69073582ee5a87c81cf9661b58434b3c26ab0089a88';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

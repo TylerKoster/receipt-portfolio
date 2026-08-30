@@ -339,6 +339,23 @@ async function writeSiteTree(
       join(projectRoot(), 'sites', 'shared', 'styles.css'),
       join(directory, 'styles.css'),
     );
+    if (site.siteId === 'search-receipt') {
+      await Promise.all([
+        copyFile(
+          join(projectRoot(), 'sites', 'search-receipt', 'search-interface.js'),
+          join(directory, 'search-interface.js'),
+        ),
+        copyFile(
+          join(
+            projectRoot(),
+            'sites',
+            'search-receipt',
+            'search-interface.css',
+          ),
+          join(directory, 'search-interface.css'),
+        ),
+      ]);
+    }
     await writeFile(
       join(directory, 'index.html'),
       renderSite(site, visible, publicBaseUrl),

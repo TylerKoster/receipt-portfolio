@@ -17,6 +17,13 @@ const FIXED_SITE_FILES = [
   'sources/index.html',
   'styles.css',
 ] as const;
+const SITE_SPECIFIC_FILES: Readonly<
+  Record<(typeof PUBLIC_SITE_ROOTS)[number], readonly string[]>
+> = {
+  'search-receipt': ['search-interface.css', 'search-interface.js'],
+  'skill-ledger': [],
+  'workflow-test-lab': [],
+};
 
 export interface PublicBuildInventoryEntry {
   readonly path: string;
@@ -52,11 +59,15 @@ async function requireRealDirectory(
   }
 }
 
-function allowedSiteFile(siteRelativePath: string): boolean {
+function allowedSiteFile(
+  siteRoot: (typeof PUBLIC_SITE_ROOTS)[number],
+  siteRelativePath: string,
+): boolean {
   return (
     FIXED_SITE_FILES.includes(
       siteRelativePath as (typeof FIXED_SITE_FILES)[number],
     ) ||
+    SITE_SPECIFIC_FILES[siteRoot].includes(siteRelativePath) ||
     /^receipts\/[a-f0-9]{64}\/index\.html$/.test(siteRelativePath) ||
     /^topics\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(siteRelativePath)
   );
@@ -98,7 +109,10 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
   }
 
   const files = ROOT_SHELL_FILES.map((path) => join(outputDirectory, path));
-  async function visit(siteRoot: string, directory: string): Promise<void> {
+  async function visit(
+    siteRoot: (typeof PUBLIC_SITE_ROOTS)[number],
+    directory: string,
+  ): Promise<void> {
     await requireRealDirectory(directory, `Public ${siteRoot} directory`);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
@@ -111,7 +125,10 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
         );
       }
       if (entry.isDirectory()) await visit(siteRoot, path);
-      else if (!entry.isFile() || !allowedSiteFile(siteRelativePath)) {
+      else if (
+        !entry.isFile() ||
+        !allowedSiteFile(siteRoot, siteRelativePath)
+      ) {
         throw new Error(
           `Unexpected public output file: ${siteRoot}/${siteRelativePath}`,
         );
@@ -128,7 +145,10 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
       .map((path) =>
         relative(join(outputDirectory, siteRoot), path).split(sep).join('/'),
       );
-    for (const fixed of FIXED_SITE_FILES) {
+    for (const fixed of [
+      ...FIXED_SITE_FILES,
+      ...SITE_SPECIFIC_FILES[siteRoot],
+    ]) {
       if (!siteFiles.includes(fixed)) {
         throw new Error(
           `Incomplete public output: missing ${siteRoot}/${fixed}`,

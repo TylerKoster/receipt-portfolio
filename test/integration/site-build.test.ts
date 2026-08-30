@@ -44,6 +44,8 @@ const mockedRm = vi.mocked(rm);
 
 const CSP =
   "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'\">";
+const SEARCH_RECEIPT_CSP =
+  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'self'\">";
 const SITE_HEADINGS = {
   'search-receipt': 'Search Receipt',
   'skill-ledger': 'SkillLedger',
@@ -473,9 +475,19 @@ describe('static receipt site build', () => {
         join(outputDirectory, siteId, 'styles.css'),
         'utf8',
       );
-      expect(html).toContain(CSP);
+      expect(html).toContain(
+        siteId === 'search-receipt' ? SEARCH_RECEIPT_CSP : CSP,
+      );
       expect(html).toContain(`href="/${siteId}/styles.css"`);
       expect(styles).toContain('--accent');
+      if (siteId !== 'search-receipt') {
+        expect(styles).toBe(
+          await readFile(
+            join(projectRoot, 'sites', 'shared', 'styles.css'),
+            'utf8',
+          ),
+        );
+      }
     }
 
     const inventory = Object.keys(await fileInventory(outputDirectory));
@@ -493,6 +505,12 @@ describe('static receipt site build', () => {
     }
     expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
     expect(inventory.some((path) => /\/topics\//.test(path))).toBe(true);
+    expect(inventory).toContain('search-receipt/search-interface.js');
+    expect(inventory).toContain('search-receipt/search-interface.css');
+    expect(inventory).not.toContain('workflow-test-lab/search-interface.js');
+    expect(inventory).not.toContain('skill-ledger/search-interface.js');
+    expect(inventory).not.toContain('workflow-test-lab/search-interface.css');
+    expect(inventory).not.toContain('skill-ledger/search-interface.css');
   });
 
   it('makes an incremental build byte-equal to a clean build after evidence changes', async () => {
@@ -766,6 +784,24 @@ describe('static receipt site build', () => {
         join(secondRuntime, 'sites', 'shared', 'styles.css'),
       ),
     ]);
+    await Promise.all([
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'search-receipt', 'search-interface.js'),
+        join(firstRuntime, 'sites', 'search-receipt', 'search-interface.js'),
+      ),
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'search-receipt', 'search-interface.js'),
+        join(secondRuntime, 'sites', 'search-receipt', 'search-interface.js'),
+      ),
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'search-receipt', 'search-interface.css'),
+        join(firstRuntime, 'sites', 'search-receipt', 'search-interface.css'),
+      ),
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'search-receipt', 'search-interface.css'),
+        join(secondRuntime, 'sites', 'search-receipt', 'search-interface.css'),
+      ),
+    ]);
 
     const evidenceRootsUsed: string[] = [];
     const recordingExecutor: ProductionBuildExecutor = async (
@@ -804,6 +840,12 @@ describe('static receipt site build', () => {
     await expect(
       readFile(join(firstOutput, 'search-receipt', 'index.html'), 'utf8'),
     ).resolves.toContain('Search Receipt');
+    await expect(
+      readFile(
+        join(firstOutput, 'search-receipt', 'search-interface.js'),
+        'utf8',
+      ),
+    ).resolves.toContain('initializeSearchReceipt');
     await expect(
       readFile(join(secondOutput, 'skill-ledger', 'index.html'), 'utf8'),
     ).resolves.toContain('SkillLedger');

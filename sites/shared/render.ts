@@ -16,8 +16,14 @@ export interface SiteDefinition {
 }
 
 export const DEFAULT_PUBLIC_BASE_URL = 'https://receipt-portfolio.example/';
-const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'";
+const CONTENT_SECURITY_POLICY_PREFIX =
+  "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'";
+
+function contentSecurityPolicy(scriptPolicy: "'none'" | "'self'"): string {
+  return `${CONTENT_SECURITY_POLICY_PREFIX}; script-src ${scriptPolicy}`;
+}
+
+const CONTENT_SECURITY_POLICY = contentSecurityPolicy("'none'");
 
 export function normalizePublicBaseUrl(value: string): string {
   if (value.includes('?') || value.includes('#')) {
@@ -152,6 +158,17 @@ function factMarkup(receipt: Receipt): string {
     .join('');
 }
 
+function searchText(receipt: Receipt): string {
+  return [
+    receipt.payload.sourceId,
+    receipt.payload.topicSlug,
+    receipt.payload.provenance.publisherName,
+    receipt.payload.interpretation,
+    ...receipt.payload.unknowns,
+    ...facts(receipt.payload.publicFacts).flat(),
+  ].join(' ');
+}
+
 function exampleLabel(receipt: Receipt): string {
   return receipt.payload.provenance.evidenceClass === 'controlled-example'
     ? '<p class="example-label"><strong>Controlled fixture example</strong> · This is not live or current source evidence.</p>'
@@ -162,6 +179,7 @@ function receiptCard(
   site: SiteDefinition,
   receipt: Receipt,
   publicBaseUrl: string,
+  searchable = false,
 ): string {
   const unknowns = receipt.payload.unknowns
     .map((unknown) => `<li>${escapeHtml(unknown)}</li>`)
@@ -171,7 +189,11 @@ function receiptCard(
       ? `Correction of <a href="${escapeHtml(sitePath(site, `/receipts/${receipt.payload.correction.correctsReceiptId}/`, publicBaseUrl))}"><code>${escapeHtml(receipt.payload.correction.correctsReceiptId)}</code></a>.`
       : 'No correction relation is asserted by this receipt.';
 
-  return `<article class="receipt-card" aria-labelledby="receipt-${escapeHtml(receipt.id)}">
+  const searchAttributes = searchable
+    ? ` data-search-record data-search-text="${escapeHtml(searchText(receipt))}" data-search-topic="${escapeHtml(receipt.payload.topicSlug)}"`
+    : '';
+
+  return `<article class="receipt-card" aria-labelledby="receipt-${escapeHtml(receipt.id)}"${searchAttributes}>
   ${exampleLabel(receipt)}
   <div class="receipt-card__heading">
     <p class="eyebrow">Accepted evidence receipt</p>
@@ -208,6 +230,8 @@ function page(
     readonly description: string;
     readonly body: string;
     readonly structuredData?: string;
+    readonly scriptPath?: string;
+    readonly stylePath?: string;
   },
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
@@ -215,16 +239,27 @@ function page(
     options.structuredData === undefined
       ? ''
       : `\n  <script type="application/ld+json">${options.structuredData}</script>`;
+  const script =
+    options.scriptPath === undefined
+      ? ''
+      : `\n  <script type="module" src="${escapeHtml(sitePath(site, options.scriptPath, publicBaseUrl))}"></script>`;
+  const productStyle =
+    options.stylePath === undefined
+      ? ''
+      : `\n  <link rel="stylesheet" href="${escapeHtml(sitePath(site, options.stylePath, publicBaseUrl))}">`;
+  const policy = contentSecurityPolicy(
+    options.scriptPath === undefined ? "'none'" : "'self'",
+  );
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
+  <meta http-equiv="Content-Security-Policy" content="${policy}">
   <meta name="description" content="${escapeHtml(options.description)}">
   <link rel="canonical" href="${escapeHtml(canonicalUrl(site, options.path, publicBaseUrl))}">
   <title>${escapeHtml(options.title)}</title>
-  <link rel="stylesheet" href="${escapeHtml(sitePath(site, '/styles.css', publicBaseUrl))}">${structuredData}
+  <link rel="stylesheet" href="${escapeHtml(sitePath(site, '/styles.css', publicBaseUrl))}">${productStyle}${structuredData}${script}
 </head>
 <body class="site-${site.siteId}">
   <a class="skip-link" href="#main-content">Skip to evidence</a>
@@ -239,7 +274,7 @@ function page(
     </nav>
   </div></header>
   <main id="main-content" class="shell">${options.body}</main>
-  <footer><div class="shell">Deterministic static evidence · No accounts, analytics, external assets, or executable source content.</div></footer>
+  <footer><div class="shell">${options.scriptPath === undefined ? 'Deterministic static evidence · No accounts, analytics, external assets, or executable source content.' : 'Deterministic static evidence · First-party filtering only; no accounts, analytics, external assets, or query transmission.'}</div></footer>
 </body>
 </html>
 `;
@@ -251,11 +286,19 @@ export function renderSite(
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
   const visible = accepted(receipts);
+  const assetPolicy = renderSiteAssetPolicy(site);
   const cards =
     visible.length === 0
       ? '<p class="empty-state">No accepted receipts are available in this build.</p>'
       : visible
-          .map((receipt) => receiptCard(site, receipt, publicBaseUrl))
+          .map((receipt) =>
+            receiptCard(
+              site,
+              receipt,
+              publicBaseUrl,
+              site.siteId === 'search-receipt',
+            ),
+          )
           .join('\n');
   const topics = [
     ...new Set(visible.map((receipt) => receipt.payload.topicSlug)),
@@ -266,17 +309,52 @@ export function renderSite(
         `<li><a href="${escapeHtml(sitePath(site, `/topics/${topic}/`, publicBaseUrl))}">${escapeHtml(topic)}</a></li>`,
     )
     .join('');
+  const topicOptions = [
+    ...new Set(visible.map((receipt) => receipt.payload.topicSlug)),
+  ]
+    .sort(compareText)
+    .map(
+      (topic) =>
+        `<option value="${escapeHtml(topic)}">${escapeHtml(topic)}</option>`,
+    )
+    .join('');
+  const searchControls =
+    site.siteId === 'search-receipt'
+      ? `<section class="search-panel" aria-labelledby="search-heading"><p class="eyebrow">Enterable record search</p><h2 id="search-heading">Find a source-bound record</h2><p>Filter the records already published on this page. Queries stay in this browser and are not stored or sent.</p>
+    <form class="search-controls" role="search" data-search-controls><div><label for="receipt-query">Search records</label><input id="receipt-query" name="receipt-query" type="search" autocomplete="off" data-search-query></div><div><label for="receipt-topic">Filter by topic</label><select id="receipt-topic" name="receipt-topic" data-search-topic-filter><option value="">All topics</option>${topicOptions}</select></div><button type="submit">Apply filters</button></form>
+    <p class="search-status" aria-live="polite" data-search-status>Showing ${visible.length} of ${visible.length} ${visible.length === 1 ? 'record' : 'records'}.</p><p class="empty-state" data-search-empty hidden>No records match this query and filter.</p><p class="empty-state" role="status" data-search-error>Interactive filtering is not active; all records remain visible.</p></section>`
+      : '';
+  const offer =
+    site.siteId === 'search-receipt'
+      ? `<section class="information-panel" aria-labelledby="offer-heading"><p class="eyebrow">Preview interest action</p><h2 id="offer-heading">Status alert and report preview</h2><p>This non-operational preview does not create an alert, send data, or start a report.</p><button type="button" data-measurement-action="alert-report-interest">I would use alerts or reports</button><p aria-live="polite" data-offer-status></p></section>`
+      : '';
   return page(
     site,
     {
       path: '/',
       title: site.title,
       description: site.description,
-      body: `<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
-    <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>`,
+      body: `${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
+    <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>${offer}`,
+      scriptPath: assetPolicy.scriptPath,
+      stylePath: assetPolicy.stylePath,
     },
     publicBaseUrl,
   );
+}
+
+export function renderSiteAssetPolicy(site: SiteDefinition): {
+  readonly scriptPath: string | undefined;
+  readonly scriptPolicy: "'none'" | "'self'";
+  readonly stylePath: string | undefined;
+} {
+  return site.siteId === 'search-receipt'
+    ? {
+        scriptPath: '/search-interface.js',
+        scriptPolicy: "'self'",
+        stylePath: '/search-interface.css',
+      }
+    : { scriptPath: undefined, scriptPolicy: "'none'", stylePath: undefined };
 }
 
 export function renderMethodology(
