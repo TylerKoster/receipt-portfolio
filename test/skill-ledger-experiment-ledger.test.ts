@@ -37,7 +37,9 @@ describe('SkillLedger synthetic usability ledger', () => {
       process.cwd(),
       'docs/skill-ledger/experiments/2026-08-30-synthetic-usability.json',
     );
-    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8')) as SyntheticUsabilityLedger;
+    const ledger = JSON.parse(
+      readFileSync(ledgerPath, 'utf8'),
+    ) as SyntheticUsabilityLedger;
 
     expect(ledger.evidenceClass).toBe('synthetic-heuristic-usability');
     expect(ledger.baseline).toEqual({
@@ -57,7 +59,8 @@ describe('SkillLedger synthetic usability ledger', () => {
         id: 'security-reviewer',
         outcome: 'partial',
         task: 'Interpret static-risk signals without treating them as safety conclusions.',
-        finding: 'Partially understood the boundary but could not decide adoption.',
+        finding:
+          'Partially understood the boundary but could not decide adoption.',
       },
       {
         id: 'automation-consultant',
@@ -74,7 +77,8 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         id: 'static-boundary-inspection',
-        scope: 'Inspect static-risk signals without treating them as safety conclusions.',
+        scope:
+          'Inspect static-risk signals without treating them as safety conclusions.',
         status: 'partial',
       },
       {

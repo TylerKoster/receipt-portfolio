@@ -26,7 +26,10 @@ const receiptA = {
     rawSha256: 'b'.repeat(64),
     normalizedSha256: 'c'.repeat(64),
   },
-  provenance: { collector: 'controlled-test-fixture', method: 'static-receipt' },
+  provenance: {
+    collector: 'controlled-test-fixture',
+    method: 'static-receipt',
+  },
   publicFacts: {
     kind: 'skill-inventory',
     packageId: 'archive-skill',
@@ -56,7 +59,10 @@ const receiptB = {
     rawSha256: 'f'.repeat(64),
     normalizedSha256: '0'.repeat(64),
   },
-  provenance: { collector: 'controlled-test-fixture', method: 'static-receipt' },
+  provenance: {
+    collector: 'controlled-test-fixture',
+    method: 'static-receipt',
+  },
   publicFacts: {
     kind: 'skill-inventory',
     packageId: 'catalog-skill',
@@ -99,10 +105,15 @@ describe('source-bound SkillLedger inventory experiment', () => {
   it('searches package and source identifiers and applies exact declared filters', () => {
     const records = sourceBoundSkillInventory([receiptA, receiptB]);
 
-    expect(filterSkillInventory(records, { query: 'ARCHIVE', dependencyState: 'none' }))
-      .toHaveLength(1);
-    expect(filterSkillInventory(records, { query: 'CURATED-CATALOG' }))
-      .toMatchObject([{ receiptId: 'receipt-b' }]);
+    expect(
+      filterSkillInventory(records, {
+        query: 'ARCHIVE',
+        dependencyState: 'none',
+      }),
+    ).toHaveLength(1);
+    expect(
+      filterSkillInventory(records, { query: 'CURATED-CATALOG' }),
+    ).toMatchObject([{ receiptId: 'receipt-b' }]);
     expect(
       filterSkillInventory(records, {
         declaredLicense: 'Apache-2.0',
@@ -115,7 +126,9 @@ describe('source-bound SkillLedger inventory experiment', () => {
   it('compares exactly two distinct source-bound records without an adoption or safety conclusion', () => {
     const records = sourceBoundSkillInventory([receiptA, receiptB]);
 
-    expect(compareSkillInventory(records, ['receipt-a', 'receipt-b'])).toMatchObject({
+    expect(
+      compareSkillInventory(records, ['receipt-a', 'receipt-b']),
+    ).toMatchObject({
       kind: 'ready',
       records: [{ receiptId: 'receipt-a' }, { receiptId: 'receipt-b' }],
     });

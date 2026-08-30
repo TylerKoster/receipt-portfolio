@@ -71,7 +71,9 @@ export type SyntheticOfferEvent = Readonly<{
   persisted: false;
 }>;
 
-function isAcceptedSkillLedgerReceipt(receipt: SourceBoundSkillReceipt): boolean {
+function isAcceptedSkillLedgerReceipt(
+  receipt: SourceBoundSkillReceipt,
+): boolean {
   return (
     receipt.receipt.siteId === 'skill-ledger' &&
     receipt.receipt.status === 'PASS' &&
@@ -96,7 +98,9 @@ export function sourceBoundSkillInventory(
       manifestPresent: receipt.publicFacts.manifestPresent,
       dependencies: receipt.publicFacts.declaredDependencies,
       dependencyState:
-        receipt.publicFacts.declaredDependencies.length === 0 ? 'none' : 'declared',
+        receipt.publicFacts.declaredDependencies.length === 0
+          ? 'none'
+          : 'declared',
       contentsSha256: receipt.publicFacts.contentsSha256,
     },
     staticRiskFlags: receipt.publicFacts.staticRiskFlags,
@@ -122,9 +126,14 @@ export function filterSkillInventory(
       record.declaredMetadata.dependencyState === filters.dependencyState;
     const matchesStaticSignal =
       filters.staticSignalPresent === undefined ||
-      (record.staticRiskFlags.length > 0) === filters.staticSignalPresent;
+      record.staticRiskFlags.length > 0 === filters.staticSignalPresent;
 
-    return matchesQuery && matchesLicense && matchesDependencyState && matchesStaticSignal;
+    return (
+      matchesQuery &&
+      matchesLicense &&
+      matchesDependencyState &&
+      matchesStaticSignal
+    );
   });
 }
 
@@ -140,7 +149,9 @@ export function compareSkillInventory(
   }
 
   const selectedRecords = receiptIds
-    .map((receiptId) => records.find((record) => record.receiptId === receiptId))
+    .map((receiptId) =>
+      records.find((record) => record.receiptId === receiptId),
+    )
     .filter((record): record is SkillInventoryRecord => record !== undefined);
 
   if (selectedRecords.length !== 2) {
