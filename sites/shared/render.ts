@@ -3,7 +3,11 @@ import type {
   ReceiptPublicFacts,
 } from '../../packages/evidence-core/src/index.js';
 
-export type SiteId = 'search-receipt' | 'workflow-test-lab' | 'skill-ledger';
+export type SiteId =
+  | 'search-receipt'
+  | 'workflow-test-lab'
+  | 'skill-ledger'
+  | 'video-moment-search';
 
 export interface SiteDefinition {
   readonly siteId: SiteId;
@@ -17,7 +21,10 @@ export interface SiteDefinition {
   readonly outcome: string;
   readonly primaryAction: {
     readonly label: string;
-    readonly targetId: 'search-controls' | 'receipts-heading';
+    readonly targetId:
+      | 'search-controls'
+      | 'receipts-heading'
+      | 'moment-search-controls';
   };
   readonly interpretationBoundary: string;
   readonly unknowns: string;

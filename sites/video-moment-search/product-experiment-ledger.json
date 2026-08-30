@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "siteId": "video-moment-search",
+  "evidenceClassification": {
+    "kind": "SIMULATED_HEURISTIC_REGRESSION_EVIDENCE",
+    "limitations": [
+      "Simulated-user results are heuristic regressions, not usability or demand evidence.",
+      "This controlled fixture does not establish a live creator library, permission, public usability, demand, or revenue."
+    ]
+  },
+  "experiment": {
+    "id": "deterministic-moment-recovery-v1",
+    "status": "LOCAL_INTEGRATION_CANDIDATE",
+    "baseline": "Production route returned 404 before this candidate.",
+    "target": "100% deterministic fixed-flow completion; expected moment appears in the top three; zero timestamp landing error.",
+    "stopRule": "Stop if any result lacks validated rights or exact source-time routing.",
+    "fixedFlow": {
+      "query": "agent evaluation",
+      "expectedFirstMomentId": "moment-agent-evals",
+      "expectedTimestampUrl": "https://video.example/watch/agent-evals?t=132"
+    },
+    "noDataBoundary": "No measured users, usability, demand, or revenue evidence exists."
+  }
+}

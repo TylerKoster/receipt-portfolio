@@ -816,6 +816,54 @@ describe('static receipt site build', () => {
         ),
       ]);
       await Promise.all([
+        realFileSystem.mkdir(
+          join(firstRuntime, 'fixtures', 'video-moment-search'),
+          { recursive: true },
+        ),
+        realFileSystem.mkdir(
+          join(secondRuntime, 'fixtures', 'video-moment-search'),
+          { recursive: true },
+        ),
+      ]);
+      await Promise.all([
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'fixtures',
+            'video-moment-search',
+            'authorized-ai-video-v1.json',
+          ),
+          join(
+            firstRuntime,
+            'fixtures',
+            'video-moment-search',
+            'authorized-ai-video-v1.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'fixtures',
+            'video-moment-search',
+            'authorized-ai-video-v1.json',
+          ),
+          join(
+            secondRuntime,
+            'fixtures',
+            'video-moment-search',
+            'authorized-ai-video-v1.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(projectRoot, 'sites', 'video-moment-search', 'styles.css'),
+          join(firstRuntime, 'sites', 'video-moment-search', 'styles.css'),
+        ),
+        realFileSystem.copyFile(
+          join(projectRoot, 'sites', 'video-moment-search', 'styles.css'),
+          join(secondRuntime, 'sites', 'video-moment-search', 'styles.css'),
+        ),
+      ]);
+      await Promise.all([
         realFileSystem.copyFile(
           join(projectRoot, 'sites', 'shared', 'styles.css'),
           join(firstRuntime, 'sites', 'shared', 'styles.css'),

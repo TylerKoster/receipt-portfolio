@@ -1,0 +1,59 @@
+{
+  "corpusId": "authorized-ai-video-local-test-v1",
+  "label": "LOCAL TEST FIXTURE ONLY — NO CREATOR AUTHORIZATION, DEMAND, OR PRODUCTION MEDIA",
+  "videos": [
+    {
+      "id": "video-agent-evals",
+      "slug": "agent-evals",
+      "title": "Local Test: Agent Evaluation Mechanics",
+      "creatorId": "local-test-creator",
+      "creatorName": "Local Test Creator",
+      "sourceUrl": "https://video.example/watch/agent-evals",
+      "durationSeconds": 300
+    }
+  ],
+  "rights": [
+    {
+      "id": "rights-local-test-video",
+      "creatorId": "local-test-creator",
+      "basis": "explicit-license",
+      "coveredVideoIds": ["video-agent-evals"],
+      "coveredSourceUrls": ["https://video.example/watch/agent-evals"],
+      "coveredCaptionHashes": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "allowedUses": {
+        "commercialUse": true,
+        "excerpts": true,
+        "timestampLinks": true
+      },
+      "maxExcerptCharacters": 280,
+      "licenseNote": "LOCAL TEST LICENSE ONLY — no creator authorization, demand, or production media is asserted.",
+      "permissionVerifiedAt": "2026-08-30T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "revocationContact": "local-test@example.invalid"
+    }
+  ],
+  "cues": [
+    {
+      "id": "cue-agent-evals",
+      "videoId": "video-agent-evals",
+      "startSeconds": 120,
+      "endSeconds": 200,
+      "text": "Local test caption coverage for agent evaluation mechanics.",
+      "captionSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "moments": [
+    {
+      "id": "moment-agent-evals",
+      "videoId": "video-agent-evals",
+      "startSeconds": 132,
+      "endSeconds": 188,
+      "excerpt": "Local test excerpt for agent evaluation mechanics.",
+      "topicSlugs": ["agent-evaluation"],
+      "state": "active",
+      "rightsGrantId": "rights-local-test-video"
+    }
+  ]
+}

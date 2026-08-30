@@ -26,6 +26,10 @@ import {
   canonicalJson,
   type Receipt,
 } from '../packages/evidence-core/src/index.js';
+import {
+  buildSearchIndex,
+  type VideoCorpus,
+} from '../packages/video-moment-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
@@ -41,6 +45,12 @@ import {
   renderTopic,
 } from '../sites/shared/render.js';
 import { skillLedgerSite } from '../sites/skill-ledger/index.js';
+import { videoMomentSearchSite } from '../sites/video-moment-search/index.js';
+import { VIDEO_MOMENT_SEARCH_CLIENT } from '../sites/video-moment-search/search-client.js';
+import {
+  renderVideoMomentHome,
+  serializePublicSearchIndex,
+} from '../sites/video-moment-search/render.js';
 import { workflowTestLabSite } from '../sites/workflow-test-lab/index.js';
 import { loadVerifiedReceipts } from './evidence-cli.js';
 
@@ -313,6 +323,7 @@ async function writeSiteTree(
   outputDirectory: string,
   receipts: readonly Receipt[],
   publicBaseUrl: string,
+  includeVideoMomentSearch: boolean,
 ): Promise<void> {
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
@@ -321,7 +332,12 @@ async function writeSiteTree(
   );
   await writeFile(
     join(outputDirectory, 'index.html'),
-    renderPortfolioHub(SITE_DEFINITIONS, publicBaseUrl),
+    renderPortfolioHub(
+      includeVideoMomentSearch
+        ? [...SITE_DEFINITIONS, videoMomentSearchSite]
+        : SITE_DEFINITIONS,
+      publicBaseUrl,
+    ),
   );
   for (const site of SITE_DEFINITIONS) {
     const directory = join(outputDirectory, site.siteId);
@@ -398,6 +414,40 @@ async function writeSiteTree(
         renderTopic(site, topic, visible, publicBaseUrl),
       );
     }
+  }
+  if (includeVideoMomentSearch) {
+    const fixture = JSON.parse(
+      await readFile(
+        join(
+          projectRoot(),
+          'fixtures',
+          'video-moment-search',
+          'authorized-ai-video-v1.json',
+        ),
+        'utf8',
+      ),
+    ) as VideoCorpus;
+    const index = buildSearchIndex(fixture);
+    const directory = join(outputDirectory, videoMomentSearchSite.siteId);
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      writeFile(
+        join(directory, 'index.html'),
+        renderVideoMomentHome(fixture, index, publicBaseUrl),
+      ),
+      writeFile(
+        join(directory, 'search-index.json'),
+        canonicalJson(serializePublicSearchIndex(fixture, index)),
+      ),
+      writeFile(
+        join(directory, 'search-client.js'),
+        VIDEO_MOMENT_SEARCH_CLIENT,
+      ),
+      copyFile(
+        join(projectRoot(), 'sites', 'video-moment-search', 'styles.css'),
+        join(directory, 'styles.css'),
+      ),
+    ]);
   }
 }
 
@@ -494,6 +544,7 @@ export async function buildSites(options: {
   outputDirectory: string;
   publicBaseUrl?: string;
   trustedWorkspaceDirectory?: string;
+  includeVideoMomentSearch?: boolean;
 }): Promise<void> {
   const publicBaseUrl = normalizePublicBaseUrl(
     options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
@@ -538,7 +589,12 @@ export async function buildSites(options: {
   );
   try {
     await verifyOwnedStaging(stagingDirectory, canonicalParentPath);
-    await writeSiteTree(stagingDirectory, receipts, publicBaseUrl);
+    await writeSiteTree(
+      stagingDirectory,
+      receipts,
+      publicBaseUrl,
+      options.includeVideoMomentSearch ?? false,
+    );
     await replaceOutput(stagingDirectory, outputDirectory, canonicalParentPath);
   } catch (error) {
     try {
@@ -568,6 +624,7 @@ async function runBuild(): Promise<void> {
       process.env[OUTPUT_DIRECTORY_ENV] ?? join('dist', 'sites'),
     ),
     publicBaseUrl: process.env[PUBLIC_BASE_URL_ENV],
+    includeVideoMomentSearch: true,
   });
 }
 
