@@ -521,7 +521,7 @@ export function renderPortfolioHub(
   const productLinks = sites
     .map(
       (site) =>
-        `<article class="receipt-card"><h2><a href="${escapeHtml(`${basePath}${site.siteId}/`)}">${escapeHtml(site.name)}</a></h2><p><strong>For:</strong> ${escapeHtml(site.audience)}</p><p><strong>Use it to:</strong> ${escapeHtml(site.useCase)}</p><p><strong>Expected output:</strong> ${escapeHtml(site.outcome)}</p></article>`,
+        `<article class="receipt-card"><h3>${escapeHtml(site.name)}</h3><p><strong>For:</strong> ${escapeHtml(site.audience)}</p><p><strong>Use it when:</strong> ${escapeHtml(site.useCase)}</p><p><strong>Expected output:</strong> ${escapeHtml(site.outcome)}</p><p><a class="primary-action" href="${escapeHtml(`${basePath}${site.siteId}/#${site.primaryAction.targetId}`)}">${escapeHtml(site.primaryAction.label)}</a></p></article>`,
     )
     .join('\n');
   return `<!doctype html>
@@ -543,7 +543,11 @@ export function renderPortfolioHub(
     <h1>Choose a task, then inspect the evidence</h1>
     <p class="proposition">Each tool states who it is for, what decision it supports, how to use it, and what its evidence cannot establish. Controlled examples are not live or current source evidence.</p>
   </div></header>
-  <main id="main-content" class="shell"><section class="receipt-list" aria-label="Portfolio products">${productLinks}</section></main>
+  <main id="main-content" class="shell">
+    <section class="information-panel" aria-labelledby="portfolio-how-to-heading"><p class="eyebrow">Three steps</p><h2 id="portfolio-how-to-heading">How to use this portfolio</h2><ol><li>Choose the question closest to the decision you need to make.</li><li>Open that product and follow its three-step Start here guide.</li><li>Use its stated limits to decide what evidence or test to check next.</li></ol></section>
+    <section class="information-panel" aria-labelledby="portfolio-boundary-heading"><p class="eyebrow">Shared boundary</p><h2 id="portfolio-boundary-heading">Shared controlled-example boundary</h2><p>All records labeled as controlled examples demonstrate a method. They are not live or current evidence, diagnoses, safety assessments, adoption recommendations, user results, demand, or revenue evidence.</p></section>
+    <section aria-labelledby="portfolio-products-heading"><p class="eyebrow">Choose a product</p><h2 id="portfolio-products-heading">Which question are you trying to answer?</h2><div class="receipt-list">${productLinks}</div></section>
+  </main>
   <footer><div class="shell">This portfolio hub is a deployment shell, not a fourth evidence product.</div></footer>
 </body>
 </html>

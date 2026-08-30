@@ -162,13 +162,63 @@ describe('user-first product orientation', () => {
     for (const site of ordered) {
       expect(html).toContain(site.name);
       expect(html).toContain(`<strong>For:</strong> ${site.audience}`);
-      expect(html).toContain(`<strong>Use it to:</strong> ${site.useCase}`);
-      expect(html).toContain(`href="/tools/${site.siteId}/"`);
+      expect(html).toContain(`<strong>Use it when:</strong> ${site.useCase}`);
+      expect(html).toContain(
+        `<a class="primary-action" href="/tools/${site.siteId}/#${site.primaryAction.targetId}">${site.primaryAction.label}</a>`,
+      );
     }
+    expect(html).not.toContain('<strong>Use it to:</strong>');
+    expect(html).not.toContain('<h2><a');
     expect(html).not.toContain('Workflow Test Lab');
     expect(html).toContain(
       '<meta name="description" content="2 task-oriented evidence products with explicit limits.">',
     );
+  });
+
+  it('explains the three-step portfolio flow and one shared controlled-example boundary', () => {
+    const html = renderPortfolioHub(sites, 'https://example.com/tools/');
+
+    expect(html).toContain(
+      '<section class="information-panel" aria-labelledby="portfolio-how-to-heading">',
+    );
+    expect(html).toContain(
+      '<h2 id="portfolio-how-to-heading">How to use this portfolio</h2>',
+    );
+    expect(html).toContain(
+      '<ol><li>Choose the question closest to the decision you need to make.</li><li>Open that product and follow its three-step Start here guide.</li><li>Use its stated limits to decide what evidence or test to check next.</li></ol>',
+    );
+    expect(html.match(/<ol>/g)).toHaveLength(1);
+    expect(html).toContain(
+      '<section class="information-panel" aria-labelledby="portfolio-boundary-heading">',
+    );
+    expect(html).toContain(
+      '<h2 id="portfolio-boundary-heading">Shared controlled-example boundary</h2>',
+    );
+    expect(html).toContain(
+      'They are not live or current evidence, diagnoses, safety assessments, adoption recommendations, user results, demand, or revenue evidence.',
+    );
+  });
+
+  it('escapes product-specific hub copy and action labels', () => {
+    const hostile: SiteDefinition = {
+      ...searchReceiptSite,
+      audience: '<img src=x onerror=alert(1)>',
+      useCase: '<script>alert(1)</script>',
+      outcome: 'one & two',
+      primaryAction: {
+        ...searchReceiptSite.primaryAction,
+        label: '<svg onload=alert(1)>',
+      },
+    };
+
+    const html = renderPortfolioHub([hostile], 'https://example.com/tools/');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).not.toContain('<svg onload');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('one &amp; two');
+    expect(html).toContain('&lt;svg onload=alert(1)&gt;');
+    expect(html).toContain('href="/tools/search-receipt/#search-controls"');
   });
 
   it('renders controlled fixture URLs as labeled inert text rather than dead links', () => {

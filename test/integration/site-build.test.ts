@@ -28,6 +28,8 @@ import {
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { searchReceiptSite } from '../../sites/search-receipt/index.js';
 import { escapeHtml, renderSite } from '../../sites/shared/render.js';
+import { skillLedgerSite } from '../../sites/skill-ledger/index.js';
+import { workflowTestLabSite } from '../../sites/workflow-test-lab/index.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual =
@@ -51,6 +53,11 @@ const SITE_HEADINGS = {
   'skill-ledger': 'SkillLedger',
   'workflow-test-lab': 'Workflow Test Lab',
 } as const;
+const SITE_DEFINITIONS = [
+  searchReceiptSite,
+  workflowTestLabSite,
+  skillLedgerSite,
+] as const;
 const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 // Full TypeScript compilation can contend with other Vitest workers in CI.
 const PRODUCTION_BUILD_SUBPROCESS_TIMEOUT_MS = 15_000;
@@ -435,15 +442,25 @@ describe('static receipt site build', () => {
     expect(hub).toContain(
       'Controlled examples are not live or current source evidence.',
     );
+    expect(hub).toContain('How to use this portfolio');
+    expect(hub).toContain('Shared controlled-example boundary');
+    expect(hub).toContain(
+      'They are not live or current evidence, diagnoses, safety assessments, adoption recommendations, user results, demand, or revenue evidence.',
+    );
     expect(hub).toContain(
       '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/">',
     );
     expect(hub).toContain('href="/receipt-portfolio/portfolio.css"');
     expect(hub).toContain('href="/receipt-portfolio/favicon.ico"');
     expect(hub).not.toContain('frame-ancestors');
-    for (const siteId of Object.keys(SITE_HEADINGS)) {
-      expect(hub).toContain(`href="/receipt-portfolio/${siteId}/"`);
+    for (const site of SITE_DEFINITIONS) {
+      expect(hub).toContain(`<strong>For:</strong> ${site.audience}`);
+      expect(hub).toContain(`<strong>Use it when:</strong> ${site.useCase}`);
+      expect(hub).toContain(
+        `<a class="primary-action" href="/receipt-portfolio/${site.siteId}/#${site.primaryAction.targetId}">${site.primaryAction.label}</a>`,
+      );
     }
+    expect(hub).not.toContain('<strong>Use it to:</strong>');
     expect(hub).toContain('Content-Security-Policy');
     expect(hub).not.toMatch(/<script\b|<img\b|https?:\/\/[^"']+\.(?:css|js)/i);
   });
