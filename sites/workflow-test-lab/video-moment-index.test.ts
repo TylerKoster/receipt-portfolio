@@ -13,7 +13,127 @@ const corpus = JSON.parse(
   ),
 ) as VideoMomentCorpus;
 
+function cloneCorpus(): VideoMomentCorpus {
+  return structuredClone(corpus);
+}
+
 describe('synthetic Video Moment Index pilot', () => {
+  it('accepts the committed synthetic fixture before retrieval or rendering', () => {
+    expect(api.validateSyntheticCorpus(corpus)).toEqual({
+      valid: true,
+      diagnostics: [],
+    });
+  });
+
+  it.each([
+    [
+      'an absent synthetic-only label',
+      (candidate: VideoMomentCorpus) => {
+        candidate.label = '';
+      },
+      ['CORPUS_LABEL_INVALID'],
+    ],
+    [
+      'a duplicate video slug',
+      (candidate: VideoMomentCorpus) => {
+        candidate.videos[1]!.slug = candidate.videos[0]!.slug;
+      },
+      [
+        'MOMENT_VIDEO_LINK_INVALID:moment-beta-active',
+        'MOMENT_VIDEO_LINK_INVALID:moment-beta-removed',
+        'VIDEO_SLUG_DUPLICATE:synthetic-alpha',
+        'VIDEO_URL_INVALID:video-beta',
+      ],
+    ],
+    [
+      'a duplicate moment ID',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[1]!.id = candidate.moments[0]!.id;
+      },
+      ['MOMENT_ID_DUPLICATE:moment-alpha-mention'],
+    ],
+    [
+      'a non-synthetic video host',
+      (candidate: VideoMomentCorpus) => {
+        candidate.videos[0]!.syntheticUrl =
+          'https://example.com/watch/synthetic-alpha';
+      },
+      [
+        'MOMENT_VIDEO_LINK_INVALID:moment-alpha-discussion',
+        'MOMENT_VIDEO_LINK_INVALID:moment-alpha-mention',
+        'VIDEO_URL_INVALID:video-alpha',
+      ],
+    ],
+    [
+      'a mismatched moment video link',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.videoSlug = 'synthetic-beta';
+      },
+      ['MOMENT_VIDEO_LINK_INVALID:moment-alpha-mention'],
+    ],
+    [
+      'invalid moment timing',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.endSeconds = candidate.moments[0]!.startSeconds;
+      },
+      ['MOMENT_TIMING_INVALID:moment-alpha-mention'],
+    ],
+    [
+      'invalid moment confidence',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.confidence = 101;
+      },
+      ['MOMENT_CONFIDENCE_INVALID:moment-alpha-mention'],
+    ],
+    [
+      'an invalid moment state',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.state =
+          'pending' as VideoMomentCorpus['moments'][number]['state'];
+      },
+      ['MOMENT_STATE_INVALID:moment-alpha-mention'],
+    ],
+    [
+      'an invalid moment classification',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.expectedClassification =
+          'summary' as VideoMomentCorpus['moments'][number]['expectedClassification'];
+      },
+      ['MOMENT_CLASSIFICATION_INVALID:moment-alpha-mention'],
+    ],
+    [
+      'an invalid provenance label',
+      (candidate: VideoMomentCorpus) => {
+        candidate.moments[0]!.provenanceLabel = 'external';
+      },
+      ['MOMENT_PROVENANCE_INVALID:moment-alpha-mention'],
+    ],
+  ])(
+    'rejects %s with stable diagnostics',
+    (_description, mutate, diagnostics) => {
+      const candidate = cloneCorpus();
+      mutate(candidate);
+      expect(api.validateSyntheticCorpus(candidate)).toEqual({
+        valid: false,
+        diagnostics,
+      });
+    },
+  );
+
+  it('fails closed before retrieval and rendering when the corpus label is invalid', () => {
+    const candidate = cloneCorpus();
+    candidate.label = 'SYNTHETIC VIDEO MOMENT INDEX PILOT';
+    expect(() => api.retrieve(candidate, 'testing', 'exact')).toThrow(
+      'Invalid synthetic corpus: CORPUS_LABEL_INVALID',
+    );
+    expect(() =>
+      api.renderCanonicalVideo(candidate, 'synthetic-alpha'),
+    ).toThrow('Invalid synthetic corpus: CORPUS_LABEL_INVALID');
+    expect(() =>
+      api.renderTransientQuery(candidate, 'testing', 'exact'),
+    ).toThrow('Invalid synthetic corpus: CORPUS_LABEL_INVALID');
+  });
+
   it('retrieves active moments by exact topic with deterministic score and ID tie-breaking', () => {
     const results = api.retrieve(corpus, 'testing', 'exact');
     expect(results.map((result) => [result.moment.id, result.score])).toEqual([
