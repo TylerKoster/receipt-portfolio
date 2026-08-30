@@ -555,7 +555,7 @@ export function renderPortfolioHub(
     <section class="information-panel" aria-labelledby="portfolio-boundary-heading"><p class="eyebrow">Shared boundary</p><h2 id="portfolio-boundary-heading">Shared controlled-example boundary</h2><p>All records labeled as controlled examples demonstrate a method. They are not live or current evidence, diagnoses, safety assessments, adoption recommendations, user results, demand, or revenue evidence.</p></section>
     <section aria-labelledby="portfolio-products-heading"><p class="eyebrow">Choose a product</p><h2 id="portfolio-products-heading">Which question are you trying to answer?</h2><div class="receipt-list">${productLinks}</div></section>
   </main>
-  <footer><div class="shell">This portfolio hub is a deployment shell, not a fourth evidence product.</div></footer>
+  <footer><div class="shell">This portfolio hub is a deployment shell, not an additional evidence product.</div></footer>
 </body>
 </html>
 `;

@@ -88,5 +88,9 @@ describe('atomic AI Moment Index build', () => {
     const hub = await readFile(join(outputDirectory, 'index.html'), 'utf8');
     expect(hub).toContain('AI Moment Index');
     expect(hub).toContain('/video-moment-search/#moment-search-controls');
+    expect(hub).toContain(
+      'This portfolio hub is a deployment shell, not an additional evidence product.',
+    );
+    expect(hub).not.toContain('not a fourth evidence product');
   });
 });
