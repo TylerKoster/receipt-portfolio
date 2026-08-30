@@ -1,26 +1,30 @@
 {
-  "corpusId": "authorized-ai-video-local-test-v1",
-  "label": "LOCAL TEST FIXTURE ONLY — NO CREATOR AUTHORIZATION, DEMAND, OR PRODUCTION MEDIA",
+  "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+  "label": "PUBLIC SOURCE REVIEWED FIXTURE — TIMESTAMP LINK + ORIGINAL EDITORIAL ANNOTATION ONLY",
   "videos": [
     {
-      "id": "video-agent-evals",
-      "slug": "agent-evals",
-      "title": "Local Test: Agent Evaluation Mechanics",
-      "creatorId": "local-test-creator",
-      "creatorName": "Local Test Creator",
-      "sourceUrl": "https://video.example/watch/agent-evals",
-      "durationSeconds": 300
+      "id": "video-robots-under-control",
+      "slug": "robots-under-control",
+      "title": "How can we keep robots under control?",
+      "creatorId": "university-of-the-netherlands",
+      "creatorName": "University of the Netherlands",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm",
+      "durationSeconds": 908,
+      "timestampStrategy": "media-fragment"
     }
   ],
   "rights": [
     {
-      "id": "rights-local-test-video",
-      "creatorId": "local-test-creator",
+      "id": "rights-commons-robots-control",
+      "creatorId": "university-of-the-netherlands",
       "basis": "explicit-license",
-      "coveredVideoIds": ["video-agent-evals"],
-      "coveredSourceUrls": ["https://video.example/watch/agent-evals"],
-      "coveredCaptionHashes": [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "coveredVideoIds": ["video-robots-under-control"],
+      "coveredSourceUrls": [
+        "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm"
+      ],
+      "coveredCaptionHashes": [],
+      "coveredAnnotationHashes": [
+        "080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd"
       ],
       "allowedUses": {
         "commercialUse": true,
@@ -28,32 +32,33 @@
         "timestampLinks": true
       },
       "maxExcerptCharacters": 280,
-      "licenseNote": "LOCAL TEST LICENSE ONLY — no creator authorization, demand, or production media is asserted.",
-      "permissionVerifiedAt": "2026-08-30T00:00:00.000Z",
+      "licenseNote": "CC BY-SA 4.0 International; timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
+      "permissionVerifiedAt": "2022-01-18T00:00:00.000Z",
       "expiresAt": "2099-01-01T00:00:00.000Z",
-      "revocationContact": "local-test@example.invalid"
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm"
     }
   ],
   "cues": [
     {
-      "id": "cue-agent-evals",
-      "videoId": "video-agent-evals",
-      "startSeconds": 120,
-      "endSeconds": 200,
-      "text": "Local test caption coverage for agent evaluation mechanics.",
-      "captionSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "id": "annotation-robots-control-132",
+      "videoId": "video-robots-under-control",
+      "startSeconds": 132,
+      "endSeconds": 133,
+      "text": "Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd"
     }
   ],
   "moments": [
     {
-      "id": "moment-agent-evals",
-      "videoId": "video-agent-evals",
+      "id": "moment-robots-control",
+      "videoId": "video-robots-under-control",
       "startSeconds": 132,
-      "endSeconds": 188,
-      "excerpt": "Local test excerpt for agent evaluation mechanics.",
-      "topicSlugs": ["agent-evaluation"],
+      "endSeconds": 133,
+      "excerpt": "Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.",
+      "topicSlugs": ["robots-control"],
       "state": "active",
-      "rightsGrantId": "rights-local-test-video"
+      "rightsGrantId": "rights-commons-robots-control"
     }
   ]
 }

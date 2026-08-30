@@ -5,7 +5,7 @@ export const videoMomentSearchSite: SiteDefinition = {
   name: 'AI Moment Index',
   title: 'AI Moment Index · Recover a specific explanation',
   description:
-    'Search a controlled explicit local-test-license fixture for exact moments in long AI tutorials, webinars, and interviews.',
+    'Search a reviewed public-source fixture for an exact timestamp in a long AI lecture.',
   proposition:
     'Recover a specific explanation and follow its evidence-bound link to the exact stored second.',
   audience:
@@ -18,13 +18,13 @@ export const videoMomentSearchSite: SiteDefinition = {
     'Open the exact source-time link and independently confirm the surrounding context.',
   ],
   outcome:
-    'A ranked, rights-validated fixture result with an exact source-time link and visible evidence limits.',
+    'A ranked reviewed-source result with an exact source-time link, original editorial annotation, and visible evidence limits.',
   primaryAction: {
     label: 'Search moments',
     targetId: 'moment-search-controls',
   },
   interpretationBoundary:
-    'This route demonstrates deterministic retrieval over a controlled fixture. It does not establish a live library, creator permission, usability, demand, or revenue.',
+    'This route demonstrates deterministic retrieval over one reviewed Commons fixture. It does not host media or transcripts or establish a live library, endorsement, usability, demand, or revenue.',
   unknowns:
-    'No live creator corpus, public availability, user outcome, demand, or revenue is claimed.',
+    'No live creator corpus, user outcome, demand, or revenue is claimed.',
 };

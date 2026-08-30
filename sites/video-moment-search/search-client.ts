@@ -16,6 +16,7 @@ export interface PublicSearchEntry {
   readonly verificationDate: string;
   readonly provenance: string;
   readonly timestampUrl: string;
+  readonly timestampStrategy?: 'query-parameter' | 'media-fragment';
 }
 
 export interface PublicSearchIndex {
@@ -79,7 +80,10 @@ function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
     typeof entry.rightsStatus !== 'string' ||
     typeof entry.verificationDate !== 'string' ||
     typeof entry.provenance !== 'string' ||
-    typeof entry.timestampUrl !== 'string'
+    typeof entry.timestampUrl !== 'string' ||
+    (entry.timestampStrategy !== undefined &&
+      entry.timestampStrategy !== 'query-parameter' &&
+      entry.timestampStrategy !== 'media-fragment')
   ) {
     return false;
   }
@@ -96,7 +100,11 @@ function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
       return false;
     }
     const expected = new URL(source);
-    expected.searchParams.set('t', String(entry.startSeconds));
+    if (entry.timestampStrategy === 'media-fragment') {
+      expected.hash = 't=' + String(entry.startSeconds);
+    } else {
+      expected.searchParams.set('t', String(entry.startSeconds));
+    }
     return timestamp.href === expected.href;
   } catch {
     return false;
@@ -197,13 +205,20 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
           typeof entry.rightsStatus !== 'string' ||
           typeof entry.verificationDate !== 'string' ||
           typeof entry.provenance !== 'string' ||
-          typeof entry.timestampUrl !== 'string') return false;
+          typeof entry.timestampUrl !== 'string' ||
+          (entry.timestampStrategy !== undefined &&
+           entry.timestampStrategy !== 'query-parameter' &&
+           entry.timestampStrategy !== 'media-fragment')) return false;
       const source = new URL(entry.sourceUrl);
       const timestamp = new URL(entry.timestampUrl);
       if (source.protocol !== 'https:' || source.username || source.password ||
           source.search || source.hash) return false;
       const expected = new URL(source.href);
-      expected.searchParams.set('t', String(entry.startSeconds));
+      if (entry.timestampStrategy === 'media-fragment') {
+        expected.hash = 't=' + String(entry.startSeconds);
+      } else {
+        expected.searchParams.set('t', String(entry.startSeconds));
+      }
       return timestamp.href === expected.href;
     } catch {
       return false;
@@ -294,7 +309,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       if (!validIndex(value)) throw new Error('index validation failed');
       index = value;
       error.hidden = true;
-      status.textContent = 'Search is ready. Enter a phrase such as “agent evaluation”.';
+      status.textContent = 'Search is ready. Enter a phrase such as “robots control”.';
     })
     .catch(() => {
       index = null;
@@ -311,7 +326,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       const query = input.value.trim();
       if (query.length === 0) {
         results.replaceChildren();
-        status.textContent = 'Enter a phrase such as “agent evaluation”.';
+        status.textContent = 'Enter a phrase such as “robots control”.';
         return;
       }
       const found = find(query);

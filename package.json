@@ -14,6 +14,8 @@
     "build": "tsc -p tsconfig.json && node dist/runtime/scripts/build-sites.js",
     "build:manifest": "node dist/runtime/scripts/hash-build.js",
     "check": "tsc --noEmit -p tsconfig.json && eslint .",
+    "check:video-moment-source-live": "tsc -p tsconfig.json && node dist/runtime/scripts/video-moment-live-source-check.js",
+    "check:video-moment-browser-live": "tsc -p tsconfig.json && node dist/runtime/scripts/video-moment-browser-check.js",
     "test": "vitest",
     "test:integration": "vitest run test/integration",
     "evidence": "tsc -p tsconfig.json && node dist/runtime/scripts/evidence-cli.js"

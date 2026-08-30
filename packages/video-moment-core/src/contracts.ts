@@ -25,6 +25,7 @@ export interface VideoRecord {
   readonly creatorName: string;
   readonly sourceUrl: string;
   readonly durationSeconds: number;
+  readonly timestampStrategy?: 'query-parameter' | 'media-fragment';
 }
 
 export interface RightsGrant {
@@ -38,6 +39,7 @@ export interface RightsGrant {
   readonly coveredVideoIds: readonly string[];
   readonly coveredSourceUrls: readonly string[];
   readonly coveredCaptionHashes: readonly string[];
+  readonly coveredAnnotationHashes?: readonly string[];
   readonly allowedUses: {
     commercialUse: boolean;
     excerpts: boolean;
@@ -56,7 +58,9 @@ export interface TimedCue {
   readonly startSeconds: number;
   readonly endSeconds: number;
   readonly text: string;
-  readonly captionSha256: string;
+  readonly evidenceKind?: 'caption' | 'editorial-annotation';
+  readonly captionSha256?: string;
+  readonly contentSha256?: string;
 }
 
 export interface VideoCorpus {
@@ -83,6 +87,9 @@ const VideoRecordSchema = z
     creatorName: z.string().min(1),
     sourceUrl: z.string().min(1),
     durationSeconds: z.number(),
+    timestampStrategy: z
+      .enum(['query-parameter', 'media-fragment'])
+      .optional(),
   })
   .strict();
 
@@ -94,6 +101,7 @@ const RightsGrantSchema = z
     coveredVideoIds: z.array(IdentifierSchema),
     coveredSourceUrls: z.array(z.string().min(1)),
     coveredCaptionHashes: z.array(z.string().min(1)),
+    coveredAnnotationHashes: z.array(z.string().min(1)).optional(),
     allowedUses: z
       .object({
         commercialUse: z.boolean(),
@@ -116,7 +124,9 @@ const TimedCueSchema = z
     startSeconds: z.number(),
     endSeconds: z.number(),
     text: z.string().min(1),
-    captionSha256: z.string().min(1),
+    evidenceKind: z.enum(['caption', 'editorial-annotation']).optional(),
+    captionSha256: z.string().min(1).optional(),
+    contentSha256: z.string().min(1).optional(),
   })
   .strict();
 
@@ -275,7 +285,8 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     if (
       grant.coveredVideoIds.length === 0 ||
       grant.coveredSourceUrls.length === 0 ||
-      grant.coveredCaptionHashes.length === 0
+      grant.coveredCaptionHashes.length === 0 &&
+      (grant.coveredAnnotationHashes?.length ?? 0) === 0
     ) {
       diagnostics.push(`RIGHTS_COVERAGE_INVALID:${grant.id}`);
     }
@@ -299,6 +310,10 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       if (!sha256Pattern.test(captionHash))
         diagnostics.push(`RIGHTS_CAPTION_HASH_INVALID:${grant.id}`);
     }
+    for (const annotationHash of grant.coveredAnnotationHashes ?? []) {
+      if (!sha256Pattern.test(annotationHash))
+        diagnostics.push(`RIGHTS_ANNOTATION_HASH_INVALID:${grant.id}`);
+    }
   }
 
   for (const cue of corpus.cues) {
@@ -309,8 +324,26 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       diagnostics.push(`CUE_TIMING_INVALID:${cue.id}`);
     else if (video && cue.endSeconds > video.durationSeconds)
       diagnostics.push(`CUE_OUTSIDE_VIDEO:${cue.id}`);
-    if (!sha256Pattern.test(cue.captionSha256))
-      diagnostics.push(`CUE_CAPTION_HASH_INVALID:${cue.id}`);
+    const evidenceKind = cue.evidenceKind ?? 'caption';
+    if (evidenceKind === 'caption') {
+      if (
+        cue.captionSha256 === undefined ||
+        !sha256Pattern.test(cue.captionSha256)
+      ) {
+        diagnostics.push(`CUE_CAPTION_HASH_INVALID:${cue.id}`);
+      }
+      if (cue.contentSha256 !== undefined)
+        diagnostics.push(`CUE_EVIDENCE_FIELDS_INVALID:${cue.id}`);
+    } else {
+      if (
+        cue.contentSha256 === undefined ||
+        !sha256Pattern.test(cue.contentSha256)
+      ) {
+        diagnostics.push(`CUE_ANNOTATION_HASH_INVALID:${cue.id}`);
+      }
+      if (cue.captionSha256 !== undefined)
+        diagnostics.push(`CUE_EVIDENCE_FIELDS_INVALID:${cue.id}`);
+    }
     const videoCues = cuesByVideoId.get(cue.videoId) ?? [];
     videoCues.push(cue);
     cuesByVideoId.set(cue.videoId, videoCues);
@@ -369,20 +402,30 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       diagnostics.push(`RIGHTS_CREATOR_NOT_ATTRIBUTABLE:${moment.id}`);
     if (video && !grant.coveredSourceUrls.includes(video.sourceUrl))
       diagnostics.push(`RIGHTS_SOURCE_URL_NOT_COVERED:${moment.id}`);
-    const momentCaptionHashes = (cuesByVideoId.get(moment.videoId) ?? [])
+    const momentEvidence = (cuesByVideoId.get(moment.videoId) ?? [])
       .filter(
         (cue) =>
           cue.startSeconds <= moment.startSeconds &&
           cue.endSeconds >= moment.endSeconds,
       )
-      .map((cue) => cue.captionSha256);
+      .map((cue) => ({
+        hash:
+          (cue.evidenceKind ?? 'caption') === 'caption'
+            ? cue.captionSha256
+            : cue.contentSha256,
+        kind: cue.evidenceKind ?? 'caption',
+      }));
     if (
-      momentCaptionHashes.length === 0 ||
-      !momentCaptionHashes.every((hash) =>
-        grant.coveredCaptionHashes.includes(hash),
+      momentEvidence.length === 0 ||
+      !momentEvidence.every(
+        (evidence) =>
+          evidence.hash !== undefined &&
+          (evidence.kind === 'caption'
+            ? grant.coveredCaptionHashes.includes(evidence.hash)
+            : (grant.coveredAnnotationHashes ?? []).includes(evidence.hash)),
       )
     ) {
-      diagnostics.push(`RIGHTS_CAPTION_NOT_COVERED:${moment.id}`);
+      diagnostics.push(`RIGHTS_EVIDENCE_NOT_COVERED:${moment.id}`);
     }
     if (!grant.allowedUses.commercialUse)
       diagnostics.push(`RIGHTS_COMMERCIAL_USE_NOT_ALLOWED:${moment.id}`);

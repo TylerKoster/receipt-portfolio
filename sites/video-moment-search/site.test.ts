@@ -32,6 +32,15 @@ const fixture = JSON.parse(
     'utf8',
   ),
 ) as VideoCorpus;
+const sourceRightsEvidence = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../fixtures/video-moment-search/commons-source-rights-v1.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+) as unknown;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 
@@ -187,7 +196,7 @@ describe('AI Moment Index public search surface', () => {
     expect(html).toContain('<input');
     expect(html).toContain('name="q"');
     expect(html).toContain('Search moments');
-    expect(html).toContain('?t=132');
+    expect(html).toContain('#t=132');
     expect(html.indexOf('name="q"')).toBeLessThan(html.indexOf('<strong>For:</strong>'));
   });
 
@@ -201,31 +210,105 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('renders the fixed query with the reviewed moment first and exact source second', () => {
-    const html = renderSearchResults(fixture, searchIndex, 'agent evaluation');
-    expect(html.indexOf('data-moment-id="moment-agent-evals"')).toBeGreaterThanOrEqual(0);
+    const html = renderSearchResults(fixture, searchIndex, 'robots control');
+    expect(html.indexOf('data-moment-id="moment-robots-control"')).toBeGreaterThanOrEqual(0);
     expect(html).toContain(
-      'href="https://video.example/watch/agent-evals?t=132"',
+      'href="https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"',
     );
-    expect(searchMoments(searchIndex, 'agent evaluation')[0]).toMatchObject({
-      momentId: 'moment-agent-evals',
+    expect(searchMoments(searchIndex, 'robots control')[0]).toMatchObject({
+      momentId: 'moment-robots-control',
       startSeconds: 132,
-      timestampUrl: 'https://video.example/watch/agent-evals?t=132',
+      timestampUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    });
+  });
+
+  it('binds the public fixture to the deterministic Commons rights evidence', () => {
+    expect(sourceRightsEvidence).toEqual({
+      schemaVersion: 1,
+      evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
+      workTitle: 'How can we keep robots under control?',
+      attributionParty: 'University of the Netherlands',
+      canonicalRightsPageUrl:
+        'https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm',
+      immutableRightsRevisionUrl:
+        'https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530',
+      license: {
+        name: 'CC BY-SA 4.0 International',
+        url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+      },
+      delivery: {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm',
+        mediaType: 'video/webm',
+        byteLength: 24788866,
+        acceptRanges: 'bytes',
+        durationSeconds: 907.299,
+      },
+      timestamp: {
+        strategy: 'media-fragment',
+        seconds: 132,
+        url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+      },
+      reviewRecord: {
+        reviewer: 'LicenseReviewerBot',
+        reviewedOn: '2022-01-18',
+        finding:
+          'Confirmed availability under CC BY-SA 4.0 International on the review date.',
+      },
+      annotation: {
+        kind: 'original-editorial',
+        text: 'Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.',
+        sha256:
+          '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
+      },
+      productBoundary: {
+        included: ['timestamp link', 'original editorial annotation'],
+        excluded: [
+          'hosting',
+          'embedding',
+          'media distribution',
+          'transcript distribution',
+          'endorsement claim',
+          'inferred permission',
+        ],
+      },
+    });
+    const evidence = sourceRightsEvidence as {
+      annotation: { text: string; sha256: string };
+      attributionParty: string;
+      delivery: { url: string };
+      timestamp: { strategy: string; seconds: number; url: string };
+      workTitle: string;
+    };
+    expect(fixture.videos[0]).toMatchObject({
+      title: evidence.workTitle,
+      creatorName: evidence.attributionParty,
+      sourceUrl: evidence.delivery.url,
+      timestampStrategy: evidence.timestamp.strategy,
+    });
+    expect(fixture.cues[0]).toMatchObject({
+      startSeconds: evidence.timestamp.seconds,
+      evidenceKind: 'editorial-annotation',
+      text: evidence.annotation.text,
+      contentSha256: evidence.annotation.sha256,
+    });
+    expect(fixture.moments[0]).toMatchObject({
+      startSeconds: evidence.timestamp.seconds,
+      excerpt: evidence.annotation.text,
     });
   });
 
   it('renders every result with its own validated stored timestamp and evidence metadata', () => {
     const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
-    const results = searchPublicIndex(publicIndex, 'agent evaluation');
+    const results = searchPublicIndex(publicIndex, 'robots control');
     expect(results).not.toHaveLength(0);
     for (const result of results) {
-      const timestamp = new URL(result.timestampUrl).searchParams.get('t');
-      expect(timestamp).toBe(String(result.startSeconds));
-      expect(result.timestampUrl).toBe(
-        `${result.sourceUrl}?t=${result.startSeconds}`,
-      );
+      const timestampUrl = new URL(result.timestampUrl);
+      expect(timestampUrl.hash).toBe(`#t=${result.startSeconds}`);
+      expect(timestampUrl.searchParams.get('t')).toBeNull();
     }
 
-    const html = renderSearchResults(fixture, searchIndex, 'agent evaluation');
+    const html = renderSearchResults(fixture, searchIndex, 'robots control');
     for (const label of [
       'Source title',
       'Creator',
@@ -240,7 +323,7 @@ describe('AI Moment Index public search surface', () => {
     ]) {
       expect(html).toContain(`<dt>${label}</dt>`);
     }
-    expect(html).toContain('2:12–3:08');
+    expect(html).toContain('2:12–2:13');
   });
 
   it('escapes hostile fixture text and leaves malformed result URLs inert', () => {
@@ -280,12 +363,12 @@ describe('AI Moment Index public search surface', () => {
           : entry,
       ),
     };
-    expect(searchPublicIndex(malformedIndex, 'agent evaluation')).toEqual([]);
+    expect(searchPublicIndex(malformedIndex, 'robots control')).toEqual([]);
   });
 
   it('provides deterministic empty, zero-result, and client-load recovery while retaining initial results', () => {
     expect(renderSearchResults(fixture, searchIndex, '')).toContain(
-      'Enter a phrase such as “agent evaluation”.',
+      'Enter a phrase such as “robots control”.',
     );
     expect(
       renderSearchResults(fixture, searchIndex, 'missing subject'),
@@ -296,7 +379,7 @@ describe('AI Moment Index public search surface', () => {
       'Search could not load. The initial reviewed moments remain available below.',
     );
     expect(home).toContain('data-server-results');
-    expect(home).toContain('moment-agent-evals');
+    expect(home).toContain('moment-robots-control');
   });
 
   it('uses semantic accessible states and required first-viewport boundaries', () => {
@@ -312,29 +395,29 @@ describe('AI Moment Index public search surface', () => {
       'How to use it',
       '<strong>What you get:</strong>',
       '<strong>Rights boundary:</strong>',
-      'controlled explicit local-test-license fixture',
+      'reviewed Commons fixture',
+      'timestamp link plus an original editorial annotation only',
+      'does not host, embed, or distribute media or transcripts',
+      'claim endorsement or inferred permission',
       'not a live creator library',
-      'not user evidence',
-      'not a permission claim',
-      'not a usability result',
-      'not demand or revenue evidence',
+      'usability, demand, or revenue evidence',
     ]) {
       expect(html).toContain(copy);
     }
   });
 
   it('exposes bounded video, moment, topic, creator, and guide pages', () => {
-    expect(renderVideoPage(fixture, searchIndex, 'video-agent-evals', baseUrl)).toContain(
-      'Local Test: Agent Evaluation Mechanics',
+    expect(renderVideoPage(fixture, searchIndex, 'video-robots-under-control', baseUrl)).toContain(
+      'How can we keep robots under control?',
     );
-    expect(renderMomentPage(fixture, searchIndex, 'moment-agent-evals', baseUrl)).toContain(
-      '?t=132',
+    expect(renderMomentPage(fixture, searchIndex, 'moment-robots-control', baseUrl)).toContain(
+      '#t=132',
     );
-    expect(renderTopicPage(fixture, searchIndex, 'agent-evaluation', baseUrl)).toContain(
-      'moment-agent-evals',
+    expect(renderTopicPage(fixture, searchIndex, 'robots-control', baseUrl)).toContain(
+      'moment-robots-control',
     );
-    expect(renderCreatorPage(fixture, searchIndex, 'local-test-creator', baseUrl)).toContain(
-      'Local Test Creator',
+    expect(renderCreatorPage(fixture, searchIndex, 'university-of-the-netherlands', baseUrl)).toContain(
+      'University of the Netherlands',
     );
     expect(renderGuidePage(baseUrl)).toContain('How to recover a moment');
     expect(videoMomentSearchSite.siteId).toBe('video-moment-search');
@@ -346,14 +429,16 @@ describe('AI Moment Index public search surface', () => {
       serializePublicSearchIndex(fixture, searchIndex),
     );
 
-    harness.submit('agent evaluation');
+    harness.submit('robots control');
 
     const articles = descendants(harness.results, 'article');
     expect(articles.map((article) => article.dataset.momentId)).toEqual([
-      'moment-agent-evals',
+      'moment-robots-control',
     ]);
     expect(descendants(articles[0]!, 'a').map((anchor) => anchor.href)).toEqual(
-      ['https://video.example/watch/agent-evals?t=132'],
+      [
+        'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+      ],
     );
     expect(harness.status.textContent).toBe('Showing 1 moment.');
   });
@@ -372,6 +457,7 @@ describe('AI Moment Index public search surface', () => {
       excerpt: 'agent evaluation',
       topicSlugs: ['testing'],
       timestampUrl: 'https://video.example/watch/exact-phrase?t=40',
+      timestampStrategy: 'query-parameter' as const,
     };
     const splitTokens = {
       ...baseEntry,
@@ -385,6 +471,7 @@ describe('AI Moment Index public search surface', () => {
       excerpt: 'Scoring workflow',
       topicSlugs: ['evaluation'],
       timestampUrl: 'https://video.example/watch/split-tokens?t=20',
+      timestampStrategy: 'query-parameter' as const,
     };
     const publicIndex = {
       schemaVersion: 1 as const,
@@ -424,6 +511,7 @@ describe('AI Moment Index public search surface', () => {
         startSeconds: 5,
         endSeconds: 15,
         timestampUrl: 'https://video.example/watch/b-video?t=5',
+        timestampStrategy: 'query-parameter' as const,
       },
       {
         ...baseEntry,
@@ -435,6 +523,7 @@ describe('AI Moment Index public search surface', () => {
         startSeconds: 20,
         endSeconds: 30,
         timestampUrl: 'https://video.example/watch/a-video-later?t=20',
+        timestampStrategy: 'query-parameter' as const,
       },
       {
         ...baseEntry,
@@ -446,6 +535,7 @@ describe('AI Moment Index public search surface', () => {
         startSeconds: 10,
         endSeconds: 15,
         timestampUrl: 'https://video.example/watch/a-video-same-b?t=10',
+        timestampStrategy: 'query-parameter' as const,
       },
       {
         ...baseEntry,
@@ -457,6 +547,7 @@ describe('AI Moment Index public search surface', () => {
         startSeconds: 10,
         endSeconds: 15,
         timestampUrl: 'https://video.example/watch/a-video-same-a?t=10',
+        timestampStrategy: 'query-parameter' as const,
       },
     ];
     const publicIndex = {
@@ -564,7 +655,7 @@ describe('AI Moment Index public search surface', () => {
 
   it('clears a transient pre-load fallback after valid loading and completes the fixed flow', async () => {
     const harness = executeClientPayload();
-    harness.submit('agent evaluation');
+    harness.submit('robots control');
     expect(harness.error.hidden).toBe(false);
     expect(harness.serverResults.textContent).toBe(
       'server-rendered initial result',
@@ -575,13 +666,13 @@ describe('AI Moment Index public search surface', () => {
     );
     expect(harness.error.hidden).toBe(true);
     expect(harness.status.textContent).toBe(
-      'Search is ready. Enter a phrase such as “agent evaluation”.',
+      'Search is ready. Enter a phrase such as “robots control”.',
     );
 
-    harness.submit('agent evaluation');
+    harness.submit('robots control');
     expect(
       descendants(harness.results, 'article')[0]?.dataset.momentId,
-    ).toBe('moment-agent-evals');
+    ).toBe('moment-robots-control');
   });
 
   it('catches unexpected submit-time rendering errors into the same fallback', async () => {
@@ -624,8 +715,15 @@ describe('AI Moment Index public search surface', () => {
           '100% deterministic fixed-flow completion; expected moment appears in the top three; zero timestamp landing error.',
         stopRule:
           'Stop if any result lacks validated rights or exact source-time routing.',
+        fixedFlow: {
+          query: 'robots control',
+          expectedFirstMomentId: 'moment-robots-control',
+          expectedTimestampUrl:
+            'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+        },
       },
     });
     expect(JSON.stringify(ledger)).toContain('not usability or demand evidence');
+    expect(JSON.stringify(ledger)).not.toContain('video.example');
   });
 });

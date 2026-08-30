@@ -27,7 +27,11 @@ function formatSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-function exactTimestampUrl(sourceUrl: string, startSeconds: number): string | null {
+function exactTimestampUrl(
+  sourceUrl: string,
+  startSeconds: number,
+  strategy: 'query-parameter' | 'media-fragment' = 'query-parameter',
+): string | null {
   try {
     if (!Number.isInteger(startSeconds) || startSeconds < 0) return null;
     const source = new URL(sourceUrl);
@@ -40,7 +44,8 @@ function exactTimestampUrl(sourceUrl: string, startSeconds: number): string | nu
     ) {
       return null;
     }
-    source.searchParams.set('t', String(startSeconds));
+    if (strategy === 'media-fragment') source.hash = `t=${startSeconds}`;
+    else source.searchParams.set('t', String(startSeconds));
     return source.href;
   } catch {
     return null;
@@ -71,6 +76,7 @@ export function serializePublicSearchIndex(
     const timestampUrl = exactTimestampUrl(
       entry.video.sourceUrl,
       entry.moment.startSeconds,
+      entry.video.timestampStrategy,
     );
     if (timestampUrl === null) {
       throw new Error(`Invalid exact timestamp URL for ${entry.moment.id}`);
@@ -95,11 +101,16 @@ export function serializePublicSearchIndex(
       excerpt: entry.moment.excerpt,
       topicSlugs: entry.moment.topicSlugs,
       correctionState: entry.moment.state,
-      confidenceClass: 'Rights-validated controlled fixture match',
-      rightsStatus: `${grant.basis}; excerpt, timestamp link, and commercial fixture display allowed`,
+      confidenceClass:
+        entry.video.timestampStrategy === 'media-fragment'
+          ? 'Reviewed public source; original editorial annotation, not transcript text'
+          : 'Rights-validated controlled fixture match',
+      rightsStatus: grant.licenseNote,
       verificationDate: grant.permissionVerifiedAt.slice(0, 10),
       provenance: `Corpus ${corpus.corpusId}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`,
       timestampUrl,
+      timestampStrategy:
+        entry.video.timestampStrategy ?? 'query-parameter',
     };
   });
 
@@ -135,7 +146,11 @@ function detailRows(entry: PublicSearchEntry): string {
 }
 
 function renderEntry(entry: PublicSearchEntry): string {
-  const timestampUrl = exactTimestampUrl(entry.sourceUrl, entry.startSeconds);
+  const timestampUrl = exactTimestampUrl(
+    entry.sourceUrl,
+    entry.startSeconds,
+    entry.timestampStrategy,
+  );
   const link =
     timestampUrl === null || timestampUrl !== entry.timestampUrl
       ? '<span class="invalid-source">Exact source link unavailable</span>'
@@ -157,7 +172,7 @@ export function renderSearchResults(
   query: string,
 ): string {
   if (query.trim().length === 0) {
-    return '<p class="guidance">Enter a phrase such as “agent evaluation”.</p>';
+    return '<p class="guidance">Enter a phrase such as “robots control”.</p>';
   }
   const publicIndex = serializePublicSearchIndex(corpus, searchIndex);
   const byMomentId = new Map(
@@ -240,7 +255,7 @@ export function renderSearchShell(
     <p><strong>Use this when:</strong> ${escapeHtml(videoMomentSearchSite.useCase)}</p>
     <h3>How to use it</h3><ol>${videoMomentSearchSite.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
     <p><strong>What you get:</strong> ${escapeHtml(videoMomentSearchSite.outcome)}</p>
-    <p class="boundary"><strong>Rights boundary:</strong> This corpus is a controlled explicit local-test-license fixture, not a live creator library, not user evidence, not a permission claim, not a usability result, and not demand or revenue evidence.</p>
+    <p class="boundary"><strong>Rights boundary:</strong> This reviewed Commons fixture provides a timestamp link plus an original editorial annotation only. It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.</p>
   </section>
   <section aria-labelledby="initial-heading" data-server-results>
     <p class="eyebrow">Available without JavaScript</p>

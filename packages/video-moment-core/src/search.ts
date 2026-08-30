@@ -113,7 +113,9 @@ function compareResults(left: SearchResult, right: SearchResult): number {
 
 function timestampFromUrl(url: string): number | null {
   try {
-    const value = new URL(url).searchParams.get('t');
+    const parsed = new URL(url);
+    const value =
+      parsed.searchParams.get('t') ?? parsed.hash.match(/^#t=(\d+)$/u)?.[1] ?? null;
     if (value === null || !/^\d+$/u.test(value)) return null;
     const seconds = Number(value);
     return Number.isSafeInteger(seconds) ? seconds : null;
@@ -130,7 +132,11 @@ export function buildTimestampUrl(
     throw new Error('startSeconds must be a non-negative integer');
   }
   const url = new URL(video.sourceUrl);
-  url.searchParams.set('t', String(startSeconds));
+  if (video.timestampStrategy === 'media-fragment') {
+    url.hash = `t=${startSeconds}`;
+  } else {
+    url.searchParams.set('t', String(startSeconds));
+  }
   return url.toString();
 }
 

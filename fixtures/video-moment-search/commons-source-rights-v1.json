@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "commons-how-can-we-keep-robots-under-control-v1",
+  "workTitle": "How can we keep robots under control?",
+  "attributionParty": "University of the Netherlands",
+  "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm",
+  "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530",
+  "license": {
+    "name": "CC BY-SA 4.0 International",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  "delivery": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm",
+    "mediaType": "video/webm",
+    "byteLength": 24788866,
+    "acceptRanges": "bytes",
+    "durationSeconds": 907.299
+  },
+  "timestamp": {
+    "strategy": "media-fragment",
+    "seconds": 132,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"
+  },
+  "reviewRecord": {
+    "reviewer": "LicenseReviewerBot",
+    "reviewedOn": "2022-01-18",
+    "finding": "Confirmed availability under CC BY-SA 4.0 International on the review date."
+  },
+  "annotation": {
+    "kind": "original-editorial",
+    "text": "Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.",
+    "sha256": "080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd"
+  },
+  "productBoundary": {
+    "included": ["timestamp link", "original editorial annotation"],
+    "excluded": [
+      "hosting",
+      "embedding",
+      "media distribution",
+      "transcript distribution",
+      "endorsement claim",
+      "inferred permission"
+    ]
+  }
+}

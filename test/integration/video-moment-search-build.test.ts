@@ -71,19 +71,16 @@ describe('atomic AI Moment Index build', () => {
     expect(client).toContain('textContent');
     expect(styles).toContain(':focus-visible');
 
-    const results = searchPublicIndex(JSON.parse(indexJson), 'agent evaluation');
+    const results = searchPublicIndex(JSON.parse(indexJson), 'robots control');
     expect(results[0]).toMatchObject({
-      momentId: 'moment-agent-evals',
+      momentId: 'moment-robots-control',
       startSeconds: 132,
-      timestampUrl: 'https://video.example/watch/agent-evals?t=132',
+      timestampStrategy: 'media-fragment',
+      timestampUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
     });
-    expect(
-      results.every(
-        (result) =>
-          new URL(result.timestampUrl).searchParams.get('t') ===
-          String(result.startSeconds),
-      ),
-    ).toBe(true);
+    expect(new URL(results[0]!.timestampUrl).hash).toBe('#t=132');
+    expect(new URL(results[0]!.timestampUrl).searchParams.get('t')).toBeNull();
 
     const hub = await readFile(join(outputDirectory, 'index.html'), 'utf8');
     expect(hub).toContain('AI Moment Index');

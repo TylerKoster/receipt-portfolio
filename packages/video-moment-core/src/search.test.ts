@@ -294,6 +294,22 @@ describe('deterministic rights-bound moment search', () => {
     );
   });
 
+  it('uses a temporal media fragment only when the source explicitly selects it', () => {
+    const directMedia = {
+      ...validCorpus.videos[0]!,
+      sourceUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm',
+      timestampStrategy: 'media-fragment' as const,
+    };
+
+    expect(buildTimestampUrl(directMedia, 132)).toBe(
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(buildTimestampUrl(validCorpus.videos[0]!, 132)).toBe(
+      'https://video.example/watch/agent-evals?t=132',
+    );
+  });
+
   it('preserves query parameters and fragments while setting the timestamp parameter', () => {
     expect(
       buildTimestampUrl(
