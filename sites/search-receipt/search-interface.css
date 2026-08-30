@@ -34,6 +34,13 @@
   color: var(--muted);
 }
 
+.search-share-link {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .search-controls input,
 .search-controls select,
 .site-search-receipt button {

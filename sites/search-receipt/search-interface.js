@@ -1,4 +1,4 @@
-/* global document */
+/* global document, URLSearchParams */
 
 function normalized(value) {
   return value.trim().toLocaleLowerCase('en-US');
@@ -98,6 +98,72 @@ function findOrCreateQueryGuidance(root, form) {
   return guidance;
 }
 
+function findOrCreateShareableFilterLink(root, form) {
+  const existing = root.querySelector('[data-search-share-link]');
+  if (existing) return existing;
+
+  const document = form.ownerDocument;
+  if (!document?.createElement || typeof form.append !== 'function')
+    return null;
+
+  const link = document.createElement('a');
+  link.setAttribute('class', 'search-share-link');
+  link.setAttribute('data-search-share-link', '');
+  link.textContent = 'Link to this filtered view';
+  form.append(link);
+  return link;
+}
+
+function shareableFilterFragment(query, topic) {
+  const parameters = new URLSearchParams();
+  parameters.set('query', query);
+  parameters.set('topic', topic);
+  return `#search?${parameters}`;
+}
+
+function hasValidPercentEncoding(value) {
+  try {
+    decodeURIComponent(value.replace(/\+/gu, ' '));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function filterStateFromFragment(hash, availableTopics) {
+  if (typeof hash !== 'string' || !hash.startsWith('#search?')) return null;
+
+  const fragment = hash.slice('#search?'.length);
+  if (!hasValidPercentEncoding(fragment)) return null;
+
+  const parameters = new URLSearchParams(fragment);
+  const allowedKeys = new Set(['query', 'topic']);
+  if (
+    [...parameters.keys()].some((key) => !allowedKeys.has(key)) ||
+    parameters.getAll('query').length !== 1 ||
+    parameters.getAll('topic').length !== 1
+  ) {
+    return null;
+  }
+
+  const topic = parameters.get('topic') ?? '';
+  if (topic !== '' && !availableTopics.has(topic)) return null;
+
+  return {
+    query: parameters.get('query') ?? '',
+    topic,
+  };
+}
+
+function locationHash(root, form) {
+  return (
+    root.location?.hash ??
+    form.ownerDocument?.location?.hash ??
+    form.ownerDocument?.defaultView?.location?.hash ??
+    ''
+  );
+}
+
 function describeWithInteractionBoundary(control) {
   if (typeof control.setAttribute !== 'function') return;
   const describedBy =
@@ -129,6 +195,18 @@ export function initializeSearchReceipt(root) {
   describeWithInteractionBoundary(query);
   describeWithInteractionBoundary(topic);
   const reset = findOrCreateResetControl(root, form);
+  const shareLink = findOrCreateShareableFilterLink(root, form);
+  const availableTopics = new Set(
+    cards.map((card) => card.dataset.searchTopic).filter(Boolean),
+  );
+  const filterState = filterStateFromFragment(
+    locationHash(root, form),
+    availableTopics,
+  );
+  if (filterState) {
+    query.value = filterState.query;
+    topic.value = filterState.topic;
+  }
 
   const apply = () => {
     try {
@@ -136,6 +214,10 @@ export function initializeSearchReceipt(root) {
       status.textContent = result.message;
       empty.hidden = result.count !== 0;
       error.hidden = true;
+      shareLink?.setAttribute(
+        'href',
+        shareableFilterFragment(query.value, topic.value),
+      );
     } catch {
       error.hidden = false;
       status.textContent = 'Search is unavailable; all records remain visible.';
