@@ -1,0 +1,79 @@
+{
+  "experimentId": "skillledger-synthetic-usability-2026-08-30",
+  "evidenceClass": "synthetic-heuristic-usability",
+  "syntheticOnly": true,
+  "baseline": {
+    "fullCompletion": 0,
+    "partialCompletion": 2,
+    "returnIntent": 0,
+    "willingnessToPay": 0
+  },
+  "personas": [
+    {
+      "id": "platform-lead",
+      "outcome": "failed",
+      "task": "Find, filter, and compare source-bound skill records.",
+      "finding": "Could not find, filter, or compare skills."
+    },
+    {
+      "id": "security-reviewer",
+      "outcome": "partial",
+      "task": "Interpret static-risk signals without treating them as safety conclusions.",
+      "finding": "Partially understood the boundary but could not decide adoption."
+    },
+    {
+      "id": "automation-consultant",
+      "outcome": "partial",
+      "task": "Inspect integrity hashes and assess a watchlist or team-inventory offer.",
+      "finding": "Partially inspected hashes; example.invalid was unreachable."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "search-filter-compare",
+      "scope": "Search, filter, and compare source-bound skill records.",
+      "status": "not-completed"
+    },
+    {
+      "id": "static-boundary-inspection",
+      "scope": "Inspect static-risk signals without treating them as safety conclusions.",
+      "status": "partial"
+    },
+    {
+      "id": "hash-provenance-inspection",
+      "scope": "Inspect integrity hashes and provenance boundaries.",
+      "status": "partial"
+    },
+    {
+      "id": "synthetic-offer-evaluation",
+      "scope": "Evaluate synthetic-only watchlist and team-inventory offers.",
+      "status": "partial"
+    }
+  ],
+  "offerMeasurement": {
+    "syntheticOnly": true,
+    "offers": [
+      {
+        "id": "watchlist",
+        "events": ["viewed", "selected"],
+        "baselineSelections": 0
+      },
+      {
+        "id": "team-inventory",
+        "events": ["viewed", "selected"],
+        "baselineSelections": 0
+      }
+    ],
+    "identityCaptured": false,
+    "persistence": false,
+    "trackingImplemented": false
+  },
+  "limits": [
+    "No real demand, adoption, safety, revenue, or willingness-to-pay conclusion is established.",
+    "P0 gap: one synthetic package.",
+    "P0 gap: no search/filter/compare/watchlist/alert/export flow.",
+    "P0 gap: no real artifact provenance.",
+    "P0 gap: no conversion/measurement path.",
+    "Synthetic offer events do not capture identity and are not persisted."
+  ]
+}
