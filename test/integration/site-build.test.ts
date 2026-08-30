@@ -714,19 +714,30 @@ describe('static receipt site build', () => {
   it('keeps canonical evidence byte-equal across concurrent production-build processes', async () => {
     const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
     const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
-    const firstOutput = join(dirname(outputDirectory), 'concurrent-sites-a');
-    const secondOutput = join(dirname(outputDirectory), 'concurrent-sites-b');
     await realFileSystem.mkdir(join(projectRoot, 'dist'), { recursive: true });
     const isolatedRuntimeRoot = await realFileSystem.mkdtemp(
       join(projectRoot, 'dist', '.concurrent-runtime-'),
     );
     temporaryDirectories.push(isolatedRuntimeRoot);
+    const firstOutput = join(isolatedRuntimeRoot, 'output-a');
+    const secondOutput = join(isolatedRuntimeRoot, 'output-b');
     const compiledRuntime = join(
       isolatedRuntimeRoot,
       'compiled-runtime-source',
     );
     const firstRuntime = join(isolatedRuntimeRoot, 'runtime-a');
     const secondRuntime = join(isolatedRuntimeRoot, 'runtime-b');
+    const firstEvidence = join(isolatedRuntimeRoot, 'evidence-a');
+    const secondEvidence = join(isolatedRuntimeRoot, 'evidence-b');
+    const acceptedFixtureEvidence = await fileInventory(testEvidenceDirectory);
+    await Promise.all([
+      realFileSystem.cp(testEvidenceDirectory, firstEvidence, {
+        recursive: true,
+      }),
+      realFileSystem.cp(testEvidenceDirectory, secondEvidence, {
+        recursive: true,
+      }),
+    ]);
 
     await compileIsolatedProductionRuntime(compiledRuntime);
     await Promise.all([
@@ -756,17 +767,37 @@ describe('static receipt site build', () => {
       ),
     ]);
 
+    const evidenceRootsUsed: string[] = [];
+    const recordingExecutor: ProductionBuildExecutor = async (
+      command,
+      arguments_,
+      options,
+    ) => {
+      evidenceRootsUsed.push(options.env[EVIDENCE_DIRECTORY_ENV] ?? '');
+      await executeProductionBuild(command, arguments_, options);
+    };
     await Promise.all([
       runProductionBuild({
+        evidenceDirectory: firstEvidence,
+        executor: recordingExecutor,
         outputDirectory: firstOutput,
         runtimeDirectory: firstRuntime,
       }),
       runProductionBuild({
+        evidenceDirectory: secondEvidence,
+        executor: recordingExecutor,
         outputDirectory: secondOutput,
         runtimeDirectory: secondRuntime,
       }),
     ]);
 
+    expect(evidenceRootsUsed.sort()).toEqual(
+      [firstEvidence, secondEvidence].sort(),
+    );
+    expect(await fileInventory(firstEvidence)).toEqual(acceptedFixtureEvidence);
+    expect(await fileInventory(secondEvidence)).toEqual(
+      acceptedFixtureEvidence,
+    );
     expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
       originalEvidence,
     );
@@ -776,6 +807,12 @@ describe('static receipt site build', () => {
     await expect(
       readFile(join(secondOutput, 'skill-ledger', 'index.html'), 'utf8'),
     ).resolves.toContain('SkillLedger');
+    await expect(
+      readFile(join(firstOutput, 'search-receipt', 'index.html'), 'utf8'),
+    ).resolves.toContain('Controlled fixture example');
+    await expect(
+      readFile(join(secondOutput, 'search-receipt', 'index.html'), 'utf8'),
+    ).resolves.toContain('Controlled fixture example');
   });
 
   it('omits a REVIEW_REQUIRED record from public rendering', async () => {
