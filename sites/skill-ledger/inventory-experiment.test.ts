@@ -175,6 +175,84 @@ describe('source-bound SkillLedger inventory experiment', () => {
     ]);
   });
 
+  it('counts duplicate declared metadata values across controlled records without inventing license buckets', () => {
+    const receiptC = {
+      ...receiptA,
+      receipt: { ...receiptA.receipt, id: 'receipt-c' },
+      publicFacts: {
+        ...receiptA.publicFacts,
+        packageId: 'archive-skill-static',
+        declaredDependencies: ['zod'],
+        staticRiskFlags: ['controlled-static-signal'],
+      },
+    } satisfies SourceBoundSkillReceipt;
+    const receiptD = {
+      ...receiptB,
+      receipt: { ...receiptB.receipt, id: 'receipt-d' },
+      publicFacts: {
+        ...receiptB.publicFacts,
+        packageId: 'catalog-skill-no-dependency',
+        declaredLicense: 'MIT',
+        declaredDependencies: [],
+      },
+    } satisfies SourceBoundSkillReceipt;
+
+    const rows = declaredMetadataFacetSummary(
+      sourceBoundSkillInventory([receiptA, receiptB, receiptC, receiptD]),
+    );
+
+    expect(rows).toEqual([
+      {
+        facet: 'declared-license',
+        value: 'Apache-2.0',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'declared-license',
+        value: 'MIT',
+        count: 3,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'dependency-state',
+        value: 'none',
+        count: 2,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'dependency-state',
+        value: 'declared',
+        count: 2,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'no-static-signals',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'static-signals-present',
+        count: 3,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+    ]);
+    expect(rows).not.toContainEqual(
+      expect.objectContaining({
+        facet: 'declared-license',
+        value: 'missing-license',
+      }),
+    );
+  });
+
   it('returns zero-count non-license facet rows when there are no records', () => {
     expect(declaredMetadataFacetSummary([])).toEqual([
       {
