@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
@@ -14,15 +13,13 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ESLint } from 'eslint';
 import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import { configDefaults } from 'vitest/config';
-import { buildVitestDiscoveryArgv } from '../support/worktree-discovery-command.js';
+import { runVitestDiscoveryProbe } from '../support/worktree-discovery-command.js';
 
-const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const require = createRequire(import.meta.url);
 const realFileSystem =
@@ -310,18 +307,10 @@ describe('nested development worktree discovery boundary', () => {
       const sentinelTestPaths = sentinelRoots.map((root) =>
         join(root, 'test', 'integration', 'sentinel-failure.test.ts'),
       ) as [string, string];
-      const childArgv = buildVitestDiscoveryArgv(
+      const result = await runVitestDiscoveryProbe(
         vitestBin,
         sentinelTestPaths,
-      );
-      const result = await execFileAsync(
-        process.execPath,
-        childArgv,
-        {
-          cwd: projectRoot,
-          timeout: 30_000,
-          maxBuffer: 2 * 1024 * 1024,
-        },
+        projectRoot,
       );
       const output = `${result.stdout}\n${result.stderr}`;
       expect(output).toMatch(/no test files found/i);

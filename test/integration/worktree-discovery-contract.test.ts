@@ -8,7 +8,7 @@ const discoveryTestPath = fileURLToPath(
 );
 
 describe('worktree discovery regression-test contract', () => {
-  it('routes its only child process through the bounded argv builder', async () => {
+  it('passes the exact constructed sentinels to the encapsulated probe', async () => {
     const source = await readFile(discoveryTestPath, 'utf8');
     const sourceFile = ts.createSourceFile(
       discoveryTestPath,
@@ -17,25 +17,35 @@ describe('worktree discovery regression-test contract', () => {
       true,
       ts.ScriptKind.TS,
     );
-    const childCalls: ts.CallExpression[] = [];
+    const probeCalls: ts.CallExpression[] = [];
+    const rawChildCalls: ts.CallExpression[] = [];
 
     function visit(node: ts.Node): void {
       if (
         ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        node.expression.text === 'execFileAsync'
+        node.expression.text === 'runVitestDiscoveryProbe'
       ) {
-        childCalls.push(node);
+        probeCalls.push(node);
+      }
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        /^(?:execFile|execFileAsync)$/.test(node.expression.text)
+      ) {
+        rawChildCalls.push(node);
       }
       ts.forEachChild(node, visit);
     }
     visit(sourceFile);
 
-    expect(childCalls).toHaveLength(1);
-    const [executable, arguments_] = childCalls[0]!.arguments;
-    expect(executable?.getText(sourceFile)).toBe('process.execPath');
-    expect(ts.isIdentifier(arguments_!) && arguments_.text === 'childArgv').toBe(
-      true,
-    );
+    expect(rawChildCalls).toEqual([]);
+    expect(probeCalls).toHaveLength(1);
+    const arguments_ = probeCalls[0]!.arguments;
+    expect(arguments_.map((argument) => argument.getText(sourceFile))).toEqual([
+      'vitestBin',
+      'sentinelTestPaths',
+      'projectRoot',
+    ]);
   });
 });
