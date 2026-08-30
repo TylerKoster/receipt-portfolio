@@ -111,9 +111,7 @@ describe('Search Receipt query and offer adapter', () => {
     expect(filterSearchRecords(records, 'google resolved', '')).toEqual([0]);
     expect(filterSearchRecords(records, '', 'guidance')).toEqual([1]);
     expect(filterSearchRecords(records, 'missing', '')).toEqual([]);
-    expect(resultCountMessage(0, 2)).toBe(
-      'No records match this query and filter.',
-    );
+    expect(resultCountMessage(0, 2)).toBe('Showing 0 of 2 records.');
     expect(resultCountMessage(1, 2)).toBe('Showing 1 of 2 records.');
   });
 
@@ -262,6 +260,7 @@ describe('Search Receipt query and offer adapter', () => {
     const topic = element();
     const status = element();
     const empty = element();
+    empty.textContent = 'No records match this query and filter.';
     const error = element();
     const cards = [
       {
@@ -300,7 +299,9 @@ describe('Search Receipt query and offer adapter', () => {
     form.listeners
       .get('submit')
       ?.forEach((listener) => listener({ preventDefault() {} }));
-    expect(status.textContent).toBe('No records match this query and filter.');
+    expect(status.textContent).toBe('Showing 0 of 2 records.');
+    expect(empty.hidden).toBe(false);
+    expect(empty.textContent).toBe('No records match this query and filter.');
     expect(cards.map((card) => card.hidden)).toEqual([true, true]);
 
     const reset = elements.get('[data-search-reset]');
@@ -333,9 +334,7 @@ describe('Search Receipt query and offer adapter', () => {
   });
 
   it('does not reflect raw query text or perform storage, analytics, or network calls', async () => {
-    expect(resultCountMessage(0, 1)).toBe(
-      'No records match this query and filter.',
-    );
+    expect(resultCountMessage(0, 1)).toBe('Showing 0 of 1 record.');
 
     const source = await readFile(
       join(projectRoot, 'sites', 'search-receipt', 'search-interface.js'),

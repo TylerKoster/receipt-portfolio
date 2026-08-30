@@ -21,7 +21,6 @@ export function filterSearchRecords(records, query, topic) {
 }
 
 export function resultCountMessage(count, total) {
-  if (count === 0) return 'No records match this query and filter.';
   return `Showing ${count} of ${total} ${total === 1 ? 'record' : 'records'}.`;
 }
 
