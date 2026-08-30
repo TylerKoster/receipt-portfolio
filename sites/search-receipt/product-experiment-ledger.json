@@ -41,15 +41,24 @@
     {
       "id": "retrieval-filter-offer-v1",
       "rank": 1,
-      "status": "ACTIVE_BLOCKED",
+      "status": "ACTIVE_NO_MEASUREMENT",
       "hypothesis": "A source-bound retrieval surface may help visitors inspect records without converting records into causal claims about their own sites.",
       "firstUserOutcome": "Enter a query/filter over source-bound records with explicit empty and error states.",
       "metric": "Unmeasured filter-to-record completion after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "blockedBy": "Coordinator-owned shared renderer/static-build/CSP adapter; public functional surface is not shipped.",
-      "nextSafeAction": "Keep the experiment specification and regression gate current; await coordinator-owned adapter authority before implementing a public surface."
+      "coordinatorReleaseEvidence": {
+        "releaseHead": "388a3d0c113ceb2e42346315811fdfbb19b7ab86",
+        "tag": "v0.1.10",
+        "provenance": "Coordinator-provided accepted release evidence."
+      },
+      "shippedCapability": {
+        "retrieval": "Client-side query and topic filtering shipped with explicit empty and error states.",
+        "offer": "The alert/report interaction is an in-page non-operational preview: it creates no alert or report and sends or retains no data.",
+        "measurement": "No telemetry, session, or interest measurement exists; no real demand or revenue conclusion."
+      },
+      "nextSafeAction": "Keep the shipped retrieval surface under bounded observation; do not infer demand or revenue unless authorized non-synthetic measurement becomes available."
     },
     {
       "id": "currentness-disclosure-v1",

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const ledgerPath = new URL('./product-experiment-ledger.json', import.meta.url);
 
 describe('Search Receipt product experiment ledger', () => {
-  it('preserves synthetic usability evidence and the ranked retrieval-filter-offer experiment', () => {
+  it('preserves synthetic usability evidence and records the shipped retrieval surface without claiming measurement', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.evidenceClassification).toEqual({
@@ -47,7 +47,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[0]).toMatchObject({
       id: 'retrieval-filter-offer-v1',
       rank: 1,
-      status: 'ACTIVE_BLOCKED',
+      status: 'ACTIVE_NO_MEASUREMENT',
       firstUserOutcome:
         'Enter a query/filter over source-bound records with explicit empty and error states.',
       metric:
@@ -55,8 +55,20 @@ describe('Search Receipt product experiment ledger', () => {
       target: '>=60% after 10 observed non-synthetic sessions',
       stopRule: '<30% after 10 sessions retires or reframes the experiment.',
       noDataBoundary: 'No data means no demand or revenue conclusion.',
-      blockedBy:
-        'Coordinator-owned shared renderer/static-build/CSP adapter; public functional surface is not shipped.',
+      coordinatorReleaseEvidence: {
+        releaseHead: '388a3d0c113ceb2e42346315811fdfbb19b7ab86',
+        tag: 'v0.1.10',
+        provenance: 'Coordinator-provided accepted release evidence.',
+      },
+      shippedCapability: {
+        retrieval:
+          'Client-side query and topic filtering shipped with explicit empty and error states.',
+        offer:
+          'The alert/report interaction is an in-page non-operational preview: it creates no alert or report and sends or retains no data.',
+        measurement:
+          'No telemetry, session, or interest measurement exists; no real demand or revenue conclusion.',
+      },
     });
+    expect(ledger.experiments[0]).not.toHaveProperty('blockedBy');
   });
 });

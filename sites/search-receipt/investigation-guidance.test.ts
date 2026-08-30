@@ -39,7 +39,7 @@ describe('Search Receipt evidence-to-investigation guidance', () => {
     expect(retrievalFilterOffer).toMatchObject({
       id: 'retrieval-filter-offer-v1',
       rank: 1,
-      status: 'ACTIVE_BLOCKED',
+      status: 'ACTIVE_NO_MEASUREMENT',
     });
     expect(currentnessDisclosure).toMatchObject({
       id: 'currentness-disclosure-v1',
