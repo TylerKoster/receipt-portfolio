@@ -97,4 +97,25 @@ describe('Search Receipt product experiment ledger', () => {
         .map((experiment: { rank: number }) => experiment.rank),
     ).toEqual([1, 2, 3, 4]);
   });
+
+  it('records search-scope discoverability without claiming measurement', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[5]).toMatchObject({
+      id: 'search-scope-discoverability-v1',
+      rank: 6,
+      status: 'ACTIVE_NO_MEASUREMENT',
+      hypothesis:
+        'Clearly naming phrase/topic search in the visible header may help a visitor find the available retrieval action while retaining currentness/no-causation limits.',
+      firstUserOutcome:
+        'Recognize that they can search controlled examples by phrase or topic and that a result is not current incident evidence or proof of their own-site cause.',
+      metric:
+        'Unmeasured search-scope comprehension after 10 observed non-synthetic sessions.',
+      target: '>=60% after 10 observed non-synthetic sessions',
+      stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+      noDataBoundary: 'No data means no demand or revenue conclusion.',
+      nextSafeAction:
+        'Keep the header search-scope disclosure under bounded observation only; no data means no demand or revenue conclusion.',
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { searchReceiptSite } from './index.js';
+import { renderSite } from '../shared/render.js';
 
 const ledgerPath = new URL('./product-experiment-ledger.json', import.meta.url);
 
@@ -25,6 +26,16 @@ describe('Search Receipt currentness disclosure', () => {
     );
     expect(searchReceiptSite.proposition).toContain(
       'check a verified official source before investigating',
+    );
+    const header = renderSite(searchReceiptSite, []).match(
+      /<header class="site-header">[\s\S]*?<\/header>/,
+    )?.[0];
+
+    expect(header).toContain(
+      'Search source-bound controlled examples by phrase or topic.',
+    );
+    expect(header).toContain(
+      'do not establish the cause of a change on your own site',
     );
     expect(retrievalFilterOffer).toMatchObject({
       id: 'retrieval-filter-offer-v1',

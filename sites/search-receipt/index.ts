@@ -7,7 +7,7 @@ export const searchReceiptSite: SiteDefinition = {
   description:
     'Source-bound controlled examples, not current incident evidence, for search-service status records.',
   proposition:
-    'Source-bound records do not establish the cause of a change on your own site; check a verified official source before investigating.',
+    'Search source-bound controlled examples by phrase or topic. They do not establish the cause of a change on your own site; check a verified official source before investigating.',
   interpretationBoundary:
     "A receipt captures one admitted observation; it does not prove a current incident or cause for a site change. Before investigating, compare a verified official source's timestamp/status with one's own site evidence; retain uncertainty if that does not establish a connection.",
   unknowns:
