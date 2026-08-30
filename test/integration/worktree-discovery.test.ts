@@ -211,9 +211,9 @@ describe('nested development worktree discovery boundary', () => {
     };
 
     try {
-      await expect(
-        createSentinel(root, owner, failingWriter),
-      ).rejects.toThrow('synthetic sentinel setup failure');
+      await expect(createSentinel(root, owner, failingWriter)).rejects.toThrow(
+        'synthetic sentinel setup failure',
+      );
       await expect(missing(root)).resolves.toBe(true);
       await expect(missing(parent)).resolves.toBe(true);
     } finally {

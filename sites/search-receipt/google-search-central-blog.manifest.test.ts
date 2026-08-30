@@ -13,7 +13,9 @@ describe('Google Search Central Blog source manifest', () => {
       JSON.parse(readFileSync(manifestPath, 'utf8')),
     );
 
-    expect(manifest.endpoint).toBe('https://feeds.feedburner.com/blogspot/amDG');
+    expect(manifest.endpoint).toBe(
+      'https://feeds.feedburner.com/blogspot/amDG',
+    );
     expect(manifest.allowedHosts).toEqual(['feeds.feedburner.com']);
   });
 });
