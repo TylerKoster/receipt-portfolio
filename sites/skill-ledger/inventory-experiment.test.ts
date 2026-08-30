@@ -7,6 +7,7 @@ import {
   assessSourceBoundSkillReceiptQuality,
   recordSyntheticOfferEvent,
   sourceBoundSkillInventory,
+  summarizeSkillInventoryComparison,
   summarizeSyntheticOfferEvents,
   type SourceBoundSkillReceipt,
   type SyntheticOfferEvent,
@@ -382,6 +383,105 @@ describe('source-bound SkillLedger inventory experiment', () => {
       reason: 'Select two distinct source-bound records to compare.',
     });
     expect(compareSkillInventory(records, ['receipt-a', 'receipt-a'])).toEqual({
+      kind: 'not-ready',
+      reason: 'Select two distinct source-bound records to compare.',
+    });
+  });
+
+  it('summarizes controlled source-bound field differences in a fixed order without conclusions', () => {
+    const records = sourceBoundSkillInventory([receiptA, receiptB]);
+    const comparison = compareSkillInventory(records, [
+      'receipt-a',
+      'receipt-b',
+    ]);
+
+    expect(summarizeSkillInventoryComparison(comparison)).toEqual({
+      kind: 'ready',
+      fields: [
+        {
+          field: 'source-id',
+          left: 'archive-index',
+          right: 'curated-catalog',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'source-url',
+          left: 'https://example.invalid/archive',
+          right: 'https://example.invalid/catalog',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'manifest-sha256',
+          left: 'a'.repeat(64),
+          right: 'e'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'raw-sha256',
+          left: 'b'.repeat(64),
+          right: 'f'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'normalized-sha256',
+          left: 'c'.repeat(64),
+          right: '0'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'contents-sha256',
+          left: 'd'.repeat(64),
+          right: '1'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'declared-license',
+          left: 'MIT',
+          right: 'Apache-2.0',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'dependency-state',
+          left: 'none',
+          right: 'declared',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'static-signal-presence',
+          left: 'no-static-signals',
+          right: 'static-signals-present',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+      ],
+    });
+  });
+
+  it('returns the exact not-ready comparison summary when two records are not selected', () => {
+    const records = sourceBoundSkillInventory([receiptA, receiptB]);
+
+    expect(
+      summarizeSkillInventoryComparison(
+        compareSkillInventory(records, ['receipt-a']),
+      ),
+    ).toEqual({
       kind: 'not-ready',
       reason: 'Select two distinct source-bound records to compare.',
     });

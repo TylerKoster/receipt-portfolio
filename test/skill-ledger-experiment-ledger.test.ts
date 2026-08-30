@@ -46,7 +46,7 @@ interface SyntheticUsabilityLedger {
 }
 
 describe('SkillLedger synthetic usability ledger', () => {
-  it('keeps a seven-area ranked portfolio with the active source-bound record quality gate at the top', () => {
+  it('keeps the exact seven-area ranked portfolio and completed experiment history', () => {
     const ledgerPath = resolve(
       process.cwd(),
       'docs/skill-ledger/experiments/2026-08-30-synthetic-usability.json',
@@ -57,26 +57,26 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'searchable-filterable-discovery',
+        area: 'source-bound-comparison',
         rank: 1,
-        experiment: 'source-bound-record-quality-gate',
+        experiment: 'controlled-comparison-field-differences',
         status: 'in-progress',
+        metric: 'controlled comparison field-difference coverage',
+        target:
+          'Exactly two quality-gated controlled records produce deterministic source, hash, declared-metadata, and static-signal-presence differences.',
+        stopRule:
+          'Field differences do not establish real provenance, safety, adoption, demand, suitability, or public UI readiness.',
+      },
+      {
+        area: 'searchable-filterable-discovery',
+        rank: 2,
+        experiment: 'source-bound-record-quality-gate',
+        status: 'completed-internal',
         metric: 'controlled invalid-record rejection coverage',
         target:
           'Every controlled record with a missing source binding, invalid observed time, or malformed hash is excluded and disclosed deterministically.',
         stopRule:
           'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
-      },
-      {
-        area: 'source-bound-comparison',
-        rank: 2,
-        experiment: 'controlled-source-bound-comparison',
-        status: 'completed-internal',
-        metric: 'controlled comparison readiness',
-        target:
-          'Two distinct source-bound controlled records can be compared internally.',
-        stopRule:
-          'No public comparison, adoption, revenue, demand, or safety claim; controlled records do not establish real provenance.',
       },
       {
         area: 'current-original-guides',
@@ -132,12 +132,20 @@ describe('SkillLedger synthetic usability ledger', () => {
           'Not started without actual users and authority; no adoption, revenue, demand, or safety claim.',
       },
     ]);
-    expect(ledger.experimentHistory).toContainEqual({
-      experiment: 'declared-metadata-taxonomy-facets',
-      status: 'completed-internal',
-      boundary:
-        'Declared metadata taxonomy facets remain controlled-record-only and do not establish safety, adoption, demand, or provenance.',
-    });
+    expect(ledger.experimentHistory).toEqual([
+      {
+        experiment: 'declared-metadata-taxonomy-facets',
+        status: 'completed-internal',
+        boundary:
+          'Declared metadata taxonomy facets remain controlled-record-only and do not establish safety, adoption, demand, or provenance.',
+      },
+      {
+        experiment: 'source-bound-record-quality-gate',
+        status: 'completed-internal',
+        boundary:
+          'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
+      },
+    ]);
   });
 
   it('preserves the supplied synthetic-only baseline and its evidence boundary', () => {

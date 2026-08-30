@@ -100,6 +100,36 @@ export type SkillInventoryComparison =
       reason: 'Select two distinct source-bound records to compare.';
     }>;
 
+export const SKILL_INVENTORY_COMPARISON_BOUNDARY =
+  'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.' as const;
+
+export type SkillInventoryComparisonSummaryField = Readonly<{
+  field:
+    | 'source-id'
+    | 'source-url'
+    | 'manifest-sha256'
+    | 'raw-sha256'
+    | 'normalized-sha256'
+    | 'contents-sha256'
+    | 'declared-license'
+    | 'dependency-state'
+    | 'static-signal-presence';
+  left: string;
+  right: string;
+  status: 'same' | 'different';
+  boundary: typeof SKILL_INVENTORY_COMPARISON_BOUNDARY;
+}>;
+
+export type SkillInventoryComparisonSummary =
+  | Readonly<{
+      kind: 'ready';
+      fields: readonly SkillInventoryComparisonSummaryField[];
+    }>
+  | Readonly<{
+      kind: 'not-ready';
+      reason: 'Select two distinct source-bound records to compare.';
+    }>;
+
 export type SyntheticOfferEvent = Readonly<{
   offerId: 'watchlist' | 'team-inventory';
   action: 'viewed' | 'selected';
@@ -326,6 +356,66 @@ export function compareSkillInventory(
   }
 
   return { kind: 'ready', records: selectedRecords };
+}
+
+export function summarizeSkillInventoryComparison(
+  comparison: SkillInventoryComparison,
+): SkillInventoryComparisonSummary {
+  if (comparison.kind === 'not-ready') {
+    return comparison;
+  }
+
+  const [leftRecord, rightRecord] = comparison.records;
+  const staticSignalPresence = (record: SkillInventoryRecord) =>
+    record.staticRiskFlags.length === 0
+      ? 'no-static-signals'
+      : 'static-signals-present';
+  const fields = [
+    ['source-id', leftRecord.source.sourceId, rightRecord.source.sourceId],
+    ['source-url', leftRecord.source.url, rightRecord.source.url],
+    [
+      'manifest-sha256',
+      leftRecord.hashes.manifestSha256,
+      rightRecord.hashes.manifestSha256,
+    ],
+    ['raw-sha256', leftRecord.hashes.rawSha256, rightRecord.hashes.rawSha256],
+    [
+      'normalized-sha256',
+      leftRecord.hashes.normalizedSha256,
+      rightRecord.hashes.normalizedSha256,
+    ],
+    [
+      'contents-sha256',
+      leftRecord.declaredMetadata.contentsSha256,
+      rightRecord.declaredMetadata.contentsSha256,
+    ],
+    [
+      'declared-license',
+      leftRecord.declaredMetadata.license,
+      rightRecord.declaredMetadata.license,
+    ],
+    [
+      'dependency-state',
+      leftRecord.declaredMetadata.dependencyState,
+      rightRecord.declaredMetadata.dependencyState,
+    ],
+    [
+      'static-signal-presence',
+      staticSignalPresence(leftRecord),
+      staticSignalPresence(rightRecord),
+    ],
+  ] as const;
+
+  return {
+    kind: 'ready',
+    fields: fields.map(([field, left, right]) => ({
+      field,
+      left,
+      right,
+      status: left === right ? 'same' : 'different',
+      boundary: SKILL_INVENTORY_COMPARISON_BOUNDARY,
+    })),
+  };
 }
 
 export function recordSyntheticOfferEvent(
