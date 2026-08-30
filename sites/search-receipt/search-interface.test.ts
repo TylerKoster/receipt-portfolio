@@ -212,6 +212,7 @@ describe('Search Receipt query and offer adapter', () => {
       addEventListener(type: string, listener: Listener): void;
       append(child: FakeElement): void;
       appendCount: number;
+      attributes: Map<string, string>;
       dataset: Record<string, string>;
       disabled: boolean;
       focus(): void;
@@ -219,7 +220,7 @@ describe('Search Receipt query and offer adapter', () => {
       focused: boolean;
       hidden: boolean;
       listeners: Map<string, Listener[]>;
-      setAttribute(): void;
+      setAttribute(name: string, value: string): void;
       textContent: string;
       type: string;
       value: string;
@@ -234,9 +235,12 @@ describe('Search Receipt query and offer adapter', () => {
       },
       append(child: FakeElement) {
         this.appendCount += 1;
-        elements.set('[data-search-reset]', child);
+        for (const name of child.attributes.keys()) {
+          if (name.startsWith('data-')) elements.set(`[${name}]`, child);
+        }
       },
       appendCount: 0,
+      attributes: new Map(),
       dataset: {},
       disabled: false,
       focus() {
@@ -247,7 +251,9 @@ describe('Search Receipt query and offer adapter', () => {
       focused: false,
       hidden: false,
       listeners: new Map<string, Listener[]>(),
-      setAttribute() {},
+      setAttribute(name: string, value: string) {
+        this.attributes.set(name, value);
+      },
       textContent: '',
       type: '',
       value: '',
@@ -307,7 +313,7 @@ describe('Search Receipt query and offer adapter', () => {
     const reset = elements.get('[data-search-reset]');
     expect(reset?.textContent).toBe('Clear filters');
     expect(initializeSearchReceipt(root)).toBe(true);
-    expect(form.appendCount).toBe(1);
+    expect(form.appendCount).toBe(2);
     expect(reset?.listeners.get('click')).toHaveLength(1);
     reset?.listeners
       .get('click')
@@ -318,6 +324,84 @@ describe('Search Receipt query and offer adapter', () => {
     expect(cards.map((card) => card.hidden)).toEqual([false, false]);
     expect(query.focused).toBe(true);
     expect(query.focusCount).toBe(1);
+  });
+
+  it('adds one static currentness boundary inside the controls without reflecting a query', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    interface FakeElement {
+      addEventListener(type: string, listener: Listener): void;
+      append(child: FakeElement): void;
+      attributes: Map<string, string>;
+      dataset: Record<string, string>;
+      hidden: boolean;
+      listeners: Map<string, Listener[]>;
+      setAttribute(name: string, value: string): void;
+      textContent: string;
+      type: string;
+      value: string;
+    }
+    const elements = new Map<string, FakeElement>();
+    const appended: FakeElement[] = [];
+    const element = (): FakeElement => ({
+      addEventListener(type: string, listener: Listener) {
+        this.listeners.set(type, [
+          ...(this.listeners.get(type) ?? []),
+          listener,
+        ]);
+      },
+      append(child: FakeElement) {
+        appended.push(child);
+        const selector = [...child.attributes.keys()].find((name) =>
+          name.startsWith('data-'),
+        );
+        if (selector) elements.set(`[${selector}]`, child);
+      },
+      attributes: new Map(),
+      dataset: {},
+      hidden: false,
+      listeners: new Map<string, Listener[]>(),
+      setAttribute(name: string, value: string) {
+        this.attributes.set(name, value);
+      },
+      textContent: '',
+      type: '',
+      value: '',
+    });
+    const form = element();
+    Object.assign(form, {
+      ownerDocument: { createElement: () => element() },
+    });
+    const query = element();
+    query.value = 'visitor-private-query';
+    const topic = element();
+    const status = element();
+    const empty = element();
+    const error = element();
+    const root = {
+      querySelector: (selector: string) => {
+        const values = new Map([
+          ['[data-search-controls]', form],
+          ['[data-search-query]', query],
+          ['[data-search-topic-filter]', topic],
+          ['[data-search-status]', status],
+          ['[data-search-empty]', empty],
+          ['[data-search-error]', error],
+        ]);
+        return values.get(selector) ?? elements.get(selector) ?? null;
+      },
+      querySelectorAll: () => [],
+    } as unknown as SearchRoot;
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    const boundary = elements.get('[data-search-interaction-boundary]');
+    expect(boundary?.textContent).toBe(
+      'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.',
+    );
+    expect(boundary?.textContent).not.toContain(query.value);
+    expect(appended.filter((child) => child === boundary)).toHaveLength(1);
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    expect(appended.filter((child) => child === boundary)).toHaveLength(1);
   });
 
   it('keeps a visible fallback when initialization cannot bind required controls', () => {

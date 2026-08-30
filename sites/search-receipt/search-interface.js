@@ -60,6 +60,23 @@ function findOrCreateResetControl(root, form) {
   return reset;
 }
 
+function findOrCreateInteractionBoundary(root, form) {
+  const existing = root.querySelector('[data-search-interaction-boundary]');
+  if (existing) return existing;
+
+  const document = form.ownerDocument;
+  if (!document?.createElement || typeof form.append !== 'function')
+    return null;
+
+  const boundary = document.createElement('p');
+  boundary.setAttribute('class', 'search-interaction-boundary');
+  boundary.setAttribute('data-search-interaction-boundary', '');
+  boundary.textContent =
+    'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.';
+  form.append(boundary);
+  return boundary;
+}
+
 export function initializeSearchReceipt(root) {
   const form = root.querySelector('[data-search-controls]');
   const query = root.querySelector('[data-search-query]');
@@ -74,6 +91,7 @@ export function initializeSearchReceipt(root) {
   if (!form || !query || !topic || !status || !empty || !error) return false;
   if (form.dataset?.searchInterfaceBound === 'true') return true;
 
+  findOrCreateInteractionBoundary(root, form);
   const reset = findOrCreateResetControl(root, form);
 
   const apply = () => {

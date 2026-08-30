@@ -71,4 +71,30 @@ describe('Search Receipt product experiment ledger', () => {
     });
     expect(ledger.experiments[0]).not.toHaveProperty('blockedBy');
   });
+
+  it('records the interaction currentness boundary without claiming measurement', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[4]).toMatchObject({
+      id: 'interaction-currentness-boundary-v1',
+      rank: 5,
+      status: 'ACTIVE_NO_MEASUREMENT',
+      hypothesis:
+        'Placing a clear controlled-example/no-causation boundary at the search interaction may help visitors interpret matching records without treating them as current incident evidence or an explanation for their own site.',
+      firstUserOutcome:
+        'Recognize that a filtered record is a controlled example, not current incident evidence or an explanation for their own-site change.',
+      metric:
+        'Unmeasured interaction-boundary comprehension after 10 observed non-synthetic sessions.',
+      target: '>=60% after 10 observed non-synthetic sessions',
+      stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+      noDataBoundary: 'No data means no demand or revenue conclusion.',
+      nextSafeAction:
+        'Keep the interaction boundary under bounded observation only; no data means no demand or revenue conclusion.',
+    });
+    expect(
+      ledger.experiments
+        .slice(0, 4)
+        .map((experiment: { rank: number }) => experiment.rank),
+    ).toEqual([1, 2, 3, 4]);
+  });
 });
