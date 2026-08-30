@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { hashPublicBuild, runHashBuildCli } from '../../scripts/hash-build.js';
 
 const EXPECTED_PATHS = [
+  'favicon.ico',
   'index.html',
   'portfolio.css',
   'search-receipt/index.html',
@@ -42,7 +43,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '6572235f63a9c90285f5b69073582ee5a87c81cf9661b58434b3c26ab0089a88';
+  'f7a2a21138a4e53cbfb96ec7beec41017ee6f628c8adcf7ea2b0790274dd5b04';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

@@ -8,7 +8,11 @@ const PUBLIC_SITE_ROOTS = [
   'skill-ledger',
   'workflow-test-lab',
 ] as const;
-const ROOT_SHELL_FILES = ['index.html', 'portfolio.css'] as const;
+const ROOT_SHELL_FILES = [
+  'favicon.ico',
+  'index.html',
+  'portfolio.css',
+] as const;
 const FIXED_SITE_FILES = [
   'index.html',
   'methodology/index.html',

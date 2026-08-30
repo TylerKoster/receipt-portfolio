@@ -27,6 +27,7 @@ import {
   type Receipt,
 } from '../packages/evidence-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
+import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
   DEFAULT_PUBLIC_BASE_URL,
   normalizePublicBaseUrl,
@@ -313,6 +314,7 @@ async function writeSiteTree(
   receipts: readonly Receipt[],
   publicBaseUrl: string,
 ): Promise<void> {
+  await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
     join(projectRoot(), 'sites', 'shared', 'styles.css'),
     join(outputDirectory, 'portfolio.css'),

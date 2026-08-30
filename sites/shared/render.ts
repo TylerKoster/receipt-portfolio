@@ -16,8 +16,10 @@ export interface SiteDefinition {
 }
 
 export const DEFAULT_PUBLIC_BASE_URL = 'https://receipt-portfolio.example/';
+// `frame-ancestors` is intentionally absent: browsers ignore it in a meta CSP.
+// Framing protection requires a deployment-controlled response header.
 const CONTENT_SECURITY_POLICY_PREFIX =
-  "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'";
+  "default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'";
 
 function contentSecurityPolicy(scriptPolicy: "'none'" | "'self'"): string {
   return `${CONTENT_SECURITY_POLICY_PREFIX}; script-src ${scriptPolicy}`;
@@ -258,6 +260,7 @@ function page(
   <meta http-equiv="Content-Security-Policy" content="${policy}">
   <meta name="description" content="${escapeHtml(options.description)}">
   <link rel="canonical" href="${escapeHtml(canonicalUrl(site, options.path, publicBaseUrl))}">
+  <link rel="icon" href="${escapeHtml(`${publicBasePath(publicBaseUrl)}favicon.ico`)}">
   <title>${escapeHtml(options.title)}</title>
   <link rel="stylesheet" href="${escapeHtml(sitePath(site, '/styles.css', publicBaseUrl))}">${productStyle}${structuredData}${script}
 </head>
@@ -523,6 +526,7 @@ export function renderPortfolioHub(
   <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
   <meta name="description" content="Three distinct source-bound evidence receipt products.">
   <link rel="canonical" href="${escapeHtml(base)}">
+  <link rel="icon" href="${escapeHtml(`${basePath}favicon.ico`)}">
   <title>Evidence receipt portfolio</title>
   <link rel="stylesheet" href="${escapeHtml(`${basePath}portfolio.css`)}">
 </head>

@@ -43,9 +43,9 @@ const realFileSystem =
 const mockedRm = vi.mocked(rm);
 
 const CSP =
-  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'\">";
+  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'; script-src 'none'\">";
 const SEARCH_RECEIPT_CSP =
-  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'self'\">";
+  "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'; script-src 'self'\">";
 const SITE_HEADINGS = {
   'search-receipt': 'Search Receipt',
   'skill-ledger': 'SkillLedger',
@@ -426,7 +426,7 @@ describe('static receipt site build', () => {
     ).toEqual(Object.keys(SITE_HEADINGS).sort());
     expect(
       entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-    ).toEqual(['index.html', 'portfolio.css']);
+    ).toEqual(['favicon.ico', 'index.html', 'portfolio.css']);
 
     const hub = await readFile(join(outputDirectory, 'index.html'), 'utf8');
     expect(hub).toContain('Evidence receipt portfolio');
@@ -437,6 +437,8 @@ describe('static receipt site build', () => {
       '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/">',
     );
     expect(hub).toContain('href="/receipt-portfolio/portfolio.css"');
+    expect(hub).toContain('href="/receipt-portfolio/favicon.ico"');
+    expect(hub).not.toContain('frame-ancestors');
     for (const siteId of Object.keys(SITE_HEADINGS)) {
       expect(hub).toContain(`href="/receipt-portfolio/${siteId}/"`);
     }
@@ -464,7 +466,7 @@ describe('static receipt site build', () => {
     ).toEqual(Object.keys(SITE_HEADINGS).sort());
     expect(
       entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-    ).toEqual(['index.html', 'portfolio.css']);
+    ).toEqual(['favicon.ico', 'index.html', 'portfolio.css']);
 
     for (const siteId of Object.keys(SITE_HEADINGS)) {
       const html = await readFile(
@@ -478,6 +480,8 @@ describe('static receipt site build', () => {
       expect(html).toContain(
         siteId === 'search-receipt' ? SEARCH_RECEIPT_CSP : CSP,
       );
+      expect(html).not.toContain('frame-ancestors');
+      expect(html).toContain('href="/favicon.ico"');
       expect(html).toContain(`href="/${siteId}/styles.css"`);
       expect(styles).toContain('--accent');
       if (siteId !== 'search-receipt') {
@@ -511,6 +515,10 @@ describe('static receipt site build', () => {
     expect(inventory).not.toContain('skill-ledger/search-interface.js');
     expect(inventory).not.toContain('workflow-test-lab/search-interface.css');
     expect(inventory).not.toContain('skill-ledger/search-interface.css');
+    expect(inventory).toContain('favicon.ico');
+    const favicon = await readFile(join(outputDirectory, 'favicon.ico'));
+    expect([...favicon.subarray(0, 6)]).toEqual([0, 0, 1, 0, 1, 0]);
+    expect(favicon.length).toBeGreaterThan(22);
   });
 
   it('makes an incremental build byte-equal to a clean build after evidence changes', async () => {
