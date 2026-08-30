@@ -62,19 +62,35 @@ function findOrCreateResetControl(root, form) {
 
 function findOrCreateInteractionBoundary(root, form) {
   const existing = root.querySelector('[data-search-interaction-boundary]');
-  if (existing) return existing;
+  if (existing) {
+    existing.setAttribute?.('id', 'search-interaction-boundary');
+    return existing;
+  }
 
   const document = form.ownerDocument;
   if (!document?.createElement || typeof form.append !== 'function')
     return null;
 
   const boundary = document.createElement('p');
+  boundary.setAttribute('id', 'search-interaction-boundary');
   boundary.setAttribute('class', 'search-interaction-boundary');
   boundary.setAttribute('data-search-interaction-boundary', '');
   boundary.textContent =
     'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.';
   form.append(boundary);
   return boundary;
+}
+
+function describeWithInteractionBoundary(control) {
+  if (typeof control.setAttribute !== 'function') return;
+  const describedBy =
+    typeof control.getAttribute === 'function'
+      ? (control.getAttribute('aria-describedby') ?? '')
+      : '';
+  const descriptionIds = new Set(describedBy.split(/\s+/u));
+  descriptionIds.delete('');
+  descriptionIds.add('search-interaction-boundary');
+  control.setAttribute('aria-describedby', [...descriptionIds].join(' '));
 }
 
 export function initializeSearchReceipt(root) {
@@ -92,6 +108,8 @@ export function initializeSearchReceipt(root) {
   if (form.dataset?.searchInterfaceBound === 'true') return true;
 
   findOrCreateInteractionBoundary(root, form);
+  describeWithInteractionBoundary(query);
+  describeWithInteractionBoundary(topic);
   const reset = findOrCreateResetControl(root, form);
 
   const apply = () => {

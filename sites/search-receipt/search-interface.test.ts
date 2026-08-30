@@ -377,6 +377,7 @@ describe('Search Receipt query and offer adapter', () => {
       append(child: FakeElement): void;
       attributes: Map<string, string>;
       dataset: Record<string, string>;
+      getAttribute(name: string): string | null;
       hidden: boolean;
       listeners: Map<string, Listener[]>;
       setAttribute(name: string, value: string): void;
@@ -402,6 +403,9 @@ describe('Search Receipt query and offer adapter', () => {
       },
       attributes: new Map(),
       dataset: {},
+      getAttribute(name: string) {
+        return this.attributes.get(name) ?? null;
+      },
       hidden: false,
       listeners: new Map<string, Listener[]>(),
       setAttribute(name: string, value: string) {
@@ -417,6 +421,104 @@ describe('Search Receipt query and offer adapter', () => {
     });
     const query = element();
     query.value = 'visitor-private-query';
+    query.setAttribute('aria-describedby', 'query-help');
+    const topic = element();
+    topic.setAttribute('aria-describedby', 'topic-help');
+    const status = element();
+    const empty = element();
+    const error = element();
+    const boundary = element();
+    boundary.setAttribute('data-search-interaction-boundary', '');
+    boundary.textContent =
+      'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.';
+    elements.set('[data-search-interaction-boundary]', boundary);
+    const root = {
+      querySelector: (selector: string) => {
+        const values = new Map([
+          ['[data-search-controls]', form],
+          ['[data-search-query]', query],
+          ['[data-search-topic-filter]', topic],
+          ['[data-search-status]', status],
+          ['[data-search-empty]', empty],
+          ['[data-search-error]', error],
+        ]);
+        return values.get(selector) ?? elements.get(selector) ?? null;
+      },
+      querySelectorAll: () => [],
+    } as unknown as SearchRoot;
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    expect(boundary?.attributes.get('id')).toBe('search-interaction-boundary');
+    expect(boundary?.textContent).toBe(
+      'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.',
+    );
+    expect(boundary?.textContent).not.toContain(query.value);
+    expect(query.attributes.get('aria-describedby')).toBe(
+      'query-help search-interaction-boundary',
+    );
+    expect(topic.attributes.get('aria-describedby')).toBe(
+      'topic-help search-interaction-boundary',
+    );
+    expect(appended.filter((child) => child === boundary)).toHaveLength(0);
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    expect(appended.filter((child) => child === boundary)).toHaveLength(0);
+    expect(query.attributes.get('aria-describedby')).toBe(
+      'query-help search-interaction-boundary',
+    );
+    expect(topic.attributes.get('aria-describedby')).toBe(
+      'topic-help search-interaction-boundary',
+    );
+  });
+
+  it('describes controls without existing aria-describedby values', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    interface FakeElement {
+      addEventListener(type: string, listener: Listener): void;
+      append(child: FakeElement): void;
+      attributes: Map<string, string>;
+      dataset: Record<string, string>;
+      getAttribute(name: string): string | null;
+      hidden: boolean;
+      listeners: Map<string, Listener[]>;
+      setAttribute(name: string, value: string): void;
+      textContent: string;
+      type: string;
+      value: string;
+    }
+    const elements = new Map<string, FakeElement>();
+    const element = (): FakeElement => ({
+      addEventListener(type: string, listener: Listener) {
+        this.listeners.set(type, [
+          ...(this.listeners.get(type) ?? []),
+          listener,
+        ]);
+      },
+      append(child: FakeElement) {
+        const selector = [...child.attributes.keys()].find((name) =>
+          name.startsWith('data-'),
+        );
+        if (selector) elements.set(`[${selector}]`, child);
+      },
+      attributes: new Map(),
+      dataset: {},
+      getAttribute(name: string) {
+        return this.attributes.get(name) ?? null;
+      },
+      hidden: false,
+      listeners: new Map<string, Listener[]>(),
+      setAttribute(name: string, value: string) {
+        this.attributes.set(name, value);
+      },
+      textContent: '',
+      type: '',
+      value: '',
+    });
+    const form = element();
+    Object.assign(form, {
+      ownerDocument: { createElement: () => element() },
+    });
+    const query = element();
     const topic = element();
     const status = element();
     const empty = element();
@@ -437,15 +539,12 @@ describe('Search Receipt query and offer adapter', () => {
     } as unknown as SearchRoot;
 
     expect(initializeSearchReceipt(root)).toBe(true);
-    const boundary = elements.get('[data-search-interaction-boundary]');
-    expect(boundary?.textContent).toBe(
-      'Controlled examples, not current incident evidence. A matching record does not explain a change on your own site.',
+    expect(query.attributes.get('aria-describedby')).toBe(
+      'search-interaction-boundary',
     );
-    expect(boundary?.textContent).not.toContain(query.value);
-    expect(appended.filter((child) => child === boundary)).toHaveLength(1);
-
-    expect(initializeSearchReceipt(root)).toBe(true);
-    expect(appended.filter((child) => child === boundary)).toHaveLength(1);
+    expect(topic.attributes.get('aria-describedby')).toBe(
+      'search-interaction-boundary',
+    );
   });
 
   it('keeps a visible fallback when initialization cannot bind required controls', () => {
