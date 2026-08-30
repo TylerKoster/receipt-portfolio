@@ -14,6 +14,7 @@ export interface PublicReviewEvidence {
 }
 
 export interface PublicSearchEntry {
+  readonly corpusId: string;
   readonly momentId: string;
   readonly videoId: string;
   readonly videoSlug: string;
@@ -26,6 +27,8 @@ export interface PublicSearchEntry {
   readonly excerpt: string;
   readonly topicSlugs: readonly string[];
   readonly correctionState: 'active' | 'corrected';
+  readonly rightsGrantId: string;
+  readonly cueIds: readonly string[];
   readonly confidenceClass: string;
   readonly rightsStatus: string;
   readonly verificationDate: string;
@@ -107,10 +110,55 @@ function safeReviewEvidence(value: unknown): value is PublicReviewEvidence {
   }
 }
 
-function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
+const REVIEWED_CONFIDENCE =
+  'Reviewed public source; original editorial annotation, not transcript text';
+const CONTROLLED_CONFIDENCE = 'Rights-validated controlled fixture match';
+
+function expectedRightsStatus(review: PublicReviewEvidence): string {
+  return `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
+}
+
+function expectedProvenance(
+  entry: Pick<
+    PublicSearchEntry,
+    'corpusId' | 'rightsGrantId' | 'cueIds' | 'reviewEvidence'
+  >,
+): string {
+  const prefix = `Corpus ${entry.corpusId}; `;
+  const lineage = `rights grant ${entry.rightsGrantId}; cue ${entry.cueIds.join(', ')}`;
+  const review = entry.reviewEvidence;
+  return review === undefined
+    ? `${prefix}${lineage}`
+    : `${prefix}evidence ${review.evidenceId}; immutable rights revision ${review.immutableRightsRevisionUrl}; reviewed by ${review.reviewer} on ${review.reviewedOn}; ${lineage}`;
+}
+
+function claimsMatchEvidence(entry: PublicSearchEntry): boolean {
+  const review = entry.reviewEvidence;
+  if (review === undefined) {
+    return (
+      entry.confidenceClass === CONTROLLED_CONFIDENCE &&
+      entry.provenance === expectedProvenance(entry) &&
+      !/\breviewed\b/iu.test(
+        `${entry.confidenceClass} ${entry.rightsStatus} ${entry.verificationDate} ${entry.provenance}`,
+      )
+    );
+  }
+  return (
+    entry.confidenceClass === REVIEWED_CONFIDENCE &&
+    entry.rightsStatus === expectedRightsStatus(review) &&
+    entry.verificationDate === review.reviewedOn &&
+    entry.provenance === expectedProvenance(entry)
+  );
+}
+
+function safeTimestampEntry(
+  value: unknown,
+  expectedCorpusId: string,
+): value is PublicSearchEntry {
   if (typeof value !== 'object' || value === null) return false;
   const entry = value as Partial<PublicSearchEntry>;
   if (
+    entry.corpusId !== expectedCorpusId ||
     typeof entry.momentId !== 'string' ||
     typeof entry.videoId !== 'string' ||
     typeof entry.videoSlug !== 'string' ||
@@ -127,6 +175,9 @@ function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
     !entry.topicSlugs.every((topic) => typeof topic === 'string') ||
     (entry.correctionState !== 'active' &&
       entry.correctionState !== 'corrected') ||
+    typeof entry.rightsGrantId !== 'string' ||
+    !Array.isArray(entry.cueIds) ||
+    !entry.cueIds.every((cueId) => typeof cueId === 'string') ||
     typeof entry.confidenceClass !== 'string' ||
     typeof entry.rightsStatus !== 'string' ||
     typeof entry.verificationDate !== 'string' ||
@@ -140,6 +191,7 @@ function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
   ) {
     return false;
   }
+  if (!claimsMatchEvidence(entry as PublicSearchEntry)) return false;
   try {
     const source = new URL(entry.sourceUrl);
     const timestamp = new URL(entry.timestampUrl);
@@ -191,17 +243,20 @@ export function searchPublicIndex(
   query: string,
   limit = 10,
 ): readonly PublicSearchEntry[] {
+  const candidateIndex = value as Partial<PublicSearchIndex>;
   if (
     typeof value !== 'object' ||
     value === null ||
-    !Array.isArray((value as Partial<PublicSearchIndex>).entries) ||
+    candidateIndex.schemaVersion !== 1 ||
+    typeof candidateIndex.corpusId !== 'string' ||
+    !Array.isArray(candidateIndex.entries) ||
     normalize(query).length === 0 ||
     limit <= 0
   ) {
     return [];
   }
-  return (value as PublicSearchIndex).entries
-    .filter(safeTimestampEntry)
+  return candidateIndex.entries
+    .filter((entry) => safeTimestampEntry(entry, candidateIndex.corpusId!))
     .map((entry) => ({ entry, score: score(entry, query) }))
     .filter((candidate) => candidate.score > 0)
     .sort(
@@ -238,6 +293,8 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
         phraseTokens.every((token, offset) => valueTokens[start + offset] === token));
   };
   const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
+  const reviewedConfidence = 'Reviewed public source; original editorial annotation, not transcript text';
+  const controlledConfidence = 'Rights-validated controlled fixture match';
   const reviewSafe = (review) => {
     try {
       if (!review || typeof review !== 'object' ||
@@ -263,9 +320,33 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       return false;
     }
   };
-  const safe = (entry) => {
+  const expectedRights = (review) => review.licenseIdentifier + '; ' +
+    review.productBoundary.included.join(' plus ') +
+    ' only; no inferred permission or endorsement.';
+  const expectedProvenance = (entry) => {
+    const prefix = 'Corpus ' + entry.corpusId + '; ';
+    const lineage = 'rights grant ' + entry.rightsGrantId + '; cue ' +
+      entry.cueIds.join(', ');
+    const review = entry.reviewEvidence;
+    return !review ? prefix + lineage : prefix + 'evidence ' + review.evidenceId +
+      '; immutable rights revision ' + review.immutableRightsRevisionUrl +
+      '; reviewed by ' + review.reviewer + ' on ' + review.reviewedOn + '; ' + lineage;
+  };
+  const claimsMatch = (entry) => {
+    const review = entry.reviewEvidence;
+    if (!review) return entry.confidenceClass === controlledConfidence &&
+      entry.provenance === expectedProvenance(entry) &&
+      !/\breviewed\b/iu.test(entry.confidenceClass + ' ' + entry.rightsStatus + ' ' +
+        entry.verificationDate + ' ' + entry.provenance);
+    return entry.confidenceClass === reviewedConfidence &&
+      entry.rightsStatus === expectedRights(review) &&
+      entry.verificationDate === review.reviewedOn &&
+      entry.provenance === expectedProvenance(entry);
+  };
+  const safe = (entry, expectedCorpusId) => {
     try {
       if (!entry || typeof entry !== 'object' ||
+          entry.corpusId !== expectedCorpusId ||
           typeof entry.momentId !== 'string' ||
           typeof entry.videoId !== 'string' ||
           typeof entry.videoSlug !== 'string' ||
@@ -279,6 +360,9 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
           !Array.isArray(entry.topicSlugs) ||
           !entry.topicSlugs.every((topic) => typeof topic === 'string') ||
           (entry.correctionState !== 'active' && entry.correctionState !== 'corrected') ||
+          typeof entry.rightsGrantId !== 'string' ||
+          !Array.isArray(entry.cueIds) ||
+          !entry.cueIds.every((cueId) => typeof cueId === 'string') ||
           typeof entry.confidenceClass !== 'string' ||
           typeof entry.rightsStatus !== 'string' ||
           typeof entry.verificationDate !== 'string' ||
@@ -289,6 +373,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
            entry.timestampStrategy !== 'media-fragment') ||
           (entry.reviewEvidence !== undefined &&
            !reviewSafe(entry.reviewEvidence))) return false;
+      if (!claimsMatch(entry)) return false;
       const source = new URL(entry.sourceUrl);
       const timestamp = new URL(entry.timestampUrl);
       if (source.protocol !== 'https:' || source.username || source.password ||
@@ -308,7 +393,8 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     try {
       return !!value && typeof value === 'object' &&
         value.schemaVersion === 1 && typeof value.corpusId === 'string' &&
-        Array.isArray(value.entries) && value.entries.every(safe);
+        Array.isArray(value.entries) &&
+        value.entries.every((entry) => safe(entry, value.corpusId));
     } catch {
       return false;
     }
@@ -316,7 +402,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   const find = (query) => {
     const queryTokens = tokens(query);
     if (queryTokens.length === 0 || !index) return [];
-    return index.entries.filter(safe).map((entry) => {
+    return index.entries.filter((entry) => safe(entry, index.corpusId)).map((entry) => {
       const title = normalize(entry.videoTitle);
       const topics = normalize(entry.topicSlugs.join(' '));
       const excerpt = normalize(entry.excerpt);
@@ -384,11 +470,11 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   };
   const showLoadError = () => {
     error.hidden = false;
-    status.textContent = 'Interactive search is unavailable; initial reviewed moments remain below.';
+    status.textContent = 'Interactive search is unavailable; initial controlled moments remain below.';
   };
   const showSearchError = () => {
     error.hidden = false;
-    status.textContent = 'Search could not load. The initial reviewed moments remain available below.';
+    status.textContent = 'Search could not load. The initial controlled moments remain available below.';
   };
 
   fetch('search-index.json', { credentials: 'same-origin' })

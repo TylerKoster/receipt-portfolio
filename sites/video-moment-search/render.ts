@@ -90,6 +90,7 @@ export function serializePublicSearchIndex(
       )
       .map((cue) => cue.id);
     return {
+      corpusId: corpus.corpusId,
       momentId: entry.moment.id,
       videoId: entry.video.id,
       videoSlug: entry.video.slug,
@@ -102,6 +103,8 @@ export function serializePublicSearchIndex(
       excerpt: entry.moment.excerpt,
       topicSlugs: entry.moment.topicSlugs,
       correctionState: entry.moment.state,
+      rightsGrantId: grant.id,
+      cueIds,
       confidenceClass:
         reviewEvidence !== undefined
           ? 'Reviewed public source; original editorial annotation, not transcript text'
@@ -267,15 +270,27 @@ export function renderSearchShell(
   baseUrl: string,
 ): string {
   const initial = initialResults(corpus, searchIndex);
+  const allInitialEntriesReviewed =
+    initial.length > 0 &&
+    initial.every((entry) => entry.reviewEvidence !== undefined);
+  const searchHeading = allInitialEntriesReviewed
+    ? 'Search the reviewed public-source moment fixture'
+    : 'Search the controlled moment fixture';
+  const initialHeading = allInitialEntriesReviewed
+    ? 'Initial reviewed moments'
+    : 'Initial controlled moments';
+  const rightsBoundary = allInitialEntriesReviewed
+    ? 'This reviewed Commons source provides a timestamp link plus an original editorial annotation only. It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.'
+    : 'Each controlled result exposes its stored rights, provenance, and correction state. Review status is shown only when a validated evidence record is present. This route does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence.';
   const body = `<section id="moment-search-controls" class="search-panel" aria-labelledby="search-heading">
     <p class="eyebrow">Find an exact explanation</p>
-    <h2 id="search-heading">Search the reviewed moment fixture</h2>
+    <h2 id="search-heading">${escapeHtml(searchHeading)}</h2>
     <form class="search-controls" role="search" data-moment-search>
       <div><label for="moment-query">What explanation do you remember?</label><input id="moment-query" name="q" type="search" autocomplete="off" data-moment-query></div>
       <button type="submit">Search moments</button>
     </form>
-    <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial reviewed moments remain available below.</p>
-    <p class="error" data-search-error hidden>Search could not load. The initial reviewed moments remain available below.</p>
+    <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>
+    <p class="error" data-search-error hidden>Search could not load. The initial controlled moments remain available below.</p>
     <div class="moment-list" data-client-results></div>
   </section>
   <section class="information-panel" aria-labelledby="start-heading">
@@ -284,11 +299,11 @@ export function renderSearchShell(
     <p><strong>Use this when:</strong> ${escapeHtml(videoMomentSearchSite.useCase)}</p>
     <h3>How to use it</h3><ol>${videoMomentSearchSite.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
     <p><strong>What you get:</strong> ${escapeHtml(videoMomentSearchSite.outcome)}</p>
-    <p class="boundary"><strong>Rights boundary:</strong> This reviewed Commons fixture provides a timestamp link plus an original editorial annotation only. It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.</p>
+    <p class="boundary"><strong>Rights boundary:</strong> ${escapeHtml(rightsBoundary)}</p>
   </section>
   <section aria-labelledby="initial-heading" data-server-results>
     <p class="eyebrow">Available without JavaScript</p>
-    <h2 id="initial-heading">Initial reviewed moments</h2>
+    <h2 id="initial-heading">${escapeHtml(initialHeading)}</h2>
     ${renderEntries(initial)}
   </section>`;
   return page(videoMomentSearchSite.title, body, baseUrl, '', true);
@@ -310,7 +325,7 @@ function filteredPage(
 ): string {
   const content =
     entries.length === 0
-      ? '<p class="guidance">No reviewed fixture moments are available for this view.</p>'
+      ? '<p class="guidance">No controlled fixture moments are available for this view.</p>'
       : renderEntries(entries);
   return page(
     title,

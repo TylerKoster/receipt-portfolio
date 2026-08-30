@@ -389,6 +389,105 @@ describe('AI Moment Index public search surface', () => {
     expect(entry.reviewEvidence).toBeUndefined();
   });
 
+  it('keeps page-level reviewed-source claims absent when review evidence is absent', () => {
+    const unreviewedMedia = structuredClone(fixture) as Mutable<VideoCorpus>;
+    delete unreviewedMedia.videos[0]!.reviewEvidenceId;
+    delete unreviewedMedia.rights[0]!.reviewEvidence;
+    expect(validateVideoCorpus(unreviewedMedia).ok).toBe(true);
+
+    const html = renderVideoMomentHome(
+      unreviewedMedia,
+      buildSearchIndex(unreviewedMedia),
+      baseUrl,
+    );
+    expect(html.toLocaleLowerCase('en-US')).not.toMatch(
+      /reviewed (?:public-)?source|commons-reviewed|reviewed commons|initial reviewed moments|search the reviewed/u,
+    );
+
+    const reviewedHtml = renderVideoMomentHome(fixture, searchIndex, baseUrl);
+    expect(reviewedHtml).toContain('Reviewed public source');
+    expect(reviewedHtml).toContain(
+      'commons-how-can-we-keep-robots-under-control-v1',
+    );
+    expect(reviewedHtml).toContain(
+      'https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&amp;oldid=1000389530',
+    );
+  });
+
+  it('rejects contradictory reviewed-source claims in the helper and shipped client', async () => {
+    const validIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const baseEntry = validIndex.entries[0]!;
+    const contradictions: readonly [
+      string,
+      (entry: Mutable<typeof baseEntry>) => void,
+    ][] = [
+      [
+        'reviewed label without evidence',
+        (entry) => {
+          delete entry.reviewEvidence;
+        },
+      ],
+      [
+        'reviewer drift',
+        (entry) => {
+          entry.reviewEvidence!.reviewer = 'ContradictoryReviewer';
+        },
+      ],
+      [
+        'review date drift',
+        (entry) => {
+          entry.reviewEvidence!.reviewedOn = '2022-01-19';
+        },
+      ],
+      [
+        'license drift',
+        (entry) => {
+          entry.reviewEvidence!.licenseIdentifier = 'Contradictory License';
+        },
+      ],
+      [
+        'evidence ID drift',
+        (entry) => {
+          entry.reviewEvidence!.evidenceId = 'contradictory-evidence';
+        },
+      ],
+      [
+        'provenance drift',
+        (entry) => {
+          entry.provenance = entry.provenance.replace(
+            'commons-how-can-we-keep-robots-under-control-v1',
+            'contradictory-evidence',
+          );
+        },
+      ],
+      [
+        'index corpus lineage drift',
+        (entry) => {
+          entry.corpusId = 'contradictory-corpus';
+          entry.provenance = entry.provenance.replace(
+            'wikimedia-commons-ai-video-reviewed-v1',
+            'contradictory-corpus',
+          );
+        },
+      ],
+    ];
+
+    for (const [name, contradict] of contradictions) {
+      const entry = structuredClone(baseEntry) as Mutable<typeof baseEntry>;
+      contradict(entry);
+      const hostileIndex = { ...validIndex, entries: [entry] };
+      expect(searchPublicIndex(hostileIndex, 'robots control'), name).toEqual(
+        [],
+      );
+
+      const harness = executeClientPayload();
+      await harness.resolveIndex(hostileIndex);
+      expect(harness.error.hidden, name).toBe(false);
+      harness.submit('robots control');
+      expect(harness.results.children, name).toEqual([]);
+    }
+  });
+
   it('renders every result with its own validated stored timestamp and evidence metadata', () => {
     const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
     const results = searchPublicIndex(publicIndex, 'robots control');
@@ -467,7 +566,7 @@ describe('AI Moment Index public search surface', () => {
     const home = renderVideoMomentHome(fixture, searchIndex, baseUrl);
     expect(home).toContain('data-search-error');
     expect(home).toContain(
-      'Search could not load. The initial reviewed moments remain available below.',
+      'Search could not load. The initial controlled moments remain available below.',
     );
     expect(home).toContain('data-server-results');
     expect(home).toContain('moment-robots-control');
@@ -486,7 +585,7 @@ describe('AI Moment Index public search surface', () => {
       'How to use it',
       '<strong>What you get:</strong>',
       '<strong>Rights boundary:</strong>',
-      'reviewed Commons fixture',
+      'reviewed Commons source',
       'timestamp link plus an original editorial annotation only',
       'does not host, embed, or distribute media or transcripts',
       'claim endorsement or inferred permission',
@@ -566,7 +665,7 @@ describe('AI Moment Index public search surface', () => {
     };
     const publicIndex = {
       schemaVersion: 1 as const,
-      corpusId: 'phrase-parity-fixture',
+      corpusId: baseEntry.corpusId,
       entries: [splitTokens, exactPhrase],
     };
     const expectedOrder = searchPublicIndex(
@@ -643,7 +742,7 @@ describe('AI Moment Index public search surface', () => {
     ];
     const publicIndex = {
       schemaVersion: 1 as const,
-      corpusId: 'tie-break-parity-fixture',
+      corpusId: baseEntry.corpusId,
       entries: tiedEntries,
     };
     const expectedOrder = searchPublicIndex(publicIndex, 'agent').map(
@@ -672,7 +771,7 @@ describe('AI Moment Index public search surface', () => {
     await wrongShape.resolveIndex({ entries: 'not-an-array' });
     expect(wrongShape.error.hidden).toBe(false);
     expect(wrongShape.status.textContent).toContain(
-      'initial reviewed moments remain below',
+      'initial controlled moments remain below',
     );
     expect(wrongShape.serverResults.textContent).toBe(
       'server-rendered initial result',
@@ -690,7 +789,7 @@ describe('AI Moment Index public search surface', () => {
     expect(partial.error.hidden).toBe(false);
     expect(() => partial.submit('agent evaluation')).not.toThrow();
     expect(partial.status.textContent).toContain(
-      'initial reviewed moments remain available below',
+      'initial controlled moments remain available below',
     );
   });
 
@@ -707,7 +806,7 @@ describe('AI Moment Index public search surface', () => {
     });
     expect(invalidSource.error.hidden).toBe(false);
     expect(invalidSource.status.textContent).toContain(
-      'initial reviewed moments remain below',
+      'initial controlled moments remain below',
     );
 
     const mismatchedTimestamp = executeClientPayload();
@@ -727,7 +826,7 @@ describe('AI Moment Index public search surface', () => {
     await rejected.rejectFetch();
     expect(rejected.error.hidden).toBe(false);
     expect(rejected.status.textContent).toBe(
-      'Interactive search is unavailable; initial reviewed moments remain below.',
+      'Interactive search is unavailable; initial controlled moments remain below.',
     );
     expect(rejected.serverResults.textContent).toBe(
       'server-rendered initial result',
@@ -737,7 +836,7 @@ describe('AI Moment Index public search surface', () => {
     await nonOk.resolveNonOkFetch();
     expect(nonOk.error.hidden).toBe(false);
     expect(nonOk.status.textContent).toBe(
-      'Interactive search is unavailable; initial reviewed moments remain below.',
+      'Interactive search is unavailable; initial controlled moments remain below.',
     );
     expect(nonOk.serverResults.textContent).toBe(
       'server-rendered initial result',
@@ -776,7 +875,7 @@ describe('AI Moment Index public search surface', () => {
     expect(() => harness.submit('agent evaluation')).not.toThrow();
     expect(harness.error.hidden).toBe(false);
     expect(harness.status.textContent).toContain(
-      'initial reviewed moments remain available below',
+      'initial controlled moments remain available below',
     );
     expect(harness.serverResults.textContent).toBe(
       'server-rendered initial result',

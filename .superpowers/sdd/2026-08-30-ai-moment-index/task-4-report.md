@@ -135,7 +135,13 @@ Command:
 `$env:AI_MOMENT_BROWSER_LIVE_CHECK='1'; npm run check:video-moment-browser-live`
 
 Exit 0. The local gate served only the four built AI Moment Index assets and
-used the Playwright CLI without adding a repository dependency. Chromium:
+used the exact repository dependency `@playwright/cli` `0.1.18` through its
+local Node entry point. The external browser cache prerequisite observed for
+this gate was
+`C:\Users\Tkost\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe`;
+the same pinned launcher reported Chromium `151.0.7922.174` and user agent
+`HeadlessChrome/151.0.0.0`. Offline `npm ci --ignore-scripts` reproduced the
+CLI package but did not provision that external browser cache. Chromium:
 
 1. entered `robots control` and submitted with Enter;
 2. observed one visible ranked result, first `moment-robots-control`;
@@ -313,6 +319,103 @@ Final facts:
   permission, endorsement, source content at 02:12, or current availability.
 - All prior one-source, no-transcript/media-save, no-user, no-demand, no-revenue,
   and no-deploy limits remain.
+
+## Cycle-03 second independent re-review fixes
+
+### Scope and RED evidence
+
+- Reviewed head: `1beabac74804240326b0bc71751709a3eacf2df0`.
+- Scope remained limited to fail-closed page copy, public claim/evidence
+  consistency, tests, and this report.
+- `npm test -- --run sites/video-moment-search/site.test.ts` → expected exit 1;
+  21 tests passed and 2 failed:
+  - A corpus that still validated after removing `reviewEvidenceId` and
+    `reviewEvidence` received unconditional reviewed-source meta, search,
+    outcome, rights-boundary, and initial-results language.
+  - The TypeScript public-index helper accepted a selected-fixture entry after
+    its structured review evidence was removed while the redundant reviewed
+    confidence, rights, date, and provenance claims remained.
+- The contradiction regression also defined reviewer, review-date, license,
+  evidence-ID, and direct-provenance drift cases for both the TypeScript helper
+  and emitted browser IIFE.
+
+### GREEN implementation
+
+- Static site definition copy is neutral. Search-shell reviewed language is
+  emitted only when every initial public entry has validated structured review
+  evidence; otherwise the search heading, recovery status, rights boundary,
+  outcome, and initial-results heading remain controlled-fixture language.
+- Evidence-less media-fragment entries therefore receive no `reviewed source`,
+  `Commons-reviewed`, `reviewed Commons`, `search the reviewed`, or
+  `initial reviewed moments` claim. The selected fixture continues to expose
+  its exact evidence ID, license and URLs, immutable rights revision,
+  reviewer/date, and product boundary on the rendered result.
+- Each public entry now carries structured corpus, rights-grant, and cue lineage.
+  Both the TypeScript helper and emitted IIFE derive the exact expected
+  confidence, rights status, verification date, and provenance from that
+  lineage plus `reviewEvidence` and reject any mismatch.
+- Without review evidence, both runtimes require the neutral controlled-fixture
+  confidence and exact neutral lineage provenance and reject reviewed text.
+- Hostile parity tests cover missing evidence with a reviewed label, reviewer
+  drift, date drift, license drift, evidence-ID drift, and direct provenance
+  drift; a companion case binds each entry's corpus lineage to the enclosing
+  public index. Every case is rejected by both runtimes.
+
+### Final fresh second-review gates
+
+- Focused page/client RED-to-GREEN:
+  `npm test -- --run sites/video-moment-search/site.test.ts` → exit 0; 23/23
+  tests passed.
+- Scoped core/public/operational:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts scripts/video-moment-validation.test.ts`
+  → exit 0; 4 files and 59/59 tests passed.
+- Combined build integration:
+  `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts`
+  → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0.
+- Offline package reproduction:
+  - `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; no changes.
+  - `npm ci --ignore-scripts --offline` → exit 0; 162 packages installed, 165
+    audited, 0 vulnerabilities.
+- A first full-suite run made concurrently with the static check hit the
+  unrelated five-second worktree-discovery import timeout after 325 passes.
+  The required isolated rerun, `npm test -- --run`, exited 0 with 29 files and
+  326/326 tests passed.
+- `npm run evidence -- collect-fixtures` → exit 0.
+- `npm run evidence -- verify --all` → exit 0.
+- `npm run build` → exit 0.
+- Opt-in one-byte source check → exit 0: 206, `video/webm`, `Accept-Ranges:
+  bytes`, `Content-Length: 1`, `Content-Range: bytes 0-0/24788866`, response
+  body read false, response body saved false.
+- Pinned Chromium built-page gate → exit 0: query `robots control`, one visible
+  result, first `moment-robots-control`, normal Playwright locator click on the
+  ordinary exact `#t=132` anchor, exact location/current source, current time
+  132, duration 907.299, ready state 4, seeking false, paused true, no error,
+  427x240, and media 206 with
+  `Content-Range: bytes 3801088-24788865/24788866`.
+
+### Browser prerequisite and residual limits
+
+- Repository tooling is pinned to `@playwright/cli` `0.1.18`; there is no
+  `npx`, implicit-latest, or registry path in the gate.
+- The gate still requires the separately present external browser cache at
+  `C:\Users\Tkost\AppData\Local\ms-playwright\chromium-1234\chrome-win64\chrome.exe`.
+  The pinned launcher observed Chromium `151.0.7922.174`
+  (`HeadlessChrome/151.0.0.0`). Browser-cache presence, Chromium execution,
+  Wikimedia availability, and live media responses remain non-hermetic.
+- No `currentTime` assignment occurred. No captions, transcripts, media,
+  screenshots, or frames were saved, and no source-content claim at 02:12 is
+  made.
+- All prior rights, one-source, no-ingestion, no-user, no-demand, no-revenue,
+  no-deploy, and no-external-effect limits remain.
+
+### Second-review changed paths
+
+- `sites/video-moment-search/index.ts`
+- `sites/video-moment-search/render.ts`
+- `sites/video-moment-search/search-client.ts`
+- `sites/video-moment-search/site.test.ts`
+- `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
 
 ## Preserved cycle-02 history
 
