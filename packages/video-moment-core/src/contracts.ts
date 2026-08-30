@@ -26,6 +26,22 @@ export interface VideoRecord {
   readonly sourceUrl: string;
   readonly durationSeconds: number;
   readonly timestampStrategy?: 'query-parameter' | 'media-fragment';
+  readonly reviewEvidenceId?: string;
+}
+
+export interface ReviewedSourceEvidence {
+  readonly classification: 'reviewed-public-source';
+  readonly evidenceId: string;
+  readonly licenseIdentifier: string;
+  readonly licenseUrl: string;
+  readonly canonicalRightsPageUrl: string;
+  readonly immutableRightsRevisionUrl: string;
+  readonly reviewer: string;
+  readonly reviewedOn: string;
+  readonly productBoundary: {
+    readonly included: readonly string[];
+    readonly excluded: readonly string[];
+  };
 }
 
 export interface RightsGrant {
@@ -50,6 +66,7 @@ export interface RightsGrant {
   readonly permissionVerifiedAt: string;
   readonly expiresAt: string;
   readonly revocationContact: string;
+  readonly reviewEvidence?: ReviewedSourceEvidence;
 }
 
 export interface TimedCue {
@@ -90,6 +107,7 @@ const VideoRecordSchema = z
     timestampStrategy: z
       .enum(['query-parameter', 'media-fragment'])
       .optional(),
+    reviewEvidenceId: IdentifierSchema.optional(),
   })
   .strict();
 
@@ -114,6 +132,25 @@ const RightsGrantSchema = z
     permissionVerifiedAt: z.string().min(1),
     expiresAt: z.string().min(1),
     revocationContact: z.string().min(1),
+    reviewEvidence: z
+      .object({
+        classification: z.literal('reviewed-public-source'),
+        evidenceId: IdentifierSchema,
+        licenseIdentifier: z.string().min(1),
+        licenseUrl: z.string().min(1),
+        canonicalRightsPageUrl: z.string().min(1),
+        immutableRightsRevisionUrl: z.string().min(1),
+        reviewer: z.string().min(1),
+        reviewedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+        productBoundary: z
+          .object({
+            included: z.array(z.string().min(1)).min(1),
+            excluded: z.array(z.string().min(1)).min(1),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -178,6 +215,19 @@ function isCanonicalSourceUrl(value: string): boolean {
 function isCanonicalTimestamp(value: string): boolean {
   if (!canonicalTimestampPattern.test(value)) return false;
   return new Date(value).toISOString() === value;
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      url.username.length === 0 &&
+      url.password.length === 0
+    );
+  } catch {
+    return false;
+  }
 }
 
 function validTiming(startSeconds: number, endSeconds: number): boolean {
@@ -263,6 +313,13 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     ) {
       diagnostics.push(`VIDEO_DURATION_INVALID:${video.id}`);
     }
+    if (video.reviewEvidenceId !== undefined) {
+      addInvalidIdentifierDiagnostic(
+        video.reviewEvidenceId,
+        'VIDEO_REVIEW_EVIDENCE_ID_INVALID',
+        diagnostics,
+      );
+    }
   }
 
   for (const grant of corpus.rights) {
@@ -313,6 +370,29 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     for (const annotationHash of grant.coveredAnnotationHashes ?? []) {
       if (!sha256Pattern.test(annotationHash))
         diagnostics.push(`RIGHTS_ANNOTATION_HASH_INVALID:${grant.id}`);
+    }
+    if (grant.reviewEvidence !== undefined) {
+      const review = grant.reviewEvidence;
+      addInvalidIdentifierDiagnostic(
+        review.evidenceId,
+        'RIGHTS_REVIEW_EVIDENCE_ID_INVALID',
+        diagnostics,
+      );
+      for (const [label, url] of [
+        ['LICENSE_URL', review.licenseUrl],
+        ['CANONICAL_RIGHTS_URL', review.canonicalRightsPageUrl],
+        ['IMMUTABLE_RIGHTS_URL', review.immutableRightsRevisionUrl],
+      ] as const) {
+        if (!isHttpsUrl(url))
+          diagnostics.push(`RIGHTS_REVIEW_${label}_INVALID:${grant.id}`);
+      }
+      const expectedLicenseNote = `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
+      if (grant.licenseNote !== expectedLicenseNote) {
+        diagnostics.push(`RIGHTS_REVIEW_LICENSE_NOTE_MISMATCH:${grant.id}`);
+      }
+      if (!grant.permissionVerifiedAt.startsWith(`${review.reviewedOn}T`)) {
+        diagnostics.push(`RIGHTS_REVIEW_DATE_MISMATCH:${grant.id}`);
+      }
     }
   }
 
@@ -402,6 +482,14 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       diagnostics.push(`RIGHTS_CREATOR_NOT_ATTRIBUTABLE:${moment.id}`);
     if (video && !grant.coveredSourceUrls.includes(video.sourceUrl))
       diagnostics.push(`RIGHTS_SOURCE_URL_NOT_COVERED:${moment.id}`);
+    if (
+      video &&
+      (video.reviewEvidenceId !== undefined ||
+        grant.reviewEvidence !== undefined) &&
+      video.reviewEvidenceId !== grant.reviewEvidence?.evidenceId
+    ) {
+      diagnostics.push(`RIGHTS_REVIEW_EVIDENCE_NOT_BOUND:${moment.id}`);
+    }
     const momentEvidence = (cuesByVideoId.get(moment.videoId) ?? [])
       .filter(
         (cue) =>

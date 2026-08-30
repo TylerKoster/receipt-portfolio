@@ -189,6 +189,131 @@ Final facts:
   creator onboarding, a live library, endorsement, deployment, real-user
   usability, demand, conversion, or revenue evidence.
 
+## Cycle-03 independent-review fixes
+
+### Scope and heads
+
+- Reviewed head: `59401ef248e8092bc90183124b2cfbf913263cfb`
+- Fix commit: reported by the implementer after this report is committed.
+- Scope remained limited to explicit review-evidence binding, public evidence
+  rendering, pinned browser tooling, and strict media-range validation.
+- No source selection, annotation, timestamp, query, live-request boundary,
+  ingestion/onboarding path, merge, push, tag, or deploy changed.
+
+### Review-fix RED evidence
+
+1. Rights/review classification and drift:
+
+   `npm test -- --run sites/video-moment-search/site.test.ts`
+
+   Expected exit 1; 18 tests passed and 3 failed:
+
+   - The public grant lacked explicit `reviewEvidence` binding to the checked-in
+     evidence ID, license identifier/URL, rights URLs, reviewer/date, and
+     product boundary.
+   - License-note drift and permission-verification date drift returned no
+     diagnostics.
+   - A media-fragment entry with review fields removed was still labeled
+     `Reviewed public source`, proving timestamp syntax incorrectly conferred
+     review status.
+
+2. Pinned browser tool and range semantics:
+
+   `npm test -- --run scripts/video-moment-validation.test.ts`
+
+   Expected exit 1; 8 tests passed and 4 failed:
+
+   - The Windows launcher still resolved through the npm `npx-cli.js` path.
+   - The exact Playwright package contract validator was unimplemented.
+   - `bytes 9-8/24788866` and
+     `bytes 0-24788866/24788866` incorrectly passed the old regex-only
+     Content-Range check.
+
+### GREEN implementation evidence
+
+- `VideoRecord.reviewEvidenceId` explicitly binds a video to a reviewed-source
+  evidence record.
+- `RightsGrant.reviewEvidence` now carries classification
+  `reviewed-public-source`, evidence ID, license identifier/URL, canonical and
+  immutable rights URLs, reviewer/date, and the included/excluded product
+  boundary.
+- Corpus validation rejects:
+  - license-note divergence from the review evidence;
+  - permission-verification date divergence from the review date; and
+  - video/grant review-evidence ID mismatch.
+- The public serializer derives `Reviewed public source`, rights status,
+  verification date, and provenance from explicit `reviewEvidence`, never from
+  `timestampStrategy`. A media-fragment record without review evidence retains
+  the non-reviewed controlled-fixture classification.
+- Server and shipped client results expose and validate the evidence ID,
+  license identifier/URL, canonical rights page, immutable rights revision,
+  reviewer/date, and product boundary. Deterministic tests bind these values
+  directly to `commons-source-rights-v1.json` and include negative grant drift.
+- Media Content-Range validation now parses start, end, and total as safe
+  integers and requires `0 <= start <= end < total == 24,788,866`.
+
+### Deterministic Playwright provisioning
+
+- Added exact dev dependency `@playwright/cli: 0.1.18`.
+- `package-lock.json` pins its tarball integrity and exact transitive
+  Playwright packages.
+- The gate reads and validates the installed package name, exact version, and
+  bin mapping before launch.
+- The gate directly runs
+  `node_modules/@playwright/cli/playwright-cli.js` with Node. It contains no
+  `npx`, `--yes`, `--package`, implicit `latest`, or cache-miss installation
+  path.
+- `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; no changes.
+- `npm ci --ignore-scripts --offline` → exit 0; 162 packages installed from
+  the local cache, 165 audited, and 0 vulnerabilities reported. Lifecycle
+  scripts and network were disabled.
+
+### Final fresh review-fix gates
+
+- Scoped core/public/operational:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts scripts/video-moment-validation.test.ts`
+  → exit 0; 4 files and 57/57 tests passed.
+- Combined build integration:
+  `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts`
+  → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0; TypeScript and ESLint passed.
+- Full suite: `npm test -- --run` → exit 0; 29 files and 324/324 tests passed.
+- Evidence collection: `npm run evidence -- collect-fixtures` → exit 0.
+- Evidence verification: `npm run evidence -- verify --all` → exit 0.
+- Production build: `npm run build` → exit 0.
+- Opt-in one-byte source check → exit 0 with the unchanged exact 206,
+  `video/webm`, byte-range, one-byte, and 24,788,866-byte total facts.
+- Pinned local Chromium gate → exit 0. It retained Enter submission and a
+  normal Playwright locator click, made no `currentTime` assignment, and
+  observed the exact `#t=132` location/current source, `currentTime=132`,
+  `duration=907.299`, healthy paused native media state, and parsed
+  `Content-Range: bytes 3801088-24788865/24788866`.
+
+### Review-fix changed paths
+
+- `fixtures/video-moment-search/authorized-ai-video-v1.json`
+- `package.json`
+- `package-lock.json`
+- `packages/video-moment-core/src/contracts.ts`
+- `packages/video-moment-core/src/index.ts`
+- `scripts/video-moment-browser-check.ts`
+- `scripts/video-moment-validation.ts`
+- `scripts/video-moment-validation.test.ts`
+- `sites/video-moment-search/render.ts`
+- `sites/video-moment-search/search-client.ts`
+- `sites/video-moment-search/site.test.ts`
+- `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
+
+### Review-fix residual limits
+
+- The exact pinned CLI removes implicit package drift but the browser and
+  Wikimedia availability remain non-hermetic external observations.
+- Review classification binds a recorded Commons review and immutable rights
+  revision. It remains evidence of the stated license record, not inferred
+  permission, endorsement, source content at 02:12, or current availability.
+- All prior one-source, no-transcript/media-save, no-user, no-demand, no-revenue,
+  and no-deploy limits remain.
+
 ## Preserved cycle-02 history
 
 ## Status

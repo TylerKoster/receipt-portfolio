@@ -1,3 +1,5 @@
+import { posix, win32 } from 'node:path';
+
 export interface LiveSourceFacts {
   readonly status: number;
   readonly finalUrl: string;
@@ -34,28 +36,54 @@ export interface ValidationResult {
   readonly diagnostics: readonly string[];
 }
 
+export const PINNED_PLAYWRIGHT_CLI_VERSION = '0.1.18';
+
 export function playwrightCliInvocation(
   platform: NodeJS.Platform,
   nodeExecutable: string,
+  projectDirectory = '.',
 ): { readonly executable: string; readonly leadingArguments: readonly string[] } {
-  if (platform === 'win32') {
-    return {
-      executable: nodeExecutable,
-      leadingArguments: [
-        win32.join(
-          win32.dirname(nodeExecutable),
-          'node_modules',
-          'npm',
-          'bin',
-          'npx-cli.js',
-        ),
-      ],
-    };
-  }
+  const path = platform === 'win32' ? win32 : posix;
   return {
-    executable: 'npx',
-    leadingArguments: [],
+    executable: nodeExecutable,
+    leadingArguments: [
+      path.join(
+        projectDirectory,
+        'node_modules',
+        '@playwright',
+        'cli',
+        'playwright-cli.js',
+      ),
+    ],
   };
+}
+
+export function validatePlaywrightCliPackage(
+  value: unknown,
+): ValidationResult {
+  if (typeof value !== 'object' || value === null) {
+    return { ok: false, diagnostics: ['PLAYWRIGHT_CLI_PACKAGE_INVALID'] };
+  }
+  const diagnostics: string[] = [];
+  const packageRecord = value as {
+    name?: unknown;
+    version?: unknown;
+    bin?: unknown;
+  };
+  if (packageRecord.name !== '@playwright/cli')
+    diagnostics.push('PLAYWRIGHT_CLI_NAME_MISMATCH');
+  if (packageRecord.version !== PINNED_PLAYWRIGHT_CLI_VERSION)
+    diagnostics.push('PLAYWRIGHT_CLI_VERSION_MISMATCH');
+  if (
+    typeof packageRecord.bin !== 'object' ||
+    packageRecord.bin === null ||
+    (packageRecord.bin as Record<string, unknown>)['playwright-cli'] !==
+      'playwright-cli.js'
+  ) {
+    diagnostics.push('PLAYWRIGHT_CLI_BIN_MISMATCH');
+  }
+  diagnostics.sort();
+  return { ok: diagnostics.length === 0, diagnostics };
 }
 
 export function playwrightPageFunction(body: string): string {
@@ -132,9 +160,18 @@ export function validateBrowserJourneyFacts(
     diagnostics.push('BROWSER_MEDIA_DIMENSIONS_MISSING');
   if (facts.mediaResponseStatus !== 206)
     diagnostics.push('BROWSER_MEDIA_RESPONSE_STATUS_MISMATCH');
+  const rangeMatch = facts.mediaResponseContentRange?.match(
+    /^bytes (\d+)-(\d+)\/(\d+)$/u,
+  );
+  const rangeValues = rangeMatch?.slice(1).map(Number);
   if (
-    facts.mediaResponseContentRange === null ||
-    !/^bytes \d+-\d+\/24788866$/u.test(facts.mediaResponseContentRange)
+    rangeValues === undefined ||
+    rangeValues.length !== 3 ||
+    !rangeValues.every(Number.isSafeInteger) ||
+    rangeValues[0]! < 0 ||
+    rangeValues[0]! > rangeValues[1]! ||
+    rangeValues[2] !== EXPECTED_SOURCE_BYTES ||
+    rangeValues[1]! >= rangeValues[2]!
   ) {
     diagnostics.push('BROWSER_MEDIA_CONTENT_RANGE_MISMATCH');
   }
@@ -149,4 +186,3 @@ export function validateBrowserJourneyFacts(
   diagnostics.sort();
   return { ok: diagnostics.length === 0, diagnostics };
 }
-import { win32 } from 'node:path';

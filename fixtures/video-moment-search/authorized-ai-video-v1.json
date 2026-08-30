@@ -10,7 +10,8 @@
       "creatorName": "University of the Netherlands",
       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm",
       "durationSeconds": 908,
-      "timestampStrategy": "media-fragment"
+      "timestampStrategy": "media-fragment",
+      "reviewEvidenceId": "commons-how-can-we-keep-robots-under-control-v1"
     }
   ],
   "rights": [
@@ -35,7 +36,28 @@
       "licenseNote": "CC BY-SA 4.0 International; timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
       "permissionVerifiedAt": "2022-01-18T00:00:00.000Z",
       "expiresAt": "2099-01-01T00:00:00.000Z",
-      "revocationContact": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm"
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm",
+      "reviewEvidence": {
+        "classification": "reviewed-public-source",
+        "evidenceId": "commons-how-can-we-keep-robots-under-control-v1",
+        "licenseIdentifier": "CC BY-SA 4.0 International",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm",
+        "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530",
+        "reviewer": "LicenseReviewerBot",
+        "reviewedOn": "2022-01-18",
+        "productBoundary": {
+          "included": ["timestamp link", "original editorial annotation"],
+          "excluded": [
+            "hosting",
+            "embedding",
+            "media distribution",
+            "transcript distribution",
+            "endorsement claim",
+            "inferred permission"
+          ]
+        }
+      }
     }
   ],
   "cues": [

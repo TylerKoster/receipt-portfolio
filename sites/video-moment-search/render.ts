@@ -81,6 +81,7 @@ export function serializePublicSearchIndex(
     if (timestampUrl === null) {
       throw new Error(`Invalid exact timestamp URL for ${entry.moment.id}`);
     }
+    const reviewEvidence = grant.reviewEvidence;
     const cueIds = (cuesByVideo.get(entry.video.id) ?? [])
       .filter(
         (cue) =>
@@ -102,15 +103,23 @@ export function serializePublicSearchIndex(
       topicSlugs: entry.moment.topicSlugs,
       correctionState: entry.moment.state,
       confidenceClass:
-        entry.video.timestampStrategy === 'media-fragment'
+        reviewEvidence !== undefined
           ? 'Reviewed public source; original editorial annotation, not transcript text'
           : 'Rights-validated controlled fixture match',
-      rightsStatus: grant.licenseNote,
-      verificationDate: grant.permissionVerifiedAt.slice(0, 10),
-      provenance: `Corpus ${corpus.corpusId}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`,
+      rightsStatus:
+        reviewEvidence === undefined
+          ? grant.licenseNote
+          : `${reviewEvidence.licenseIdentifier}; ${reviewEvidence.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`,
+      verificationDate:
+        reviewEvidence?.reviewedOn ?? grant.permissionVerifiedAt.slice(0, 10),
+      provenance:
+        reviewEvidence === undefined
+          ? `Corpus ${corpus.corpusId}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`
+          : `Corpus ${corpus.corpusId}; evidence ${reviewEvidence.evidenceId}; immutable rights revision ${reviewEvidence.immutableRightsRevisionUrl}; reviewed by ${reviewEvidence.reviewer} on ${reviewEvidence.reviewedOn}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`,
       timestampUrl,
       timestampStrategy:
         entry.video.timestampStrategy ?? 'query-parameter',
+      reviewEvidence,
     };
   });
 
@@ -122,7 +131,7 @@ export function serializePublicSearchIndex(
 }
 
 function detailRows(entry: PublicSearchEntry): string {
-  const rows: readonly [string, string][] = [
+  const rows: [string, string][] = [
     ['Source title', entry.videoTitle],
     ['Creator', entry.creatorName],
     ['Excerpt', entry.excerpt],
@@ -135,8 +144,28 @@ function detailRows(entry: PublicSearchEntry): string {
     ['Rights status', entry.rightsStatus],
     ['Verification date', entry.verificationDate],
     ['Provenance', entry.provenance],
-    ['Correction state', entry.correctionState],
   ];
+  if (entry.reviewEvidence !== undefined) {
+    rows.push(
+      ['Evidence ID', entry.reviewEvidence.evidenceId],
+      ['License', entry.reviewEvidence.licenseIdentifier],
+      ['License URL', entry.reviewEvidence.licenseUrl],
+      ['Canonical rights page', entry.reviewEvidence.canonicalRightsPageUrl],
+      [
+        'Immutable rights revision',
+        entry.reviewEvidence.immutableRightsRevisionUrl,
+      ],
+      [
+        'Review record',
+        `${entry.reviewEvidence.reviewer} · ${entry.reviewEvidence.reviewedOn}`,
+      ],
+      [
+        'Product boundary',
+        `Included: ${entry.reviewEvidence.productBoundary.included.join(', ')}; excluded: ${entry.reviewEvidence.productBoundary.excluded.join(', ')}`,
+      ],
+    );
+  }
+  rows.push(['Correction state', entry.correctionState]);
   return rows
     .map(
       ([label, value]) =>

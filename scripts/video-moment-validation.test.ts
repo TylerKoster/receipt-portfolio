@@ -4,6 +4,7 @@ import {
   validateLiveSourceFacts,
   playwrightCliInvocation,
   playwrightPageFunction,
+  validatePlaywrightCliPackage,
   type BrowserJourneyFacts,
   type LiveSourceFacts,
 } from './video-moment-validation.js';
@@ -46,12 +47,36 @@ const browserFacts: BrowserJourneyFacts = {
 describe('AI Moment Index bounded live validation', () => {
   it('launches the Windows npx JavaScript entry point without cmd shell quoting', () => {
     expect(
-      playwrightCliInvocation('win32', 'C:\\Program Files\\nodejs\\node.exe'),
+      playwrightCliInvocation(
+        'win32',
+        'C:\\Program Files\\nodejs\\node.exe',
+        'C:\\repo',
+      ),
     ).toEqual({
       executable: 'C:\\Program Files\\nodejs\\node.exe',
       leadingArguments: [
-        'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js',
+        'C:\\repo\\node_modules\\@playwright\\cli\\playwright-cli.js',
       ],
+    });
+  });
+
+  it('requires the repository-pinned Playwright CLI package contract', () => {
+    expect(
+      validatePlaywrightCliPackage({
+        name: '@playwright/cli',
+        version: '0.1.18',
+        bin: { 'playwright-cli': 'playwright-cli.js' },
+      }),
+    ).toEqual({ ok: true, diagnostics: [] });
+    expect(
+      validatePlaywrightCliPackage({
+        name: '@playwright/cli',
+        version: '0.1.19',
+        bin: { 'playwright-cli': 'playwright-cli.js' },
+      }),
+    ).toEqual({
+      ok: false,
+      diagnostics: ['PLAYWRIGHT_CLI_VERSION_MISMATCH'],
     });
   });
 
@@ -124,5 +149,19 @@ describe('AI Moment Index bounded live validation', () => {
         'BROWSER_MEDIA_RESPONSE_STATUS_MISMATCH',
       ],
     });
+  });
+
+  it.each([
+    'bytes 9-8/24788866',
+    'bytes 0-24788866/24788866',
+    'bytes 0-0/24788865',
+    'bytes -1-0/24788866',
+  ])('rejects an impossible media content range: %s', (contentRange) => {
+    expect(
+      validateBrowserJourneyFacts({
+        ...browserFacts,
+        mediaResponseContentRange: contentRange,
+      }).diagnostics,
+    ).toContain('BROWSER_MEDIA_CONTENT_RANGE_MISMATCH');
   });
 });

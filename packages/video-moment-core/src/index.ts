@@ -1,6 +1,7 @@
 export { VideoCorpusSchema, validateVideoCorpus } from './contracts.js';
 export type {
   RightsGrant,
+  ReviewedSourceEvidence,
   TimedCue,
   VideoCorpus,
   VideoCorpusValidation,

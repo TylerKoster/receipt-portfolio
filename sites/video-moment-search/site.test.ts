@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSearchIndex,
   searchMoments,
+  validateVideoCorpus,
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
 import {
@@ -43,6 +44,10 @@ const sourceRightsEvidence = JSON.parse(
 ) as unknown;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
+
+type Mutable<Value> = {
+  -readonly [Key in keyof Value]: Mutable<Value[Key]>;
+};
 
 type SubmitListener = (event: { preventDefault(): void }) => void;
 
@@ -277,6 +282,11 @@ describe('AI Moment Index public search surface', () => {
       annotation: { text: string; sha256: string };
       attributionParty: string;
       delivery: { url: string };
+      evidenceId: string;
+      immutableRightsRevisionUrl: string;
+      license: { name: string; url: string };
+      productBoundary: { included: string[]; excluded: string[] };
+      reviewRecord: { reviewer: string; reviewedOn: string };
       timestamp: { strategy: string; seconds: number; url: string };
       workTitle: string;
     };
@@ -296,6 +306,87 @@ describe('AI Moment Index public search surface', () => {
       startSeconds: evidence.timestamp.seconds,
       excerpt: evidence.annotation.text,
     });
+    expect(fixture.rights[0]).toMatchObject({
+      id: 'rights-commons-robots-control',
+      licenseNote:
+        'CC BY-SA 4.0 International; timestamp link plus original editorial annotation only; no inferred permission or endorsement.',
+      permissionVerifiedAt: '2022-01-18T00:00:00.000Z',
+      reviewEvidence: {
+        classification: 'reviewed-public-source',
+        evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
+        licenseIdentifier: 'CC BY-SA 4.0 International',
+        licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        canonicalRightsPageUrl:
+          'https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm',
+        immutableRightsRevisionUrl:
+          'https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530',
+        reviewer: 'LicenseReviewerBot',
+        reviewedOn: '2022-01-18',
+        productBoundary: evidence.productBoundary,
+      },
+    });
+
+    const publicEntry = serializePublicSearchIndex(fixture, searchIndex)
+      .entries[0] as ReturnType<typeof serializePublicSearchIndex>['entries'][number] & {
+      reviewEvidence?: unknown;
+    };
+    expect(publicEntry.reviewEvidence).toEqual(
+      (fixture.rights[0] as { reviewEvidence?: unknown }).reviewEvidence,
+    );
+    expect(publicEntry.rightsStatus).toContain(evidence.license.name);
+    expect(publicEntry.verificationDate).toBe(evidence.reviewRecord.reviewedOn);
+    expect(publicEntry.provenance).toContain(evidence.evidenceId);
+    expect(publicEntry.provenance).toContain(evidence.immutableRightsRevisionUrl);
+    expect(publicEntry.provenance).toContain(evidence.reviewRecord.reviewer);
+
+    const html = renderSearchResults(fixture, searchIndex, 'robots control');
+    for (const value of [
+      evidence.evidenceId,
+      evidence.license.name,
+      evidence.license.url,
+      evidence.immutableRightsRevisionUrl.replace('&', '&amp;'),
+      evidence.reviewRecord.reviewer,
+      evidence.reviewRecord.reviewedOn,
+      ...evidence.productBoundary.included,
+      ...evidence.productBoundary.excluded,
+    ]) {
+      expect(html).toContain(value);
+    }
+  });
+
+  it('rejects public rights grant and review-evidence drift', () => {
+    const licenseDrift = structuredClone(fixture) as Mutable<VideoCorpus>;
+    licenseDrift.rights[0]!.licenseNote = 'drifted license note';
+    expect(validateVideoCorpus(licenseDrift).diagnostics).toContain(
+      'RIGHTS_REVIEW_LICENSE_NOTE_MISMATCH:rights-commons-robots-control',
+    );
+
+    const dateDrift = structuredClone(fixture) as Mutable<VideoCorpus>;
+    dateDrift.rights[0]!.permissionVerifiedAt =
+      '2022-01-19T00:00:00.000Z';
+    expect(validateVideoCorpus(dateDrift).diagnostics).toContain(
+      'RIGHTS_REVIEW_DATE_MISMATCH:rights-commons-robots-control',
+    );
+
+    const evidenceIdDrift = structuredClone(fixture) as Mutable<VideoCorpus>;
+    const reviewEvidence = evidenceIdDrift.rights[0]!.reviewEvidence!;
+    reviewEvidence.evidenceId = 'drifted-review-evidence';
+    expect(validateVideoCorpus(evidenceIdDrift).diagnostics).toContain(
+      'RIGHTS_REVIEW_EVIDENCE_NOT_BOUND:moment-robots-control',
+    );
+  });
+
+  it('does not infer reviewed status from media-fragment syntax', () => {
+    const unreviewedMedia = structuredClone(fixture) as Mutable<VideoCorpus>;
+    delete unreviewedMedia.videos[0]!.reviewEvidenceId;
+    delete unreviewedMedia.rights[0]!.reviewEvidence;
+    const entry = serializePublicSearchIndex(
+      unreviewedMedia,
+      buildSearchIndex(unreviewedMedia),
+    ).entries[0]!;
+    expect(entry.timestampStrategy).toBe('media-fragment');
+    expect(entry.confidenceClass).toBe('Rights-validated controlled fixture match');
+    expect(entry.reviewEvidence).toBeUndefined();
   });
 
   it('renders every result with its own validated stored timestamp and evidence metadata', () => {

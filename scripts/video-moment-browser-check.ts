@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   validateBrowserJourneyFacts,
+  validatePlaywrightCliPackage,
   playwrightCliInvocation,
   playwrightPageFunction,
   VIDEO_MOMENT_QUERY,
@@ -24,16 +25,16 @@ function projectRoot(): string {
 }
 
 function cli(cwd: string, ...args: readonly string[]): Promise<string> {
-  const invocation = playwrightCliInvocation(process.platform, process.execPath);
+  const invocation = playwrightCliInvocation(
+    process.platform,
+    process.execPath,
+    projectRoot(),
+  );
   return new Promise((resolveOutput, reject) => {
     const child = spawn(
       invocation.executable,
       [
         ...invocation.leadingArguments,
-        '--yes',
-        '--package',
-        '@playwright/cli',
-        'playwright-cli',
         '--session',
         SESSION,
         ...args,
@@ -56,6 +57,25 @@ function cli(cwd: string, ...args: readonly string[]): Promise<string> {
       else reject(new Error(`playwright-cli exit ${String(code)}: ${stderr || stdout}`));
     });
   });
+}
+
+async function verifyPinnedPlaywrightCli(): Promise<void> {
+  const packageJson = JSON.parse(
+    await readFile(
+      resolve(
+        projectRoot(),
+        'node_modules',
+        '@playwright',
+        'cli',
+        'package.json',
+      ),
+      'utf8',
+    ),
+  ) as unknown;
+  const validation = validatePlaywrightCliPackage(packageJson);
+  if (!validation.ok) {
+    throw new Error(validation.diagnostics.join(','));
+  }
 }
 
 function markedJson(output: string, marker: string): Record<string, unknown> {
@@ -126,6 +146,7 @@ export async function checkVideoMomentBrowserJourney(): Promise<BrowserJourneyFa
       `${BROWSER_LIVE_ENV}=1 is required; this check opens the selected public media in Chromium`,
     );
   }
+  await verifyPinnedPlaywrightCli();
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ai-moment-browser-'));
   const canonicalTemporary = await realpath(temporaryDirectory);
   if (dirname(canonicalTemporary) !== resolve(tmpdir())) {
