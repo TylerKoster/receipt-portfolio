@@ -17,7 +17,8 @@ describe('Search Receipt product experiment ledger', () => {
       {
         persona: 'agency SEO operator',
         task: 'Determine whether a current Google incident explained volatility.',
-        outcome: 'Unable to decide whether a current Google incident explained volatility.',
+        outcome:
+          'Unable to decide whether a current Google incident explained volatility.',
       },
       {
         persona: 'governance analyst',
