@@ -474,6 +474,103 @@ describe('source-bound SkillLedger inventory experiment', () => {
     });
   });
 
+  it('keeps equal source identifiers as same while preserving other controlled field differences', () => {
+    const receiptWithSharedSourceId = {
+      ...receiptB,
+      receipt: { ...receiptB.receipt, id: 'receipt-shared-source-id' },
+      source: { ...receiptB.source, sourceId: 'archive-index' },
+    } satisfies SourceBoundSkillReceipt;
+    const records = sourceBoundSkillInventory([
+      receiptA,
+      receiptWithSharedSourceId,
+    ]);
+
+    expect(
+      summarizeSkillInventoryComparison(
+        compareSkillInventory(records, [
+          'receipt-a',
+          'receipt-shared-source-id',
+        ]),
+      ),
+    ).toEqual({
+      kind: 'ready',
+      fields: [
+        {
+          field: 'source-id',
+          left: 'archive-index',
+          right: 'archive-index',
+          status: 'same',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'source-url',
+          left: 'https://example.invalid/archive',
+          right: 'https://example.invalid/catalog',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'manifest-sha256',
+          left: 'a'.repeat(64),
+          right: 'e'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'raw-sha256',
+          left: 'b'.repeat(64),
+          right: 'f'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'normalized-sha256',
+          left: 'c'.repeat(64),
+          right: '0'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'contents-sha256',
+          left: 'd'.repeat(64),
+          right: '1'.repeat(64),
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'declared-license',
+          left: 'MIT',
+          right: 'Apache-2.0',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'dependency-state',
+          left: 'none',
+          right: 'declared',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+        {
+          field: 'static-signal-presence',
+          left: 'no-static-signals',
+          right: 'static-signals-present',
+          status: 'different',
+          boundary:
+            'Field differences do not establish real provenance, safety, adoption, demand, or suitability conclusions.',
+        },
+      ],
+    });
+  });
+
   it('returns the exact not-ready comparison summary when two records are not selected', () => {
     const records = sourceBoundSkillInventory([receiptA, receiptB]);
 
