@@ -83,6 +83,18 @@
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
       "nextSafeAction": "Use the methodology guidance to compare a verified official source's timestamp/status with site evidence before considering an investigation; retain uncertainty unless that comparison establishes a connection."
+    },
+    {
+      "id": "no-result-recovery-v1",
+      "rank": 4,
+      "status": "ACTIVE_NO_MEASUREMENT",
+      "hypothesis": "A visible clear-filters action may help a visitor return to all source-bound records after a no-match state without retaining or sending their query/filter input.",
+      "firstUserOutcome": "Return to all source-bound records after a no-match without retaining or sending query/filter input.",
+      "metric": "Unmeasured no-result recovery after 10 observed non-synthetic sessions.",
+      "target": ">=60% after 10 observed non-synthetic sessions",
+      "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
+      "noDataBoundary": "No data means no demand or revenue conclusion.",
+      "nextSafeAction": "Keep the clear-filters recovery action under bounded observation only; no data means no demand or revenue conclusion."
     }
   ]
 }

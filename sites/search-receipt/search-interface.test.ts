@@ -208,6 +208,117 @@ describe('Search Receipt query and offer adapter', () => {
     expect(status.textContent).toBe('Showing 1 of 2 records.');
   });
 
+  it('adds a visible clear-filters recovery action after a no-match without retaining or sending input', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    interface FakeElement {
+      addEventListener(type: string, listener: Listener): void;
+      append(child: FakeElement): void;
+      appendCount: number;
+      dataset: Record<string, string>;
+      disabled: boolean;
+      focus(): void;
+      focusCount: number;
+      focused: boolean;
+      hidden: boolean;
+      listeners: Map<string, Listener[]>;
+      setAttribute(): void;
+      textContent: string;
+      type: string;
+      value: string;
+    }
+    const elements = new Map<string, FakeElement>();
+    const element = (): FakeElement => ({
+      addEventListener(type: string, listener: Listener) {
+        this.listeners.set(type, [
+          ...(this.listeners.get(type) ?? []),
+          listener,
+        ]);
+      },
+      append(child: FakeElement) {
+        this.appendCount += 1;
+        elements.set('[data-search-reset]', child);
+      },
+      appendCount: 0,
+      dataset: {},
+      disabled: false,
+      focus() {
+        this.focusCount += 1;
+        this.focused = true;
+      },
+      focusCount: 0,
+      focused: false,
+      hidden: false,
+      listeners: new Map<string, Listener[]>(),
+      setAttribute() {},
+      textContent: '',
+      type: '',
+      value: '',
+    });
+    const form = element();
+    Object.assign(form, {
+      ownerDocument: { createElement: () => element() },
+    });
+    const query = element();
+    const topic = element();
+    const status = element();
+    const empty = element();
+    const error = element();
+    const cards = [
+      {
+        dataset: {
+          searchText: 'google crawling resolved',
+          searchTopic: 'search-status',
+        },
+        hidden: false,
+      },
+      {
+        dataset: {
+          searchText: 'central blog robots guidance',
+          searchTopic: 'guidance',
+        },
+        hidden: false,
+      },
+    ];
+    const root = {
+      querySelector: (selector: string) => {
+        const values = new Map([
+          ['[data-search-controls]', form],
+          ['[data-search-query]', query],
+          ['[data-search-topic-filter]', topic],
+          ['[data-search-status]', status],
+          ['[data-search-empty]', empty],
+          ['[data-search-error]', error],
+        ]);
+        return values.get(selector) ?? elements.get(selector) ?? null;
+      },
+      querySelectorAll: () => cards,
+    } as unknown as SearchRoot;
+
+    expect(initializeSearchReceipt(root)).toBe(true);
+    query.value = 'missing';
+    topic.value = 'guidance';
+    form.listeners
+      .get('submit')
+      ?.forEach((listener) => listener({ preventDefault() {} }));
+    expect(status.textContent).toBe('No records match this query and filter.');
+    expect(cards.map((card) => card.hidden)).toEqual([true, true]);
+
+    const reset = elements.get('[data-search-reset]');
+    expect(reset?.textContent).toBe('Clear filters');
+    expect(initializeSearchReceipt(root)).toBe(true);
+    expect(form.appendCount).toBe(1);
+    expect(reset?.listeners.get('click')).toHaveLength(1);
+    reset?.listeners
+      .get('click')
+      ?.forEach((listener) => listener({ preventDefault() {} }));
+    expect(query.value).toBe('');
+    expect(topic.value).toBe('');
+    expect(status.textContent).toBe('Showing 2 of 2 records.');
+    expect(cards.map((card) => card.hidden)).toEqual([false, false]);
+    expect(query.focused).toBe(true);
+    expect(query.focusCount).toBe(1);
+  });
+
   it('keeps a visible fallback when initialization cannot bind required controls', () => {
     const html = renderSite(searchReceiptSite, [receipt()]);
     expect(html).toContain(

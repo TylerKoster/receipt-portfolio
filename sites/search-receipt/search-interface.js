@@ -45,6 +45,22 @@ export function applySearchState(cards, query, topic) {
   };
 }
 
+function findOrCreateResetControl(root, form) {
+  const existing = root.querySelector('[data-search-reset]');
+  if (existing) return existing;
+
+  const document = form.ownerDocument;
+  if (!document?.createElement || typeof form.append !== 'function')
+    return null;
+
+  const reset = document.createElement('button');
+  reset.setAttribute('data-search-reset', '');
+  reset.textContent = 'Clear filters';
+  reset.type = 'button';
+  form.append(reset);
+  return reset;
+}
+
 export function initializeSearchReceipt(root) {
   const form = root.querySelector('[data-search-controls]');
   const query = root.querySelector('[data-search-query]');
@@ -57,6 +73,9 @@ export function initializeSearchReceipt(root) {
   const cards = [...root.querySelectorAll('[data-search-record]')];
 
   if (!form || !query || !topic || !status || !empty || !error) return false;
+  if (form.dataset?.searchInterfaceBound === 'true') return true;
+
+  const reset = findOrCreateResetControl(root, form);
 
   const apply = () => {
     try {
@@ -80,6 +99,12 @@ export function initializeSearchReceipt(root) {
   });
   query.addEventListener('input', apply);
   topic.addEventListener('change', apply);
+  reset?.addEventListener('click', () => {
+    query.value = '';
+    topic.value = '';
+    apply();
+    if (typeof query.focus === 'function') query.focus();
+  });
   offer?.addEventListener('click', () => {
     offer.disabled = true;
     if (offerStatus) {
@@ -88,6 +113,7 @@ export function initializeSearchReceipt(root) {
     }
   });
   apply();
+  if (form.dataset) form.dataset.searchInterfaceBound = 'true';
   return true;
 }
 
