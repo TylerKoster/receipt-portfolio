@@ -8,4 +8,10 @@ describe('SkillLedger site copy', () => {
       'The absence of a recorded static-risk flag or declared dependency is not evidence that a package is safe.',
     );
   });
+
+  it('labels static-risk flags as limited signals instead of a security assessment', () => {
+    expect(renderMethodology(skillLedgerSite)).toContain(
+      'Static-risk flags are limited signals, not a security assessment.',
+    );
+  });
 });
