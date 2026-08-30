@@ -416,8 +416,8 @@ async function writeSiteTree(
     }
   }
   if (includeVideoMomentSearch) {
-    const fixture = JSON.parse(
-      await readFile(
+    const [fixture, sourceRightsEvidence] = await Promise.all([
+      readFile(
         join(
           projectRoot(),
           'fixtures',
@@ -425,19 +425,35 @@ async function writeSiteTree(
           'authorized-ai-video-v1.json',
         ),
         'utf8',
-      ),
-    ) as VideoCorpus;
+      ).then((content) => JSON.parse(content) as VideoCorpus),
+      readFile(
+        join(
+          projectRoot(),
+          'fixtures',
+          'video-moment-search',
+          'commons-source-rights-v1.json',
+        ),
+        'utf8',
+      ).then((content) => JSON.parse(content) as unknown),
+    ]);
     const index = buildSearchIndex(fixture);
     const directory = join(outputDirectory, videoMomentSearchSite.siteId);
     await mkdir(directory, { recursive: true });
     await Promise.all([
       writeFile(
         join(directory, 'index.html'),
-        renderVideoMomentHome(fixture, index, publicBaseUrl),
+        renderVideoMomentHome(
+          fixture,
+          index,
+          publicBaseUrl,
+          sourceRightsEvidence,
+        ),
       ),
       writeFile(
         join(directory, 'search-index.json'),
-        canonicalJson(serializePublicSearchIndex(fixture, index)),
+        canonicalJson(
+          serializePublicSearchIndex(fixture, index, sourceRightsEvidence),
+        ),
       ),
       writeFile(
         join(directory, 'search-client.js'),

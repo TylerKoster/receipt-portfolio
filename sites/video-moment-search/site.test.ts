@@ -22,6 +22,10 @@ import {
   searchPublicIndex,
   VIDEO_MOMENT_SEARCH_CLIENT,
 } from './search-client.js';
+import {
+  validateCommonsSourceEvidence,
+  type CommonsSourceRightsEvidence,
+} from './source-evidence.js';
 import { videoMomentSearchSite } from './index.js';
 
 const fixture = JSON.parse(
@@ -41,7 +45,7 @@ const sourceRightsEvidence = JSON.parse(
     ),
     'utf8',
   ),
-) as unknown;
+) as CommonsSourceRightsEvidence;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 
@@ -229,6 +233,12 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('binds the public fixture to the deterministic Commons rights evidence', () => {
+    expect(
+      validateCommonsSourceEvidence(fixture, sourceRightsEvidence),
+    ).toEqual({
+      ok: true,
+      diagnostics: [],
+    });
     expect(sourceRightsEvidence).toEqual({
       schemaVersion: 1,
       evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
@@ -351,6 +361,60 @@ describe('AI Moment Index public search surface', () => {
       ...evidence.productBoundary.excluded,
     ]) {
       expect(html).toContain(value);
+    }
+  });
+
+  it('fails site construction when the checked-in Commons evidence drifts from reviewed content lineage', () => {
+    const invalidEvidence = [
+      [
+        'annotation text',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.annotation.text = 'Unsupported standalone 02:12 claim.'),
+      ],
+      [
+        'annotation hash',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.annotation.sha256 = '0'.repeat(64)),
+      ],
+      [
+        'source linkage',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.delivery.url = 'https://example.test/drifted.webm'),
+      ],
+      [
+        'timestamp linkage',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.timestamp.seconds = 133),
+      ],
+      [
+        'rights linkage',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.license.name = 'CC0 1.0'),
+      ],
+      [
+        'review finding',
+        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
+          (candidate.reviewRecord.finding = 'Unsupported review finding.'),
+      ],
+    ] as const;
+
+    for (const [name, invalidate] of invalidEvidence) {
+      const candidate = structuredClone(
+        sourceRightsEvidence,
+      ) as Mutable<CommonsSourceRightsEvidence>;
+      invalidate(candidate);
+      expect(validateCommonsSourceEvidence(fixture, candidate).ok, name).toBe(
+        false,
+      );
+      expect(
+        () => serializePublicSearchIndex(fixture, searchIndex, candidate),
+        name,
+      ).toThrow('Invalid Commons source evidence');
+      let html: string | undefined;
+      expect(() => {
+        html = renderVideoMomentHome(fixture, searchIndex, baseUrl, candidate);
+      }, name).toThrow('Invalid Commons source evidence');
+      expect(html, name).toBeUndefined();
     }
   });
 
@@ -637,18 +701,13 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('escapes hostile fixture text and leaves malformed result URLs inert', () => {
-    const hostileCorpus: VideoCorpus = {
-      ...fixture,
-      videos: fixture.videos.map((video) => ({
-        ...video,
-        title: '<script>alert(1)</script>',
-        creatorName: '<img src=x onerror=alert(1)>',
-      })),
-      moments: fixture.moments.map((moment) => ({
-        ...moment,
-        excerpt: '<button onclick=alert(1)>open</button>',
-      })),
-    };
+    const hostileCorpus = structuredClone(fixture) as Mutable<VideoCorpus>;
+    delete hostileCorpus.videos[0]!.reviewEvidenceId;
+    delete hostileCorpus.rights[0]!.reviewEvidence;
+    hostileCorpus.videos[0]!.title = '<script>alert(1)</script>';
+    hostileCorpus.videos[0]!.creatorName = '<img src=x onerror=alert(1)>';
+    hostileCorpus.moments[0]!.excerpt =
+      '<button onclick=alert(1)>open</button>';
     const hostileHtml = renderVideoMomentHome(
       hostileCorpus,
       buildSearchIndex(hostileCorpus),

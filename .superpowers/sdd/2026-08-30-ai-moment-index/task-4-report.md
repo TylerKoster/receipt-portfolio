@@ -575,6 +575,109 @@ Final facts:
   one-source, no-content-claim, no-ingestion, no-user, no-demand, no-revenue,
   and no-deploy limits remain unchanged.
 
+## Cycle-03 whole-candidate content-lineage fix
+
+### Scope and RED evidence
+
+- Reviewed head: `06a08d825dc6db58f620feaa47f9707ee313ef41`.
+- Scope remained limited to reviewed cue/excerpt lineage, the checked-in Commons
+  evidence boundary used by production site construction, focused tests, the
+  isolated-runtime fixture boundary, and this report.
+- Core RED:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts -t "recomputes reviewed cue hashes"`
+  → expected exit 1; the new selected test failed because changing exact
+  `cue.text` while retaining its stored SHA returned `diagnostics=[]`.
+- Production-site RED:
+  `npm test -- --run sites/video-moment-search/site.test.ts -t "fails site construction when the checked-in Commons evidence drifts"`
+  → expected exit 1; serialization and SSR ignored a separately drifted Commons
+  annotation and emitted output instead of throwing.
+- The first combined/full run exposed a second deterministic RED after the
+  builder began requiring the evidence record: the isolated concurrent runtime
+  copied `authorized-ai-video-v1.json` but not
+  `commons-source-rights-v1.json`, so the production subprocess failed with
+  `ENOENT`. The focused reproduction was the existing canonical-evidence
+  concurrency test.
+
+### GREEN content and source binding
+
+- Reviewed moment validation now hashes exact `cue.text` UTF-8 bytes with
+  SHA-256 and requires equality with the cue hash already accepted by the
+  rights grant. A reviewed excerpt must exactly equal a temporally covering,
+  hash-valid, grant-covered cue. Evidence-less legacy corpora retain their
+  prior behavior.
+- `validateCommonsSourceEvidence` is a pure fail-closed validator used directly
+  by tests and by public-index/SSR construction when the external record is
+  supplied. It validates the external schema and binds its evidence ID, title,
+  attribution, delivery URL/media-duration boundary, fragment strategy and
+  exact timestamp URL, reviewer/date, license and rights URLs, product
+  boundary, annotation text/hash, grant/video/moment linkage, and canonical
+  rights contact to the validated corpus.
+- The production builder now reads both checked-in files before constructing
+  HTML or `search-index.json` and passes the Commons record into both render
+  boundaries. Annotation text/hash, delivery source, timestamp, and license
+  drift each fail before HTML assignment.
+- The hostile-escaping regression now deliberately uses an evidence-less
+  legacy clone. It continues to exercise output escaping without manufacturing
+  a reviewed claim that is disconnected from the accepted annotation.
+- The isolated compiled-runtime test copies both production fixture files, so
+  its two concurrent builds exercise the same fail-closed evidence dependency
+  as the normal production build.
+
+### Final fresh whole-candidate gates
+
+- Focused lineage suites:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts sites/video-moment-search/site.test.ts test/integration/video-moment-search-build.test.ts`
+  → exit 0; 3 files and 43/43 tests passed.
+- Scoped core/public/operational:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts scripts/video-moment-validation.test.ts`
+  → exit 0; 4 files and 64/64 tests passed.
+- Isolated-runtime RED repair:
+  `npm test -- --run test/integration/site-build.test.ts -t "keeps canonical evidence byte-equal"`
+  → exit 0; selected test passed.
+- Combined build integration:
+  `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts`
+  → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0; TypeScript and ESLint passed.
+- Full suite: `npm test -- --run` → exit 0; 29 files and 331/331 tests passed.
+- Offline package reproduction:
+  - `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; no changes.
+  - `npm ci --ignore-scripts --offline` → exit 0; 162 packages installed, 165
+    audited, and 0 vulnerabilities; no lifecycle scripts or network.
+- `npm run evidence -- collect-fixtures` → exit 0.
+- `npm run evidence -- verify --all` → exit 0.
+- `npm run build` → exit 0.
+- `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Opt-in one-byte source check → exit 0: 206, `video/webm`, `Accept-Ranges:
+  bytes`, `Content-Length: 1`, `Content-Range: bytes 0-0/24788866`, response
+  body read false, response body saved false.
+- Pinned Chromium built-page gate → exit 0: entered `robots control`, observed
+  one visible ranked result and first `moment-robots-control`, used a normal
+  Playwright locator click on the ordinary exact `#t=132` anchor, and observed
+  exact location/current source, current time 132 (0-second error within the
+  documented ≤2.0-second tolerance), duration 907.299, ready state 4, seeking
+  false, paused true, no error, 427x240, and media 206 with
+  `Content-Range: bytes 3801088-24788865/24788866`. No programmatic current-time
+  assignment or saved media/caption/transcript/screenshot/frame was used.
+- Built fixed-query proof: stored second 132 and first emitted anchor
+  `https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132`.
+
+### Whole-candidate changed paths and residual limits
+
+- `packages/video-moment-core/src/contracts.ts`
+- `packages/video-moment-core/src/contracts.test.ts`
+- `packages/video-moment-core/src/index.ts`
+- `scripts/build-sites.ts`
+- `sites/video-moment-search/source-evidence.ts`
+- `sites/video-moment-search/render.ts`
+- `sites/video-moment-search/site.test.ts`
+- `test/integration/site-build.test.ts`
+- `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
+- The external Commons file is now a mandatory production build input for the
+  reviewed route. Availability and browser observations remain non-hermetic.
+  The annotation remains an original title-grounded editorial marker, not a
+  transcript/content claim. The pinned external Chromium cache, one-source,
+  no-ingestion, no-user, no-demand, no-revenue, and no-deploy limits remain.
+
 ## Preserved cycle-02 history
 
 ## Status

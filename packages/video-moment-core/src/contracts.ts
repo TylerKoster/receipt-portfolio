@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 const identifierPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -46,6 +47,10 @@ export interface ReviewedSourceEvidence {
 
 function nonBlankText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function sha256Utf8(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 function isStrictCalendarDate(value: unknown): value is string {
@@ -502,12 +507,13 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       diagnostics.push(`MOMENT_CORRECTION_TARGET_INVALID:${moment.id}`);
     }
 
-    const coveredCue = (cuesByVideoId.get(moment.videoId) ?? []).some(
+    const coveringCues = (cuesByVideoId.get(moment.videoId) ?? []).filter(
       (cue) =>
         cue.startSeconds <= moment.startSeconds &&
         cue.endSeconds >= moment.endSeconds,
     );
-    if (!coveredCue) diagnostics.push(`MOMENT_OUTSIDE_CAPTIONS:${moment.id}`);
+    if (coveringCues.length === 0)
+      diagnostics.push(`MOMENT_OUTSIDE_CAPTIONS:${moment.id}`);
 
     const grant = rightsById.get(moment.rightsGrantId);
     if (!grant) {
@@ -528,19 +534,14 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     ) {
       diagnostics.push(`RIGHTS_REVIEW_EVIDENCE_NOT_BOUND:${moment.id}`);
     }
-    const momentEvidence = (cuesByVideoId.get(moment.videoId) ?? [])
-      .filter(
-        (cue) =>
-          cue.startSeconds <= moment.startSeconds &&
-          cue.endSeconds >= moment.endSeconds,
-      )
-      .map((cue) => ({
-        hash:
-          (cue.evidenceKind ?? 'caption') === 'caption'
-            ? cue.captionSha256
-            : cue.contentSha256,
-        kind: cue.evidenceKind ?? 'caption',
-      }));
+    const momentEvidence = coveringCues.map((cue) => ({
+      hash:
+        (cue.evidenceKind ?? 'caption') === 'caption'
+          ? cue.captionSha256
+          : cue.contentSha256,
+      kind: cue.evidenceKind ?? 'caption',
+      cue,
+    }));
     if (
       momentEvidence.length === 0 ||
       !momentEvidence.every(
@@ -552,6 +553,24 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
       )
     ) {
       diagnostics.push(`RIGHTS_EVIDENCE_NOT_COVERED:${moment.id}`);
+    }
+    if (grant.reviewEvidence !== undefined) {
+      for (const evidence of momentEvidence) {
+        if (evidence.hash !== sha256Utf8(evidence.cue.text)) {
+          diagnostics.push(`CUE_REVIEW_TEXT_HASH_MISMATCH:${evidence.cue.id}`);
+        }
+      }
+      const excerptIsBound = momentEvidence.some(
+        (evidence) =>
+          evidence.hash === sha256Utf8(evidence.cue.text) &&
+          evidence.cue.text === moment.excerpt &&
+          (evidence.kind === 'caption'
+            ? grant.coveredCaptionHashes.includes(evidence.hash)
+            : (grant.coveredAnnotationHashes ?? []).includes(evidence.hash)),
+      );
+      if (!excerptIsBound) {
+        diagnostics.push(`MOMENT_REVIEW_EXCERPT_NOT_BOUND:${moment.id}`);
+      }
     }
     if (!grant.allowedUses.commercialUse)
       diagnostics.push(`RIGHTS_COMMERCIAL_USE_NOT_ALLOWED:${moment.id}`);

@@ -1,5 +1,6 @@
 export {
   isReviewedSourceEvidenceSubstantive,
+  sha256Utf8,
   VideoCorpusSchema,
   validateVideoCorpus,
 } from './contracts.js';

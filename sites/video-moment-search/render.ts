@@ -14,6 +14,7 @@ import type {
   PublicSearchEntry,
   PublicSearchIndex,
 } from './search-client.js';
+import { validateCommonsSourceEvidence } from './source-evidence.js';
 
 function routePath(baseUrl: string, suffix = ''): string {
   const path = new URL(normalizePublicBaseUrl(baseUrl)).pathname;
@@ -56,10 +57,22 @@ function exactTimestampUrl(
 export function serializePublicSearchIndex(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
+  sourceEvidence?: unknown,
 ): PublicSearchIndex {
   const validation = validateVideoCorpus(corpus);
   if (!validation.ok) {
     throw new Error(`Invalid video corpus: ${validation.diagnostics.join(', ')}`);
+  }
+  if (sourceEvidence !== undefined) {
+    const evidenceValidation = validateCommonsSourceEvidence(
+      corpus,
+      sourceEvidence,
+    );
+    if (!evidenceValidation.ok) {
+      throw new Error(
+        `Invalid Commons source evidence: ${evidenceValidation.diagnostics.join(', ')}`,
+      );
+    }
   }
   const grants = new Map(corpus.rights.map((grant) => [grant.id, grant]));
   const cuesByVideo = new Map(
@@ -275,8 +288,12 @@ export function renderSearchShell(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
   baseUrl: string,
+  sourceEvidence?: unknown,
 ): string {
-  const initial = initialResults(corpus, searchIndex);
+  const initial =
+    sourceEvidence === undefined
+      ? initialResults(corpus, searchIndex)
+      : serializePublicSearchIndex(corpus, searchIndex, sourceEvidence).entries;
   const allInitialEntriesReviewed =
     initial.length > 0 &&
     initial.every((entry) => entry.reviewEvidence !== undefined);
@@ -320,8 +337,9 @@ export function renderVideoMomentHome(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
   baseUrl: string,
+  sourceEvidence?: unknown,
 ): string {
-  return renderSearchShell(corpus, searchIndex, baseUrl);
+  return renderSearchShell(corpus, searchIndex, baseUrl, sourceEvidence);
 }
 
 function filteredPage(

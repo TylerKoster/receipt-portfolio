@@ -855,6 +855,34 @@ describe('static receipt site build', () => {
           ),
         ),
         realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'fixtures',
+            'video-moment-search',
+            'commons-source-rights-v1.json',
+          ),
+          join(
+            firstRuntime,
+            'fixtures',
+            'video-moment-search',
+            'commons-source-rights-v1.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'fixtures',
+            'video-moment-search',
+            'commons-source-rights-v1.json',
+          ),
+          join(
+            secondRuntime,
+            'fixtures',
+            'video-moment-search',
+            'commons-source-rights-v1.json',
+          ),
+        ),
+        realFileSystem.copyFile(
           join(projectRoot, 'sites', 'video-moment-search', 'styles.css'),
           join(firstRuntime, 'sites', 'video-moment-search', 'styles.css'),
         ),

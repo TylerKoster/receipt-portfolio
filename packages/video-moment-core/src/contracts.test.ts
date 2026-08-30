@@ -117,7 +117,8 @@ describe('rights-bound video corpus contracts', () => {
     ][] = [
       [
         'blank evidence ID',
-        (candidate) => (candidate.rights[0]!.reviewEvidence!.evidenceId = '   '),
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.evidenceId = '   '),
       ],
       [
         'blank license identifier',
@@ -164,6 +165,20 @@ describe('rights-bound video corpus contracts', () => {
       invalidate(candidate);
       expect(validateVideoCorpus(candidate).ok, name).toBe(false);
     }
+  });
+
+  it('recomputes reviewed cue hashes and binds excerpts to accepted cue text', () => {
+    const cueDrift = cloneReviewedCorpus();
+    cueDrift.cues[0]!.text = `${cueDrift.cues[0]!.text} unsupported drift`;
+    expect(validateVideoCorpus(cueDrift).diagnostics).toContain(
+      'CUE_REVIEW_TEXT_HASH_MISMATCH:annotation-robots-control-132',
+    );
+
+    const excerptDrift = cloneReviewedCorpus();
+    excerptDrift.moments[0]!.excerpt = 'Unsupported standalone 02:12 claim.';
+    expect(validateVideoCorpus(excerptDrift).diagnostics).toContain(
+      'MOMENT_REVIEW_EXCERPT_NOT_BOUND:moment-robots-control',
+    );
   });
 
   it('rejects a moment whose exact source timestamp is not rights-covered', () => {
