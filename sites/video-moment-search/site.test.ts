@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
   buildSearchIndex,
@@ -33,6 +34,140 @@ const fixture = JSON.parse(
 ) as VideoCorpus;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
+
+type SubmitListener = (event: { preventDefault(): void }) => void;
+
+class FakeHTMLElement {
+  readonly children: FakeHTMLElement[] = [];
+  readonly dataset: Record<string, string> = {};
+  className = '';
+  hidden = false;
+  href = '';
+  textContent = '';
+  failNextReplace = false;
+
+  constructor(readonly tagName = 'div') {}
+
+  append(...children: FakeHTMLElement[]): void {
+    this.children.push(...children);
+  }
+
+  replaceChildren(...children: FakeHTMLElement[]): void {
+    if (this.failNextReplace) {
+      this.failNextReplace = false;
+      throw new Error('controlled DOM write failure');
+    }
+    this.children.splice(0, this.children.length, ...children);
+  }
+}
+
+class FakeHTMLFormElement extends FakeHTMLElement {
+  private readonly listeners = new Map<string, SubmitListener>();
+
+  constructor() {
+    super('form');
+  }
+
+  addEventListener(type: string, listener: SubmitListener): void {
+    this.listeners.set(type, listener);
+  }
+
+  submit(): void {
+    this.listeners.get('submit')?.({ preventDefault() {} });
+  }
+}
+
+class FakeHTMLInputElement extends FakeHTMLElement {
+  value = '';
+
+  constructor() {
+    super('input');
+  }
+}
+
+interface ClientHarness {
+  readonly error: FakeHTMLElement;
+  readonly results: FakeHTMLElement;
+  readonly serverResults: FakeHTMLElement;
+  readonly status: FakeHTMLElement;
+  failNextRender(): void;
+  resolveIndex(value: unknown): Promise<void>;
+  submit(query: string): void;
+}
+
+function descendants(
+  element: FakeHTMLElement,
+  tagName: string,
+): FakeHTMLElement[] {
+  return [
+    ...(element.tagName === tagName ? [element] : []),
+    ...element.children.flatMap((child) => descendants(child, tagName)),
+  ];
+}
+
+async function flushClientPromises(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+function executeClientPayload(): ClientHarness {
+  const form = new FakeHTMLFormElement();
+  const input = new FakeHTMLInputElement();
+  const status = new FakeHTMLElement('p');
+  const results = new FakeHTMLElement('div');
+  const error = new FakeHTMLElement('p');
+  error.hidden = true;
+  const serverResults = new FakeHTMLElement('section');
+  serverResults.textContent = 'server-rendered initial result';
+  let resolveFetch!: (response: {
+    readonly ok: boolean;
+    json(): Promise<unknown>;
+  }) => void;
+  const fetchPromise = new Promise<{
+    readonly ok: boolean;
+    json(): Promise<unknown>;
+  }>((resolve) => {
+    resolveFetch = resolve;
+  });
+  const selectors = new Map<string, FakeHTMLElement>([
+    ['[data-moment-search]', form],
+    ['[data-moment-query]', input],
+    ['[data-search-status]', status],
+    ['[data-client-results]', results],
+    ['[data-search-error]', error],
+    ['[data-server-results]', serverResults],
+  ]);
+  const document = {
+    createElement: (tagName: string) => new FakeHTMLElement(tagName),
+    querySelector: (selector: string) => selectors.get(selector) ?? null,
+  };
+
+  runInNewContext(VIDEO_MOMENT_SEARCH_CLIENT, {
+    document,
+    fetch: () => fetchPromise,
+    HTMLElement: FakeHTMLElement,
+    HTMLFormElement: FakeHTMLFormElement,
+    HTMLInputElement: FakeHTMLInputElement,
+    URL,
+  });
+
+  return {
+    error,
+    results,
+    serverResults,
+    status,
+    failNextRender: () => {
+      results.failNextReplace = true;
+    },
+    resolveIndex: async (value: unknown) => {
+      resolveFetch({ ok: true, json: async () => value });
+      await flushClientPromises();
+    },
+    submit: (query: string) => {
+      input.value = query;
+      form.submit();
+    },
+  };
+}
 
 describe('AI Moment Index public search surface', () => {
   it('puts an enterable search form and exact timestamped initial results first', () => {
@@ -191,6 +326,140 @@ describe('AI Moment Index public search surface', () => {
     );
     expect(renderGuidePage(baseUrl)).toContain('How to recover a moment');
     expect(videoMomentSearchSite.siteId).toBe('video-moment-search');
+  });
+
+  it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+
+    harness.submit('agent evaluation');
+
+    const articles = descendants(harness.results, 'article');
+    expect(articles.map((article) => article.dataset.momentId)).toEqual([
+      'moment-agent-evals',
+    ]);
+    expect(descendants(articles[0]!, 'a').map((anchor) => anchor.href)).toEqual(
+      ['https://video.example/watch/agent-evals?t=132'],
+    );
+    expect(harness.status.textContent).toBe('Showing 1 moment.');
+  });
+
+  it('keeps shipped payload ranking equal to phrase-bonus helper ranking', async () => {
+    const baseEntry = serializePublicSearchIndex(fixture, searchIndex).entries[0]!;
+    const exactPhrase = {
+      ...baseEntry,
+      momentId: 'moment-exact-phrase',
+      videoId: 'video-exact-phrase',
+      videoSlug: 'z-exact-phrase',
+      sourceUrl: 'https://video.example/watch/exact-phrase',
+      videoTitle: 'Research notes',
+      startSeconds: 40,
+      endSeconds: 70,
+      excerpt: 'agent evaluation',
+      topicSlugs: ['testing'],
+      timestampUrl: 'https://video.example/watch/exact-phrase?t=40',
+    };
+    const splitTokens = {
+      ...baseEntry,
+      momentId: 'moment-split-tokens',
+      videoId: 'video-split-tokens',
+      videoSlug: 'a-split-tokens',
+      sourceUrl: 'https://video.example/watch/split-tokens',
+      videoTitle: 'Agent systems',
+      startSeconds: 20,
+      endSeconds: 35,
+      excerpt: 'Scoring workflow',
+      topicSlugs: ['evaluation'],
+      timestampUrl: 'https://video.example/watch/split-tokens?t=20',
+    };
+    const publicIndex = {
+      schemaVersion: 1 as const,
+      corpusId: 'phrase-parity-fixture',
+      entries: [splitTokens, exactPhrase],
+    };
+    const expectedOrder = searchPublicIndex(
+      publicIndex,
+      'agent evaluation',
+    ).map((entry) => entry.momentId);
+    expect(expectedOrder).toEqual([
+      'moment-exact-phrase',
+      'moment-split-tokens',
+    ]);
+    const harness = executeClientPayload();
+    await harness.resolveIndex(publicIndex);
+
+    harness.submit('agent evaluation');
+
+    expect(
+      descendants(harness.results, 'article').map(
+        (article) => article.dataset.momentId,
+      ),
+    ).toEqual(expectedOrder);
+  });
+
+  it('routes wrong-shaped and partially malformed loaded indexes to client-error recovery', async () => {
+    const wrongShape = executeClientPayload();
+    await wrongShape.resolveIndex({ entries: 'not-an-array' });
+    expect(wrongShape.error.hidden).toBe(false);
+    expect(wrongShape.status.textContent).toContain(
+      'initial reviewed moments remain below',
+    );
+    expect(wrongShape.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
+
+    const validIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const partial = executeClientPayload();
+    await partial.resolveIndex({
+      ...validIndex,
+      entries: validIndex.entries.map((entry) => ({
+        ...entry,
+        topicSlugs: null,
+      })),
+    });
+    expect(partial.error.hidden).toBe(false);
+    expect(() => partial.submit('agent evaluation')).not.toThrow();
+    expect(partial.status.textContent).toContain(
+      'initial reviewed moments remain available below',
+    );
+  });
+
+  it('clears a transient pre-load fallback after valid loading and completes the fixed flow', async () => {
+    const harness = executeClientPayload();
+    harness.submit('agent evaluation');
+    expect(harness.error.hidden).toBe(false);
+    expect(harness.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
+
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+    expect(harness.error.hidden).toBe(true);
+
+    harness.submit('agent evaluation');
+    expect(
+      descendants(harness.results, 'article')[0]?.dataset.momentId,
+    ).toBe('moment-agent-evals');
+  });
+
+  it('catches unexpected submit-time rendering errors into the same fallback', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+    harness.failNextRender();
+
+    expect(() => harness.submit('agent evaluation')).not.toThrow();
+    expect(harness.error.hidden).toBe(false);
+    expect(harness.status.textContent).toContain(
+      'initial reviewed moments remain available below',
+    );
+    expect(harness.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
   });
 
   it('ships a text-only browser renderer with keyboard submit and local asset recovery', () => {

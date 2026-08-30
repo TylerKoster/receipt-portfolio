@@ -51,6 +51,10 @@ function containsPhrase(value: string, phrase: string): boolean {
   );
 }
 
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function safeTimestampEntry(value: unknown): value is PublicSearchEntry {
   if (typeof value !== 'object' || value === null) return false;
   const entry = value as Partial<PublicSearchEntry>;
@@ -142,9 +146,9 @@ export function searchPublicIndex(
     .sort(
       (left, right) =>
         right.score - left.score ||
-        left.entry.videoSlug.localeCompare(right.entry.videoSlug) ||
+        compareText(left.entry.videoSlug, right.entry.videoSlug) ||
         left.entry.startSeconds - right.entry.startSeconds ||
-        left.entry.momentId.localeCompare(right.entry.momentId),
+        compareText(left.entry.momentId, right.entry.momentId),
     )
     .slice(0, Math.floor(limit))
     .map((candidate) => candidate.entry);
@@ -163,11 +167,37 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
 
   let index = null;
   const normalize = (value) => value.normalize('NFKC').toLocaleLowerCase('en-US')
-    .replace(/[\\p{Pd}_]/gu, ' ').replace(/\\s+/gu, ' ').trim();
-  const tokens = (value) => normalize(value).match(/[\\p{L}\\p{N}]+/gu) || [];
+    .replace(/[\p{Pd}_]/gu, ' ').replace(/\s+/gu, ' ').trim();
+  const tokens = (value) => normalize(value).match(/[\p{L}\p{N}]+/gu) || [];
+  const containsPhrase = (value, phrase) => {
+    const phraseTokens = tokens(phrase);
+    const valueTokens = tokens(value);
+    return phraseTokens.length > 0 && phraseTokens.length <= valueTokens.length &&
+      valueTokens.some((_, start) =>
+        phraseTokens.every((token, offset) => valueTokens[start + offset] === token));
+  };
+  const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
   const safe = (entry) => {
     try {
-      if (!Number.isInteger(entry.startSeconds) || entry.startSeconds < 0) return false;
+      if (!entry || typeof entry !== 'object' ||
+          typeof entry.momentId !== 'string' ||
+          typeof entry.videoId !== 'string' ||
+          typeof entry.videoSlug !== 'string' ||
+          typeof entry.sourceUrl !== 'string' ||
+          typeof entry.videoTitle !== 'string' ||
+          typeof entry.creatorId !== 'string' ||
+          typeof entry.creatorName !== 'string' ||
+          !Number.isInteger(entry.startSeconds) || entry.startSeconds < 0 ||
+          !Number.isInteger(entry.endSeconds) || entry.endSeconds <= entry.startSeconds ||
+          typeof entry.excerpt !== 'string' ||
+          !Array.isArray(entry.topicSlugs) ||
+          !entry.topicSlugs.every((topic) => typeof topic === 'string') ||
+          (entry.correctionState !== 'active' && entry.correctionState !== 'corrected') ||
+          typeof entry.confidenceClass !== 'string' ||
+          typeof entry.rightsStatus !== 'string' ||
+          typeof entry.verificationDate !== 'string' ||
+          typeof entry.provenance !== 'string' ||
+          typeof entry.timestampUrl !== 'string') return false;
       const source = new URL(entry.sourceUrl);
       const timestamp = new URL(entry.timestampUrl);
       if (source.protocol !== 'https:' || source.username || source.password ||
@@ -179,9 +209,18 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       return false;
     }
   };
+  const validIndex = (value) => {
+    try {
+      return !!value && typeof value === 'object' &&
+        value.schemaVersion === 1 && typeof value.corpusId === 'string' &&
+        Array.isArray(value.entries) && value.entries.every(safe);
+    } catch {
+      return false;
+    }
+  };
   const find = (query) => {
     const queryTokens = tokens(query);
-    if (queryTokens.length === 0 || !index || !Array.isArray(index.entries)) return [];
+    if (queryTokens.length === 0 || !index) return [];
     return index.entries.filter(safe).map((entry) => {
       const title = normalize(entry.videoTitle);
       const topics = normalize(entry.topicSlugs.join(' '));
@@ -189,14 +228,17 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       const values = new Set(tokens(title + ' ' + topics + ' ' + excerpt));
       if (!queryTokens.every((token) => values.has(token))) return { entry, score: 0 };
       return { entry, score:
+        (containsPhrase(title, query) ? 10000 : 0) +
+        (containsPhrase(topics, query) ? 10000 : 0) +
+        (containsPhrase(excerpt, query) ? 10000 : 0) +
         queryTokens.filter((token) => tokens(title).includes(token)).length * 100 +
         queryTokens.filter((token) => tokens(topics).includes(token)).length * 50 +
         queryTokens.filter((token) => tokens(excerpt).includes(token)).length * 10 };
     }).filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score ||
-        a.entry.videoSlug.localeCompare(b.entry.videoSlug) ||
+        compareText(a.entry.videoSlug, b.entry.videoSlug) ||
         a.entry.startSeconds - b.entry.startSeconds ||
-        a.entry.momentId.localeCompare(b.entry.momentId))
+        compareText(a.entry.momentId, b.entry.momentId))
       .slice(0, 10).map((item) => item.entry);
   };
   const addText = (parent, name, value) => {
@@ -234,35 +276,51 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     article.append(heading, metadata);
     return article;
   };
+  const showLoadError = () => {
+    error.hidden = false;
+    status.textContent = 'Interactive search is unavailable; initial reviewed moments remain below.';
+  };
+  const showSearchError = () => {
+    error.hidden = false;
+    status.textContent = 'Search could not load. The initial reviewed moments remain available below.';
+  };
 
   fetch('search-index.json', { credentials: 'same-origin' })
     .then((response) => {
       if (!response.ok) throw new Error('index load failed');
       return response.json();
     })
-    .then((value) => { index = value; })
+    .then((value) => {
+      if (!validIndex(value)) throw new Error('index validation failed');
+      index = value;
+      error.hidden = true;
+    })
     .catch(() => {
-      error.hidden = false;
-      status.textContent = 'Interactive search is unavailable; initial reviewed moments remain below.';
+      index = null;
+      showLoadError();
     });
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!index) {
-      error.hidden = false;
-      status.textContent = 'Search could not load. The initial reviewed moments remain available below.';
-      return;
+    try {
+      if (!index) {
+        showSearchError();
+        return;
+      }
+      const query = input.value.trim();
+      if (query.length === 0) {
+        results.replaceChildren();
+        status.textContent = 'Enter a phrase such as “agent evaluation”.';
+        return;
+      }
+      const found = find(query);
+      results.replaceChildren(...found.map(card));
+      error.hidden = true;
+      status.textContent = found.length === 0
+        ? 'No moments match this phrase. Try fewer or different words.'
+        : 'Showing ' + found.length + (found.length === 1 ? ' moment.' : ' moments.');
+    } catch {
+      showSearchError();
     }
-    const query = input.value.trim();
-    if (query.length === 0) {
-      results.replaceChildren();
-      status.textContent = 'Enter a phrase such as “agent evaluation”.';
-      return;
-    }
-    const found = find(query);
-    results.replaceChildren(...found.map(card));
-    status.textContent = found.length === 0
-      ? 'No moments match this phrase. Try fewer or different words.'
-      : 'Showing ' + found.length + (found.length === 1 ? ' moment.' : ' moments.');
   });
 })();`;
