@@ -1,4 +1,5 @@
 import {
+  isReviewedSourceEvidenceSubstantive,
   searchMoments,
   validateVideoCorpus,
   type SearchIndex,
@@ -82,6 +83,12 @@ export function serializePublicSearchIndex(
       throw new Error(`Invalid exact timestamp URL for ${entry.moment.id}`);
     }
     const reviewEvidence = grant.reviewEvidence;
+    if (
+      reviewEvidence !== undefined &&
+      !isReviewedSourceEvidenceSubstantive(reviewEvidence)
+    ) {
+      throw new Error(`Invalid reviewed-source evidence for ${entry.moment.id}`);
+    }
     const cueIds = (cuesByVideo.get(entry.video.id) ?? [])
       .filter(
         (cue) =>

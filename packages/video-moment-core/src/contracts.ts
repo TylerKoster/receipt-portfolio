@@ -44,6 +44,43 @@ export interface ReviewedSourceEvidence {
   };
 }
 
+function nonBlankText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isStrictCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function isReviewedSourceEvidenceSubstantive(
+  value: unknown,
+): value is ReviewedSourceEvidence {
+  if (typeof value !== 'object' || value === null) return false;
+  const review = value as Partial<ReviewedSourceEvidence>;
+  return (
+    review.classification === 'reviewed-public-source' &&
+    nonBlankText(review.evidenceId) &&
+    nonBlankText(review.licenseIdentifier) &&
+    nonBlankText(review.licenseUrl) &&
+    nonBlankText(review.canonicalRightsPageUrl) &&
+    nonBlankText(review.immutableRightsRevisionUrl) &&
+    nonBlankText(review.reviewer) &&
+    isStrictCalendarDate(review.reviewedOn) &&
+    typeof review.productBoundary === 'object' &&
+    review.productBoundary !== null &&
+    Array.isArray(review.productBoundary.included) &&
+    Array.isArray(review.productBoundary.excluded) &&
+    review.productBoundary.included.length > 0 &&
+    review.productBoundary.excluded.length > 0 &&
+    review.productBoundary.included.every(nonBlankText) &&
+    review.productBoundary.excluded.every(nonBlankText)
+  );
+}
+
 export interface RightsGrant {
   readonly id: string;
   readonly creatorId: string;
@@ -150,6 +187,7 @@ const RightsGrantSchema = z
           .strict(),
       })
       .strict()
+      .refine(isReviewedSourceEvidenceSubstantive)
       .optional(),
   })
   .strict();

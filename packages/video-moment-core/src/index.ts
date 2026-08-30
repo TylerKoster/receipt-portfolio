@@ -1,4 +1,8 @@
-export { VideoCorpusSchema, validateVideoCorpus } from './contracts.js';
+export {
+  isReviewedSourceEvidenceSubstantive,
+  VideoCorpusSchema,
+  validateVideoCorpus,
+} from './contracts.js';
 export type {
   RightsGrant,
   ReviewedSourceEvidence,

@@ -493,6 +493,88 @@ Final facts:
   one-source, no-content-claim, no-ingestion, no-user, no-demand, no-revenue,
   and no-deploy limits remain.
 
+## Cycle-03 fourth re-review core/SSR parity fix
+
+### Scope and RED evidence
+
+- Reviewed head: `44d016024033da8a2ad73faa9e5fd0b652e67e1d`.
+- Scope remained limited to core review-evidence substance validation, SSR
+  fail-closed behavior, shared predicate reuse, tests, and this report.
+- RED command:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts sites/video-moment-search/site.test.ts -t "semantically blank or impossible|before serialization or reviewed SSR"`
+  → expected exit 1 with both selected tests failing:
+  - Core corpus validation accepted a tab-only reviewer.
+  - Corpus validation and server serialization accepted a whitespace-only
+    license identifier after the license note was synchronized, leaving
+    `Reviewed public source` SSR reachable from substantively invalid evidence.
+- The core matrix also covered blank evidence ID, empty included/excluded uses,
+  blank boundary members, and an impossible calendar date. The SSR matrix
+  covered whitespace-only license, reviewer, included/excluded members, and an
+  impossible date.
+
+### GREEN implementation
+
+- Core now exports `isReviewedSourceEvidenceSubstantive` as the single
+  server-side predicate for trimmed nonempty required text, nonempty included
+  and excluded arrays with nonblank members, and a strict real UTC calendar
+  `YYYY-MM-DD` review date.
+- The reviewed-evidence Zod schema refines through that predicate before
+  semantic corpus processing. Existing core identifier and HTTPS diagnostics
+  remain in force.
+- The TypeScript public-entry validator reuses the same core predicate and adds
+  its existing HTTPS checks. The emitted IIFE retains the equivalent mirrored
+  predicate because it is shipped as a standalone browser payload.
+- SSR serialization performs a defensive predicate check after the mandatory
+  full corpus validation. Invalid review evidence therefore throws
+  `Invalid video corpus` before public-index creation, page rendering, or any
+  `Reviewed public source` HTML assignment.
+- The selected reviewed fixture remains valid. The existing evidence-less
+  legacy corpus test remains valid and receives neutral public copy.
+
+### Final fresh fourth-review gates
+
+- Focused core/SSR suites:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts sites/video-moment-search/site.test.ts`
+  → exit 0; 2 files and 39/39 tests passed.
+- Scoped core/public/operational:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts scripts/video-moment-validation.test.ts`
+  → exit 0; 4 files and 62/62 tests passed.
+- Combined build integration:
+  `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts`
+  → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0.
+- Full suite: `npm test -- --run` → exit 0; 29 files and 329/329 tests passed.
+- Offline package reproduction:
+  - `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; no changes.
+  - `npm ci --ignore-scripts --offline` → exit 0; 162 packages installed, 165
+    audited, and 0 vulnerabilities.
+- `npm run evidence -- collect-fixtures` → exit 0.
+- `npm run evidence -- verify --all` → exit 0.
+- `npm run build` → exit 0.
+- `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Opt-in one-byte source check → exit 0: 206, `video/webm`, `Accept-Ranges:
+  bytes`, `Content-Length: 1`, `Content-Range: bytes 0-0/24788866`, response
+  body read false, response body saved false.
+- Pinned Chromium built-page gate → exit 0: query `robots control`, one visible
+  result, first `moment-robots-control`, normal Playwright locator click on the
+  ordinary exact `#t=132` anchor, exact location/current source, current time
+  132, duration 907.299, ready state 4, seeking false, paused true, no error,
+  427x240, and media 206 with
+  `Content-Range: bytes 3801088-24788865/24788866`.
+
+### Fourth-review changed paths and limits
+
+- `packages/video-moment-core/src/contracts.ts`
+- `packages/video-moment-core/src/contracts.test.ts`
+- `packages/video-moment-core/src/index.ts`
+- `sites/video-moment-search/render.ts`
+- `sites/video-moment-search/search-client.ts`
+- `sites/video-moment-search/site.test.ts`
+- `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
+- The pinned CLI/external Chromium cache, non-hermetic Wikimedia, rights,
+  one-source, no-content-claim, no-ingestion, no-user, no-demand, no-revenue,
+  and no-deploy limits remain unchanged.
+
 ## Preserved cycle-02 history
 
 ## Status

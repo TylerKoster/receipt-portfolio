@@ -73,6 +73,18 @@ function cloneValidCorpus(): Mutable<VideoCorpus> {
   return structuredClone(validCorpus) as Mutable<VideoCorpus>;
 }
 
+function cloneReviewedCorpus(): Mutable<VideoCorpus> {
+  return JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../fixtures/video-moment-search/authorized-ai-video-v1.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  ) as Mutable<VideoCorpus>;
+}
+
 describe('rights-bound video corpus contracts', () => {
   it('accepts the committed local test-only rights-cleared fixture', () => {
     const fixture = JSON.parse(
@@ -96,6 +108,62 @@ describe('rights-bound video corpus contracts', () => {
       ok: true,
       diagnostics: [],
     });
+  });
+
+  it('rejects semantically blank or impossible reviewed-source evidence', () => {
+    const invalidEvidence: readonly [
+      string,
+      (candidate: Mutable<VideoCorpus>) => void,
+    ][] = [
+      [
+        'blank evidence ID',
+        (candidate) => (candidate.rights[0]!.reviewEvidence!.evidenceId = '   '),
+      ],
+      [
+        'blank license identifier',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.licenseIdentifier = '   '),
+      ],
+      [
+        'blank reviewer',
+        (candidate) => (candidate.rights[0]!.reviewEvidence!.reviewer = '\t'),
+      ],
+      [
+        'impossible review date',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.reviewedOn = '2022-02-30'),
+      ],
+      [
+        'empty included uses',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.included = []),
+      ],
+      [
+        'empty excluded uses',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.excluded = []),
+      ],
+      [
+        'blank included use',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.included = [
+            '   ',
+          ]),
+      ],
+      [
+        'blank excluded use',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.excluded = [
+            '\t',
+          ]),
+      ],
+    ];
+
+    for (const [name, invalidate] of invalidEvidence) {
+      const candidate = cloneReviewedCorpus();
+      invalidate(candidate);
+      expect(validateVideoCorpus(candidate).ok, name).toBe(false);
+    }
   });
 
   it('rejects a moment whose exact source timestamp is not rights-covered', () => {

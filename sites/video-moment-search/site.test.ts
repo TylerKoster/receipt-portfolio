@@ -551,6 +551,63 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
+  it('rejects invalid corpus review evidence before serialization or reviewed SSR copy', () => {
+    const invalidEvidence: readonly [
+      string,
+      (candidate: Mutable<VideoCorpus>) => void,
+    ][] = [
+      [
+        'whitespace license',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.licenseIdentifier = '   '),
+      ],
+      [
+        'whitespace reviewer',
+        (candidate) => (candidate.rights[0]!.reviewEvidence!.reviewer = '\t'),
+      ],
+      [
+        'whitespace included use',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.included = [
+            '   ',
+          ]),
+      ],
+      [
+        'whitespace excluded use',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.productBoundary.excluded = [
+            '\t',
+          ]),
+      ],
+      [
+        'impossible review date',
+        (candidate) =>
+          (candidate.rights[0]!.reviewEvidence!.reviewedOn = '2022-02-30'),
+      ],
+    ];
+
+    for (const [name, invalidate] of invalidEvidence) {
+      const candidate = structuredClone(fixture) as Mutable<VideoCorpus>;
+      invalidate(candidate);
+      const review = candidate.rights[0]!.reviewEvidence!;
+      candidate.rights[0]!.licenseNote = `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
+
+      expect(validateVideoCorpus(candidate).ok, name).toBe(false);
+      expect(
+        () => serializePublicSearchIndex(candidate, searchIndex),
+        name,
+      ).toThrow('Invalid video corpus');
+      let html: string | undefined;
+      expect(
+        () => {
+          html = renderVideoMomentHome(candidate, searchIndex, baseUrl);
+        },
+        name,
+      ).toThrow('Invalid video corpus');
+      expect(html, name).toBeUndefined();
+    }
+  });
+
   it('renders every result with its own validated stored timestamp and evidence metadata', () => {
     const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
     const results = searchPublicIndex(publicIndex, 'robots control');
