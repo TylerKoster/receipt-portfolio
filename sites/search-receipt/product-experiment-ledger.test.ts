@@ -124,7 +124,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -148,7 +148,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
@@ -164,24 +164,6 @@ describe('Search Receipt product experiment ledger', () => {
       noDataBoundary: 'No data means no demand or revenue conclusion.',
       nextSafeAction:
         'Keep the source-bound query guidance under bounded observation only; no data means no demand or revenue conclusion.',
-    });
-  });
-
-  it('records a shareable filtered view without claiming measurement or demand', () => {
-    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
-
-    expect(
-      ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(ledger.experiments[8]).toMatchObject({
-      id: 'shareable-filter-view-v1',
-      rank: 9,
-      status: 'ACTIVE_NO_MEASUREMENT',
-      metric:
-        'Unmeasured shareable-filter completion after 10 observed non-synthetic sessions.',
-      target: '>=60% after 10 observed non-synthetic sessions',
-      stopRule: '<30% after 10 sessions retires or reframes the experiment.',
-      noDataBoundary: 'No data means no demand or revenue conclusion.',
     });
   });
 });
