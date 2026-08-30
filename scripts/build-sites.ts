@@ -321,7 +321,7 @@ async function writeSiteTree(
   );
   await writeFile(
     join(outputDirectory, 'index.html'),
-    renderPortfolioHub(publicBaseUrl),
+    renderPortfolioHub(SITE_DEFINITIONS, publicBaseUrl),
   );
   for (const site of SITE_DEFINITIONS) {
     const directory = join(outputDirectory, site.siteId);

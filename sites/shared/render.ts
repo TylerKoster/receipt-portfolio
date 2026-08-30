@@ -11,6 +11,14 @@ export interface SiteDefinition {
   readonly title: string;
   readonly description: string;
   readonly proposition: string;
+  readonly audience: string;
+  readonly useCase: string;
+  readonly howTo: readonly [string, string, string];
+  readonly outcome: string;
+  readonly primaryAction: {
+    readonly label: string;
+    readonly targetId: 'search-controls' | 'receipts-heading';
+  };
   readonly interpretationBoundary: string;
   readonly unknowns: string;
 }
@@ -100,7 +108,13 @@ function canonicalUrl(
   return `${base}${site.siteId}${suffix}`;
 }
 
-function sourceLink(sourceUrl: string): string {
+function sourceLink(
+  sourceUrl: string,
+  evidenceClass: Receipt['payload']['provenance']['evidenceClass'],
+): string {
+  if (evidenceClass === 'controlled-example') {
+    return `<span class="fixture-source">Controlled fixture URL: ${escapeHtml(sourceUrl)} (not a live destination)</span>`;
+  }
   try {
     if (new URL(sourceUrl).protocol === 'https:') {
       return `<a href="${escapeHtml(sourceUrl)}">${escapeHtml(sourceUrl)}</a>`;
@@ -202,7 +216,7 @@ function receiptCard(
     <h3 id="receipt-${escapeHtml(receipt.id)}"><a href="${escapeHtml(sitePath(site, `/receipts/${receipt.id}/`, publicBaseUrl))}">${escapeHtml(receipt.payload.sourceId)}</a></h3>
   </div>
   <dl class="receipt-meta">
-    <div><dt>Evidence source</dt><dd>${sourceLink(receipt.payload.sourceUrl)}</dd></div>
+    <div><dt>Evidence source</dt><dd>${sourceLink(receipt.payload.sourceUrl, receipt.payload.provenance.evidenceClass)}</dd></div>
     <div><dt>Observed time</dt><dd><time datetime="${escapeHtml(receipt.payload.observedAt)}">${escapeHtml(receipt.payload.observedAt)}</time></dd></div>
     <div><dt>Policy decision</dt><dd><strong>${escapeHtml(receipt.payload.policy.decision)}</strong></dd></div>
     <div><dt>Sequence</dt><dd>${escapeHtml(String(receipt.payload.sequence))}</dd></div>
@@ -323,7 +337,7 @@ export function renderSite(
     .join('');
   const searchControls =
     site.siteId === 'search-receipt'
-      ? `<section class="search-panel" aria-labelledby="search-heading"><p class="eyebrow">Enterable record search</p><h2 id="search-heading">Find a source-bound record</h2><p>Filter the records already published on this page. Queries stay in this browser and are not stored or sent.</p>
+      ? `<section id="search-controls" class="search-panel" aria-labelledby="search-heading"><p class="eyebrow">Enterable record search</p><h2 id="search-heading">Find a source-bound record</h2><p>Filter the records already published on this page. Queries stay in this browser and are not stored or sent.</p>
     <form class="search-controls" role="search" data-search-controls><div><label for="receipt-query">Search records</label><input id="receipt-query" name="receipt-query" type="search" autocomplete="off" data-search-query></div><div><label for="receipt-topic">Filter by topic</label><select id="receipt-topic" name="receipt-topic" data-search-topic-filter><option value="">All topics</option>${topicOptions}</select></div><button type="submit">Apply filters</button></form>
     <p class="search-status" aria-live="polite" data-search-status>Showing ${visible.length} of ${visible.length} ${visible.length === 1 ? 'record' : 'records'}.</p><p class="empty-state" data-search-empty hidden>No records match this query and filter.</p><p class="empty-state" role="status" data-search-error>Interactive filtering is not active; all records remain visible.</p></section>`
       : '';
@@ -331,13 +345,20 @@ export function renderSite(
     site.siteId === 'search-receipt'
       ? `<section class="information-panel" aria-labelledby="offer-heading"><p class="eyebrow">Preview interest action</p><h2 id="offer-heading">Status alert and report preview</h2><p>This non-operational preview does not create an alert, send data, or start a report.</p><button type="button" data-measurement-action="alert-report-interest">I would use alerts or reports</button><p aria-live="polite" data-offer-status></p></section>`
       : '';
+  const startHere = `<section class="start-here information-panel" aria-labelledby="start-here-heading"><p class="eyebrow">Start here</p><h2 id="start-here-heading">Is this for you?</h2>
+    <p><strong>For:</strong> ${escapeHtml(site.audience)}</p>
+    <p><strong>Use this when:</strong> ${escapeHtml(site.useCase)}</p>
+    <h3>How to use it</h3><ol>${site.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
+    <p><strong>What you get:</strong> ${escapeHtml(site.outcome)}</p>
+    <p><strong>What it cannot tell you:</strong> ${escapeHtml(site.unknowns)}</p>
+    <p><a class="primary-action" href="#${site.primaryAction.targetId}">${escapeHtml(site.primaryAction.label)}</a></p></section>`;
   return page(
     site,
     {
       path: '/',
       title: site.title,
       description: site.description,
-      body: `${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
+      body: `${startHere}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
     <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>${offer}`,
       scriptPath: assetPolicy.scriptPath,
       stylePath: assetPolicy.stylePath,
@@ -394,7 +415,7 @@ export function renderSources(
     )
     .map(
       (receipt) =>
-        `<li><strong>${escapeHtml(receipt.payload.sourceId)}</strong> · ${sourceLink(receipt.payload.sourceUrl)} · ${escapeHtml(receipt.payload.provenance.publisherName)} · ${receipt.payload.provenance.evidenceClass === 'controlled-example' ? 'Controlled fixture example; not live/current evidence' : 'Official primary live-source manifest'}</li>`,
+        `<li><strong>${escapeHtml(receipt.payload.sourceId)}</strong> · ${sourceLink(receipt.payload.sourceUrl, receipt.payload.provenance.evidenceClass)} · ${escapeHtml(receipt.payload.provenance.publisherName)} · ${receipt.payload.provenance.evidenceClass === 'controlled-example' ? 'Controlled fixture example; not live/current evidence' : 'Official primary live-source manifest'}</li>`,
     )
     .join('');
   return page(
@@ -492,30 +513,15 @@ export function renderRobots(
 }
 
 export function renderPortfolioHub(
+  sites: readonly SiteDefinition[],
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
   const base = normalizePublicBaseUrl(publicBaseUrl);
   const basePath = publicBasePath(base);
-  const productLinks = [
-    [
-      'search-receipt',
-      'Search Receipt',
-      'Source-bound search status receipts.',
-    ],
-    [
-      'workflow-test-lab',
-      'Workflow Test Lab',
-      'Fixture-checked workflow records with explicit limits.',
-    ],
-    [
-      'skill-ledger',
-      'SkillLedger',
-      'Non-executing metadata receipts for skill packages.',
-    ],
-  ]
+  const productLinks = sites
     .map(
-      ([siteId, name, description]) =>
-        `<article class="receipt-card"><h2><a href="${escapeHtml(`${basePath}${siteId}/`)}">${escapeHtml(name!)}</a></h2><p>${escapeHtml(description!)}</p></article>`,
+      (site) =>
+        `<article class="receipt-card"><h2><a href="${escapeHtml(`${basePath}${site.siteId}/`)}">${escapeHtml(site.name)}</a></h2><p><strong>For:</strong> ${escapeHtml(site.audience)}</p><p><strong>Use it to:</strong> ${escapeHtml(site.useCase)}</p><p><strong>Expected output:</strong> ${escapeHtml(site.outcome)}</p></article>`,
     )
     .join('\n');
   return `<!doctype html>
@@ -524,7 +530,7 @@ export function renderPortfolioHub(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
-  <meta name="description" content="Three distinct source-bound evidence receipt products.">
+  <meta name="description" content="${sites.length} task-oriented evidence products with explicit limits.">
   <link rel="canonical" href="${escapeHtml(base)}">
   <link rel="icon" href="${escapeHtml(`${basePath}favicon.ico`)}">
   <title>Evidence receipt portfolio</title>
@@ -534,8 +540,8 @@ export function renderPortfolioHub(
   <a class="skip-link" href="#main-content">Skip to products</a>
   <header class="site-header"><div class="shell">
     <p class="portfolio-label">Evidence receipt portfolio</p>
-    <h1>Three bounded evidence products</h1>
-    <p class="proposition">Controlled examples are not live or current source evidence. Live-source receipts remain distinct and require their own admitted source evidence.</p>
+    <h1>Choose a task, then inspect the evidence</h1>
+    <p class="proposition">Each tool states who it is for, what decision it supports, how to use it, and what its evidence cannot establish. Controlled examples are not live or current source evidence.</p>
   </div></header>
   <main id="main-content" class="shell"><section class="receipt-list" aria-label="Portfolio products">${productLinks}</section></main>
   <footer><div class="shell">This portfolio hub is a deployment shell, not a fourth evidence product.</div></footer>
