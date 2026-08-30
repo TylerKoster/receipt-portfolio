@@ -4,6 +4,7 @@ import {
   compareSkillInventory,
   declaredMetadataFacetSummary,
   filterSkillInventory,
+  assessControlledGuideDraftAdmission,
   assessSourceBoundSkillReceiptQuality,
   recordSyntheticOfferEvent,
   sourceBoundSkillInventory,
@@ -80,6 +81,60 @@ const receiptB = {
 } satisfies SourceBoundSkillReceipt;
 
 describe('source-bound SkillLedger inventory experiment', () => {
+  it('admits a controlled guide draft only when its source-bound receipt is quality-gated', () => {
+    const draft = {
+      guideId: 'controlled-guide-archive-skill',
+      title: 'Controlled archive skill guide',
+      summary: 'A controlled draft bound to a quality-gated source receipt.',
+      declaredSourceRole: 'original-guide',
+      sourcePublisher: 'Controlled test publisher',
+      sourceReceipt: receiptA,
+    };
+
+    expect(assessControlledGuideDraftAdmission(draft)).toEqual({
+      kind: 'ready',
+      issues: [],
+      boundary:
+        'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, or suitability.',
+    });
+  });
+
+  it('reports guide admission issues in fixed order without mutating the draft or source receipt behavior', () => {
+    const invalidSourceReceipt = {
+      ...receiptA,
+      receipt: { ...receiptA.receipt, id: '' },
+    } satisfies SourceBoundSkillReceipt;
+    const draft = {
+      guideId: ' ',
+      title: '',
+      summary: '\t',
+      declaredSourceRole: 'source-guide',
+      sourcePublisher: ' ',
+      sourceReceipt: invalidSourceReceipt,
+    };
+    const draftBefore = structuredClone(draft);
+    const sourceQualityBefore =
+      assessSourceBoundSkillReceiptQuality(invalidSourceReceipt);
+
+    expect(assessControlledGuideDraftAdmission(draft)).toEqual({
+      kind: 'not-ready',
+      issues: [
+        'missing-guide-id',
+        'missing-guide-title',
+        'missing-guide-summary',
+        'invalid-declared-source-role',
+        'missing-source-publisher',
+        'source-receipt-not-ready',
+      ],
+      boundary:
+        'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, or suitability.',
+    });
+    expect(draft).toEqual(draftBefore);
+    expect(assessSourceBoundSkillReceiptQuality(invalidSourceReceipt)).toEqual(
+      sourceQualityBefore,
+    );
+  });
+
   it('assesses a complete controlled source-bound receipt as ready without issues', () => {
     expect(assessSourceBoundSkillReceiptQuality(receiptA)).toEqual({
       kind: 'ready',

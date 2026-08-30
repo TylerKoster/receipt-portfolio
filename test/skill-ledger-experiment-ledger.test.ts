@@ -57,10 +57,21 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'source-bound-comparison',
+        area: 'current-original-guides',
         rank: 1,
-        experiment: 'controlled-comparison-field-differences',
+        experiment: 'controlled-guide-draft-admission-contract',
         status: 'in-progress',
+        metric: 'controlled guide draft admission coverage',
+        target:
+          'Each controlled guide draft requires nonempty guide/source bindings and a quality-gated source receipt.',
+        stopRule:
+          'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, suitability, or public UI readiness.',
+      },
+      {
+        area: 'source-bound-comparison',
+        rank: 2,
+        experiment: 'controlled-comparison-field-differences',
+        status: 'completed-internal',
         metric: 'controlled comparison field-difference coverage',
         target:
           'Exactly two quality-gated controlled records produce deterministic source, hash, declared-metadata, and static-signal-presence differences.',
@@ -69,7 +80,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'searchable-filterable-discovery',
-        rank: 2,
+        rank: 3,
         experiment: 'source-bound-record-quality-gate',
         status: 'completed-internal',
         metric: 'controlled invalid-record rejection coverage',
@@ -77,17 +88,6 @@ describe('SkillLedger synthetic usability ledger', () => {
           'Every controlled record with a missing source binding, invalid observed time, or malformed hash is excluded and disclosed deterministically.',
         stopRule:
           'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
-      },
-      {
-        area: 'current-original-guides',
-        rank: 3,
-        experiment: 'source-backed-current-original-guides',
-        status: 'blocked',
-        metric: 'verified guide provenance',
-        target:
-          'Requires real provenance and authority for current original guidance.',
-        stopRule:
-          'Blocked without real provenance and authority; no adoption, revenue, demand, or safety claim.',
       },
       {
         area: 'discoverability',
@@ -144,6 +144,12 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-internal',
         boundary:
           'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
+      },
+      {
+        experiment: 'controlled-comparison-field-differences',
+        status: 'completed-internal',
+        boundary:
+          'Field differences do not establish real provenance, safety, adoption, demand, suitability, or public UI readiness.',
       },
     ]);
   });

@@ -86,6 +86,38 @@ export type SourceBoundSkillReceiptQualityAssessment =
       boundary: typeof SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY;
     }>;
 
+export const CONTROLLED_GUIDE_DRAFT_ADMISSION_BOUNDARY =
+  'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, or suitability.' as const;
+
+export type ControlledGuideDraft = Readonly<{
+  guideId: string;
+  title: string;
+  summary: string;
+  declaredSourceRole: string;
+  sourcePublisher: string;
+  sourceReceipt: SourceBoundSkillReceipt;
+}>;
+
+export type ControlledGuideDraftAdmissionIssue =
+  | 'missing-guide-id'
+  | 'missing-guide-title'
+  | 'missing-guide-summary'
+  | 'invalid-declared-source-role'
+  | 'missing-source-publisher'
+  | 'source-receipt-not-ready';
+
+export type ControlledGuideDraftAdmissionAssessment =
+  | Readonly<{
+      kind: 'ready';
+      issues: readonly [];
+      boundary: typeof CONTROLLED_GUIDE_DRAFT_ADMISSION_BOUNDARY;
+    }>
+  | Readonly<{
+      kind: 'not-ready';
+      issues: readonly ControlledGuideDraftAdmissionIssue[];
+      boundary: typeof CONTROLLED_GUIDE_DRAFT_ADMISSION_BOUNDARY;
+    }>;
+
 export type DeclaredMetadataFacetSummaryRow = Readonly<{
   facet: 'declared-license' | 'dependency-state' | 'static-signal-presence';
   value: string;
@@ -225,6 +257,41 @@ export function assessSourceBoundSkillReceiptQuality(
     kind: 'not-ready',
     issues,
     boundary: SOURCE_BOUND_RECEIPT_QUALITY_BOUNDARY,
+  };
+}
+
+export function assessControlledGuideDraftAdmission(
+  draft: ControlledGuideDraft,
+): ControlledGuideDraftAdmissionAssessment {
+  const issues: ControlledGuideDraftAdmissionIssue[] = [];
+
+  if (draft.guideId.trim() === '') issues.push('missing-guide-id');
+  if (draft.title.trim() === '') issues.push('missing-guide-title');
+  if (draft.summary.trim() === '') issues.push('missing-guide-summary');
+  if (draft.declaredSourceRole !== 'original-guide') {
+    issues.push('invalid-declared-source-role');
+  }
+  if (draft.sourcePublisher.trim() === '') {
+    issues.push('missing-source-publisher');
+  }
+  if (
+    assessSourceBoundSkillReceiptQuality(draft.sourceReceipt).kind !== 'ready'
+  ) {
+    issues.push('source-receipt-not-ready');
+  }
+
+  if (issues.length === 0) {
+    return {
+      kind: 'ready',
+      issues: [],
+      boundary: CONTROLLED_GUIDE_DRAFT_ADMISSION_BOUNDARY,
+    };
+  }
+
+  return {
+    kind: 'not-ready',
+    issues,
+    boundary: CONTROLLED_GUIDE_DRAFT_ADMISSION_BOUNDARY,
   };
 }
 
