@@ -130,6 +130,25 @@ describe('source-bound SkillLedger inventory experiment', () => {
     });
   });
 
+  it('rejects a calendar-normalized invalid ISO UTC observed timestamp', () => {
+    const invalidDateReceipt = {
+      ...receiptA,
+      receipt: { ...receiptA.receipt, id: 'receipt-invalid-date' },
+      source: {
+        ...receiptA.source,
+        observedAt: '2026-02-30T00:00:00.000Z',
+      },
+    } satisfies SourceBoundSkillReceipt;
+
+    expect(
+      assessSourceBoundSkillReceiptQuality(invalidDateReceipt),
+    ).toMatchObject({
+      kind: 'not-ready',
+      issues: ['invalid-observed-at'],
+    });
+    expect(sourceBoundSkillInventory([invalidDateReceipt])).toEqual([]);
+  });
+
   it('excludes an otherwise accepted receipt when source-bound quality is not ready', () => {
     const malformedReceipt = {
       ...receiptA,

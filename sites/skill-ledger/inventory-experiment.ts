@@ -144,6 +144,17 @@ function isSha256(value: string): boolean {
   return /^[0-9a-f]{64}$/.test(value);
 }
 
+function isStrictIsoUtcTimestamp(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
+    return false;
+  }
+
+  const timestamp = Date.parse(value);
+  return (
+    !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value
+  );
+}
+
 export function assessSourceBoundSkillReceiptQuality(
   receipt: SourceBoundSkillReceipt,
 ): SourceBoundSkillReceiptQualityAssessment {
@@ -152,7 +163,7 @@ export function assessSourceBoundSkillReceiptQuality(
   if (receipt.receipt.id.trim() === '') issues.push('missing-receipt-id');
   if (receipt.source.sourceId.trim() === '') issues.push('missing-source-id');
   if (!isHttpsUrl(receipt.source.url)) issues.push('invalid-source-url');
-  if (Number.isNaN(Date.parse(receipt.source.observedAt))) {
+  if (!isStrictIsoUtcTimestamp(receipt.source.observedAt)) {
     issues.push('invalid-observed-at');
   }
   if (receipt.publicFacts.packageId.trim() === '') {
