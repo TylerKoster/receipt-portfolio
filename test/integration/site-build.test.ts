@@ -114,22 +114,71 @@ async function fileInventory(
 }
 
 async function runProductionBuild(publicBaseUrl?: string): Promise<void> {
-  const command =
-    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
-  const arguments_ =
-    process.platform === 'win32'
-      ? ['/d', '/s', '/c', 'npm run build']
-      : ['run', 'build'];
-  await execFileAsync(command, arguments_, {
-    cwd: projectRoot,
-    env:
-      publicBaseUrl === undefined
-        ? process.env
-        : {
-            ...process.env,
-            RECEIPT_PORTFOLIO_BASE_URL: publicBaseUrl,
-          },
-  });
+  const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
+  const evidenceBackupDirectory = join(
+    dirname(testEvidenceDirectory),
+    'canonical-evidence-backup',
+  );
+  const canonicalEvidenceExisted = await realFileSystem
+    .lstat(canonicalEvidenceDirectory)
+    .then(() => true)
+    .catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        return false;
+      }
+      throw error;
+    });
+
+  if (canonicalEvidenceExisted) {
+    await realFileSystem.cp(
+      canonicalEvidenceDirectory,
+      evidenceBackupDirectory,
+      { recursive: true },
+    );
+  }
+
+  try {
+    await realFileSystem.rm(canonicalEvidenceDirectory, {
+      recursive: true,
+      force: true,
+    });
+    await realFileSystem.cp(testEvidenceDirectory, canonicalEvidenceDirectory, {
+      recursive: true,
+    });
+
+    const command =
+      process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
+    const arguments_ =
+      process.platform === 'win32'
+        ? ['/d', '/s', '/c', 'npm run build']
+        : ['run', 'build'];
+    await execFileAsync(command, arguments_, {
+      cwd: projectRoot,
+      env:
+        publicBaseUrl === undefined
+          ? process.env
+          : {
+              ...process.env,
+              RECEIPT_PORTFOLIO_BASE_URL: publicBaseUrl,
+            },
+    });
+  } finally {
+    await realFileSystem.rm(canonicalEvidenceDirectory, {
+      recursive: true,
+      force: true,
+    });
+    if (canonicalEvidenceExisted) {
+      await realFileSystem.cp(
+        evidenceBackupDirectory,
+        canonicalEvidenceDirectory,
+        { recursive: true },
+      );
+    }
+  }
 }
 
 beforeEach(async () => {
@@ -606,7 +655,13 @@ describe('static receipt site build', () => {
   });
 
   it('keeps compiler artifacts outside the real production site output', async () => {
+    const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
+    const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
     await runProductionBuild();
+
+    expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
+      originalEvidence,
+    );
 
     const inventory = Object.keys(
       await fileInventory(join(projectRoot, 'dist', 'sites')),
