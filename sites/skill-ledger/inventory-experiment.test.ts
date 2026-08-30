@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STATIC_SIGNAL_BOUNDARY,
   compareSkillInventory,
+  declaredMetadataFacetSummary,
   filterSkillInventory,
   recordSyntheticOfferEvent,
   sourceBoundSkillInventory,
@@ -123,6 +124,88 @@ describe('source-bound SkillLedger inventory experiment', () => {
         staticSignalPresent: true,
       }),
     ).toMatchObject([{ receiptId: 'receipt-b' }]);
+  });
+
+  it('summarizes declared metadata facets in deterministic controlled-record order', () => {
+    const records = sourceBoundSkillInventory([receiptA, receiptB]);
+
+    expect(declaredMetadataFacetSummary(records)).toEqual([
+      {
+        facet: 'declared-license',
+        value: 'Apache-2.0',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'declared-license',
+        value: 'MIT',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'dependency-state',
+        value: 'none',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'dependency-state',
+        value: 'declared',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'no-static-signals',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'static-signals-present',
+        count: 1,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+    ]);
+  });
+
+  it('returns zero-count non-license facet rows when there are no records', () => {
+    expect(declaredMetadataFacetSummary([])).toEqual([
+      {
+        facet: 'dependency-state',
+        value: 'none',
+        count: 0,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'dependency-state',
+        value: 'declared',
+        count: 0,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'no-static-signals',
+        count: 0,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+      {
+        facet: 'static-signal-presence',
+        value: 'static-signals-present',
+        count: 0,
+        boundary:
+          'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.',
+      },
+    ]);
   });
 
   it('compares exactly two distinct source-bound records without an adoption or safety conclusion', () => {

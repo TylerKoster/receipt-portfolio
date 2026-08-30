@@ -4,6 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 interface SyntheticUsabilityLedger {
   evidenceClass: string;
+  experimentPortfolio: Array<{
+    area: string;
+    rank: number;
+    experiment: string;
+    status: string;
+    metric: string;
+    target: string;
+    stopRule: string;
+  }>;
   baseline: {
     fullCompletion: number;
     partialCompletion: number;
@@ -32,6 +41,37 @@ interface SyntheticUsabilityLedger {
 }
 
 describe('SkillLedger synthetic usability ledger', () => {
+  it('keeps a ranked portfolio with a controlled-record taxonomy experiment at the top', () => {
+    const ledgerPath = resolve(
+      process.cwd(),
+      'docs/skill-ledger/experiments/2026-08-30-synthetic-usability.json',
+    );
+    const ledger = JSON.parse(
+      readFileSync(ledgerPath, 'utf8'),
+    ) as SyntheticUsabilityLedger;
+
+    expect(ledger.experimentPortfolio.map((entry) => entry.area)).toEqual([
+      'searchable-filterable-discovery',
+      'source-bound-comparison',
+      'current-original-guides',
+      'discoverability',
+      'measurement',
+      'conversion',
+      'monetization',
+    ]);
+    expect(ledger.experimentPortfolio[0]).toMatchObject({
+      rank: 1,
+      experiment: 'declared-metadata-taxonomy-facets',
+      status: 'in-progress',
+      metric: 'controlled-record facet coverage',
+      target:
+        'Exact deterministic facet counts for declared license, dependency state, and static-signal presence.',
+    });
+    expect(ledger.experimentPortfolio[0].stopRule).toContain(
+      'No public discoverability, demand, safety, or public UI integration claim from controlled records.',
+    );
+  });
+
   it('preserves the supplied synthetic-only baseline and its evidence boundary', () => {
     const ledgerPath = resolve(
       process.cwd(),

@@ -56,6 +56,16 @@ export type SkillInventoryFilters = Readonly<{
   staticSignalPresent?: boolean;
 }>;
 
+export const DECLARED_METADATA_FACET_BOUNDARY =
+  'Declared metadata facets are not safety, adoption, demand, or provenance conclusions.' as const;
+
+export type DeclaredMetadataFacetSummaryRow = Readonly<{
+  facet: 'declared-license' | 'dependency-state' | 'static-signal-presence';
+  value: string;
+  count: number;
+  boundary: typeof DECLARED_METADATA_FACET_BOUNDARY;
+}>;
+
 export type SkillInventoryComparison =
   | Readonly<{ kind: 'ready'; records: readonly SkillInventoryRecord[] }>
   | Readonly<{
@@ -148,6 +158,48 @@ export function filterSkillInventory(
       matchesStaticSignal
     );
   });
+}
+
+export function declaredMetadataFacetSummary(
+  records: readonly SkillInventoryRecord[],
+): readonly DeclaredMetadataFacetSummaryRow[] {
+  const count = (matches: (record: SkillInventoryRecord) => boolean) =>
+    records.filter(matches).length;
+  const licenses = [
+    ...new Set(records.map((record) => record.declaredMetadata.license)),
+  ]
+    .sort()
+    .map((license) => ({
+      facet: 'declared-license' as const,
+      value: license,
+      count: count((record) => record.declaredMetadata.license === license),
+      boundary: DECLARED_METADATA_FACET_BOUNDARY,
+    }));
+
+  return [
+    ...licenses,
+    ...(['none', 'declared'] as const).map((dependencyState) => ({
+      facet: 'dependency-state' as const,
+      value: dependencyState,
+      count: count(
+        (record) => record.declaredMetadata.dependencyState === dependencyState,
+      ),
+      boundary: DECLARED_METADATA_FACET_BOUNDARY,
+    })),
+    ...(
+      [
+        ['no-static-signals', false],
+        ['static-signals-present', true],
+      ] as const
+    ).map(([value, hasStaticSignals]) => ({
+      facet: 'static-signal-presence' as const,
+      value,
+      count: count(
+        (record) => record.staticRiskFlags.length > 0 === hasStaticSignals,
+      ),
+      boundary: DECLARED_METADATA_FACET_BOUNDARY,
+    })),
+  ];
 }
 
 export function compareSkillInventory(

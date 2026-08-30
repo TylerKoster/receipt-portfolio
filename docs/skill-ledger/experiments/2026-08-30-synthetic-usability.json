@@ -2,6 +2,71 @@
   "experimentId": "skillledger-synthetic-usability-2026-08-30",
   "evidenceClass": "synthetic-heuristic-usability",
   "syntheticOnly": true,
+  "experimentPortfolio": [
+    {
+      "area": "searchable-filterable-discovery",
+      "rank": 1,
+      "experiment": "declared-metadata-taxonomy-facets",
+      "status": "in-progress",
+      "metric": "controlled-record facet coverage",
+      "target": "Exact deterministic facet counts for declared license, dependency state, and static-signal presence.",
+      "stopRule": "No public discoverability, demand, safety, or public UI integration claim from controlled records. This does not establish adoption, revenue, demand, or safety."
+    },
+    {
+      "area": "source-bound-comparison",
+      "rank": 2,
+      "experiment": "controlled-source-bound-comparison",
+      "status": "completed-internal",
+      "metric": "controlled comparison readiness",
+      "target": "Two distinct source-bound controlled records can be compared internally.",
+      "stopRule": "No public comparison, adoption, revenue, demand, or safety claim; controlled records do not establish real provenance."
+    },
+    {
+      "area": "current-original-guides",
+      "rank": 3,
+      "experiment": "source-backed-current-original-guides",
+      "status": "blocked",
+      "metric": "verified guide provenance",
+      "target": "Requires real provenance and authority for current original guidance.",
+      "stopRule": "Blocked without real provenance and authority; no adoption, revenue, demand, or safety claim."
+    },
+    {
+      "area": "discoverability",
+      "rank": 4,
+      "experiment": "public-discoverability-evaluation",
+      "status": "blocked",
+      "metric": "public discovery evidence",
+      "target": "Requires authorized public UI and real provenance.",
+      "stopRule": "Blocked without public UI, real provenance, and authority; no adoption, revenue, demand, or safety claim."
+    },
+    {
+      "area": "measurement",
+      "rank": 5,
+      "experiment": "internal-controlled-measurement",
+      "status": "completed-internal",
+      "metric": "synthetic event accounting",
+      "target": "Controlled synthetic event counts remain non-persistent and identity-free.",
+      "stopRule": "Internal synthetic measurement is not evidence of adoption, revenue, demand, or safety."
+    },
+    {
+      "area": "conversion",
+      "rank": 6,
+      "experiment": "real-user-conversion-evaluation",
+      "status": "not-started",
+      "metric": "authorized real-user conversion evidence",
+      "target": "Requires actual users, public UI, and authority.",
+      "stopRule": "Not started without actual users, public UI, and authority; no adoption, revenue, demand, or safety claim."
+    },
+    {
+      "area": "monetization",
+      "rank": 7,
+      "experiment": "authorized-monetization-evaluation",
+      "status": "not-started",
+      "metric": "authorized payment evidence",
+      "target": "Requires actual users, pricing authority, and payment capability.",
+      "stopRule": "Not started without actual users and authority; no adoption, revenue, demand, or safety claim."
+    }
+  ],
   "baseline": {
     "fullCompletion": 0,
     "partialCompletion": 2,
