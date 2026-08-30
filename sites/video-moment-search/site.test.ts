@@ -488,6 +488,69 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
+  it('rejects semantically empty or invalid review evidence in the helper and shipped client', async () => {
+    const validIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const baseEntry = validIndex.entries[0]!;
+    const synchronizeClaims = (entry: Mutable<typeof baseEntry>): void => {
+      const review = entry.reviewEvidence!;
+      entry.rightsStatus = `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
+      entry.verificationDate = review.reviewedOn;
+      entry.provenance = `Corpus ${entry.corpusId}; evidence ${review.evidenceId}; immutable rights revision ${review.immutableRightsRevisionUrl}; reviewed by ${review.reviewer} on ${review.reviewedOn}; rights grant ${entry.rightsGrantId}; cue ${entry.cueIds.join(', ')}`;
+    };
+    const invalidEvidence: readonly [
+      string,
+      (entry: Mutable<typeof baseEntry>) => void,
+    ][] = [
+      ['empty evidence ID', (entry) => (entry.reviewEvidence!.evidenceId = '')],
+      [
+        'empty license identifier',
+        (entry) => (entry.reviewEvidence!.licenseIdentifier = ''),
+      ],
+      ['empty reviewer', (entry) => (entry.reviewEvidence!.reviewer = '')],
+      ['empty review date', (entry) => (entry.reviewEvidence!.reviewedOn = '')],
+      [
+        'malformed review date',
+        (entry) => (entry.reviewEvidence!.reviewedOn = '2022-1-18'),
+      ],
+      [
+        'impossible review date',
+        (entry) => (entry.reviewEvidence!.reviewedOn = '2022-02-30'),
+      ],
+      [
+        'empty included uses',
+        (entry) => (entry.reviewEvidence!.productBoundary.included = []),
+      ],
+      [
+        'empty excluded uses',
+        (entry) => (entry.reviewEvidence!.productBoundary.excluded = []),
+      ],
+      [
+        'whitespace-only included use',
+        (entry) => (entry.reviewEvidence!.productBoundary.included = ['   ']),
+      ],
+      [
+        'whitespace-only excluded use',
+        (entry) => (entry.reviewEvidence!.productBoundary.excluded = ['\t']),
+      ],
+    ];
+
+    for (const [name, invalidate] of invalidEvidence) {
+      const entry = structuredClone(baseEntry) as Mutable<typeof baseEntry>;
+      invalidate(entry);
+      synchronizeClaims(entry);
+      const hostileIndex = { ...validIndex, entries: [entry] };
+      expect(searchPublicIndex(hostileIndex, 'robots control'), name).toEqual(
+        [],
+      );
+
+      const harness = executeClientPayload();
+      await harness.resolveIndex(hostileIndex);
+      expect(harness.error.hidden, name).toBe(false);
+      harness.submit('robots control');
+      expect(harness.results.children, name).toEqual([]);
+    }
+  });
+
   it('renders every result with its own validated stored timestamp and evidence metadata', () => {
     const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
     const results = searchPublicIndex(publicIndex, 'robots control');

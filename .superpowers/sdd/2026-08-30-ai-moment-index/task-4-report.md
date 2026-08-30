@@ -417,6 +417,82 @@ Final facts:
 - `sites/video-moment-search/site.test.ts`
 - `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
 
+## Cycle-03 third re-review substance fix
+
+### Scope and RED evidence
+
+- Reviewed head: `8dca58120328e3bb90bfecd2c44c02c734fb4220`.
+- Scope remained limited to public review-evidence substance validation, hostile
+  parity tests, and this tracked report.
+- RED command:
+  `npm test -- --run sites/video-moment-search/site.test.ts -t "rejects semantically empty or invalid review evidence"`
+  → expected exit 1. The selected public entry remained accepted after its
+  evidence ID was changed to an empty string and its redundant rights,
+  verification, and provenance strings were regenerated to be internally
+  consistent. This proved claim-string consistency alone did not establish
+  substantive review evidence.
+- The same hostile matrix defined empty license identifier, reviewer, and date;
+  malformed and impossible calendar dates; empty included/excluded use arrays;
+  and whitespace-only included/excluded members for both the TypeScript helper
+  and emitted browser IIFE.
+
+### GREEN implementation
+
+- Both public validators now require trimmed nonempty evidence ID, license
+  identifier, reviewer, and product-boundary members.
+- Included and excluded product uses must each be a nonempty array of nonempty,
+  non-whitespace strings.
+- `reviewedOn` must match exact `YYYY-MM-DD` syntax and round-trip as the same
+  UTC calendar date, rejecting malformed values and impossible dates such as
+  `2022-02-30`.
+- License, canonical-rights, and immutable-revision URLs retain the existing
+  HTTPS/no-credentials checks.
+- Substance validation executes before cross-field claim validation, so
+  self-consistently regenerated display strings cannot make empty or invalid
+  structured evidence pass.
+- The hostile matrix passes identically in the TypeScript helper and the
+  emitted IIFE for all ten substance cases.
+
+### Final fresh third-review gates
+
+- Focused page/client suite:
+  `npm test -- --run sites/video-moment-search/site.test.ts` → exit 0; 24/24
+  tests passed.
+- Scoped core/public/operational:
+  `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts scripts/video-moment-validation.test.ts`
+  → exit 0; 4 files and 60/60 tests passed.
+- Combined build integration:
+  `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts`
+  → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0.
+- Full suite: `npm test -- --run` → exit 0; 29 files and 327/327 tests passed.
+- Offline package reproduction:
+  - `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; no changes.
+  - `npm ci --ignore-scripts --offline` → exit 0; 162 packages installed, 165
+    audited, and 0 vulnerabilities.
+- `npm run evidence -- collect-fixtures` → exit 0.
+- `npm run evidence -- verify --all` → exit 0.
+- `npm run build` → exit 0.
+- `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Opt-in one-byte source check → exit 0: 206, `video/webm`, `Accept-Ranges:
+  bytes`, `Content-Length: 1`, `Content-Range: bytes 0-0/24788866`, response
+  body read false, response body saved false.
+- Pinned Chromium built-page gate → exit 0: query `robots control`, one visible
+  result, first `moment-robots-control`, normal Playwright locator click on the
+  ordinary exact `#t=132` anchor, exact location/current source, current time
+  132, duration 907.299, ready state 4, seeking false, paused true, no error,
+  427x240, and media 206 with
+  `Content-Range: bytes 3801088-24788865/24788866`.
+
+### Third-review changed paths and limits
+
+- `sites/video-moment-search/search-client.ts`
+- `sites/video-moment-search/site.test.ts`
+- `.superpowers/sdd/2026-08-30-ai-moment-index/task-4-report.md`
+- The same pinned CLI/external Chromium cache, non-hermetic Wikimedia, rights,
+  one-source, no-content-claim, no-ingestion, no-user, no-demand, no-revenue,
+  and no-deploy limits remain.
+
 ## Preserved cycle-02 history
 
 ## Status

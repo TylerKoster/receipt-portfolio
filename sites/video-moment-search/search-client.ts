@@ -75,24 +75,38 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function nonBlankText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validReviewDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function safeReviewEvidence(value: unknown): value is PublicReviewEvidence {
   if (typeof value !== 'object' || value === null) return false;
   const review = value as Partial<PublicReviewEvidence>;
   if (
     review.classification !== 'reviewed-public-source' ||
-    typeof review.evidenceId !== 'string' ||
-    typeof review.licenseIdentifier !== 'string' ||
+    !nonBlankText(review.evidenceId) ||
+    !nonBlankText(review.licenseIdentifier) ||
     typeof review.licenseUrl !== 'string' ||
     typeof review.canonicalRightsPageUrl !== 'string' ||
     typeof review.immutableRightsRevisionUrl !== 'string' ||
-    typeof review.reviewer !== 'string' ||
-    typeof review.reviewedOn !== 'string' ||
+    !nonBlankText(review.reviewer) ||
+    !validReviewDate(review.reviewedOn) ||
     typeof review.productBoundary !== 'object' ||
     review.productBoundary === null ||
     !Array.isArray(review.productBoundary.included) ||
     !Array.isArray(review.productBoundary.excluded) ||
-    !review.productBoundary.included.every((item) => typeof item === 'string') ||
-    !review.productBoundary.excluded.every((item) => typeof item === 'string')
+    review.productBoundary.included.length === 0 ||
+    review.productBoundary.excluded.length === 0 ||
+    !review.productBoundary.included.every(nonBlankText) ||
+    !review.productBoundary.excluded.every(nonBlankText)
   ) {
     return false;
   }
@@ -295,22 +309,30 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
   const reviewedConfidence = 'Reviewed public source; original editorial annotation, not transcript text';
   const controlledConfidence = 'Rights-validated controlled fixture match';
+  const nonBlank = (value) => typeof value === 'string' && value.trim().length > 0;
+  const validReviewDate = (value) => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value + 'T00:00:00.000Z');
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
   const reviewSafe = (review) => {
     try {
       if (!review || typeof review !== 'object' ||
           review.classification !== 'reviewed-public-source' ||
-          typeof review.evidenceId !== 'string' ||
-          typeof review.licenseIdentifier !== 'string' ||
+          !nonBlank(review.evidenceId) ||
+          !nonBlank(review.licenseIdentifier) ||
           typeof review.licenseUrl !== 'string' ||
           typeof review.canonicalRightsPageUrl !== 'string' ||
           typeof review.immutableRightsRevisionUrl !== 'string' ||
-          typeof review.reviewer !== 'string' ||
-          typeof review.reviewedOn !== 'string' ||
+          !nonBlank(review.reviewer) ||
+          !validReviewDate(review.reviewedOn) ||
           !review.productBoundary || typeof review.productBoundary !== 'object' ||
           !Array.isArray(review.productBoundary.included) ||
           !Array.isArray(review.productBoundary.excluded) ||
-          !review.productBoundary.included.every((item) => typeof item === 'string') ||
-          !review.productBoundary.excluded.every((item) => typeof item === 'string')) return false;
+          review.productBoundary.included.length === 0 ||
+          review.productBoundary.excluded.length === 0 ||
+          !review.productBoundary.included.every(nonBlank) ||
+          !review.productBoundary.excluded.every(nonBlank)) return false;
       return [review.licenseUrl, review.canonicalRightsPageUrl,
         review.immutableRightsRevisionUrl].every((value) => {
         const url = new URL(value);
