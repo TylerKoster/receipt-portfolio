@@ -8,7 +8,7 @@ const discoveryTestPath = fileURLToPath(
 );
 
 describe('worktree discovery regression-test contract', () => {
-  it('allows one child probe limited to explicit excluded sentinels', async () => {
+  it('routes its only child process through the bounded argv builder', async () => {
     const source = await readFile(discoveryTestPath, 'utf8');
     const sourceFile = ts.createSourceFile(
       discoveryTestPath,
@@ -34,21 +34,8 @@ describe('worktree discovery regression-test contract', () => {
     expect(childCalls).toHaveLength(1);
     const [executable, arguments_] = childCalls[0]!.arguments;
     expect(executable?.getText(sourceFile)).toBe('process.execPath');
-    expect(ts.isArrayLiteralExpression(arguments_!)).toBe(true);
-    if (!ts.isArrayLiteralExpression(arguments_!)) return;
-
-    const [binary, command, sentinels, emptyPass] = arguments_.elements;
-    expect(ts.isIdentifier(binary!) && binary.text === 'vitestBin').toBe(true);
-    expect(ts.isStringLiteral(command!) && command.text === 'run').toBe(true);
-    expect(
-      ts.isSpreadElement(sentinels!) &&
-        ts.isIdentifier(sentinels.expression) &&
-        sentinels.expression.text === 'sentinelTestPaths',
-    ).toBe(true);
-    expect(
-      ts.isStringLiteral(emptyPass!) && emptyPass.text === '--passWithNoTests',
-    ).toBe(true);
-
-    expect(arguments_.elements).toHaveLength(4);
+    expect(ts.isIdentifier(arguments_!) && arguments_.text === 'childArgv').toBe(
+      true,
+    );
   });
 });

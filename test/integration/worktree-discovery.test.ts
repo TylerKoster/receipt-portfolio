@@ -4,23 +4,29 @@ import { existsSync } from 'node:fs';
 import {
   lstat,
   mkdir,
+  mkdtemp,
   readFile,
   realpath,
-  rm,
+  rmdir,
   writeFile,
 } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { setTimeout as delay } from 'node:timers/promises';
 import { ESLint } from 'eslint';
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { configDefaults } from 'vitest/config';
+import { buildVitestDiscoveryArgv } from '../support/worktree-discovery-command.js';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const require = createRequire(import.meta.url);
+const realFileSystem =
+  await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
 
 async function missing(path: string): Promise<boolean> {
   try {
@@ -42,11 +48,12 @@ async function createSentinel(
     data: string,
     encoding: 'utf8',
   ) => Promise<unknown> = writeFile,
-): Promise<void> {
+): Promise<boolean> {
   const parent = dirname(root);
+  let parentCreated = false;
   let rootCreated = false;
   try {
-    await mkdir(parent, { recursive: true });
+    parentCreated = (await mkdir(parent, { recursive: true })) !== undefined;
     const parentStats = await lstat(parent);
     if (parentStats.isSymbolicLink() || !parentStats.isDirectory()) {
       throw new Error(
@@ -74,14 +81,20 @@ async function createSentinel(
       `import { expect, it } from 'vitest';\nit('must never discover a nested worktree test', () => { expect('nested').toBe('active-root'); });\n`,
       'utf8',
     );
+    return parentCreated;
   } catch (error) {
     const cleanupErrors: unknown[] = [];
     if (rootCreated) {
       try {
-        await rm(root, { force: true, recursive: true });
+        await realFileSystem.rm(root, { force: true, recursive: true });
       } catch (cleanupError) {
         cleanupErrors.push(cleanupError);
       }
+    }
+    try {
+      await removeCreatedEmptyParent(parent, parentCreated);
+    } catch (cleanupError) {
+      cleanupErrors.push(cleanupError);
     }
     if (cleanupErrors.length > 0) {
       throw new AggregateError(
@@ -93,14 +106,19 @@ async function createSentinel(
   }
 }
 
-async function removeSentinel(root: string, owner: string): Promise<void> {
-  if (await missing(root)) return;
-  const expectedParents = [
+async function removeSentinel(
+  root: string,
+  owner: string,
+  expectedParents: readonly string[] = [
     resolve(projectRoot, '.worktrees'),
     resolve(projectRoot, 'worktrees'),
-  ];
+  ],
+): Promise<void> {
+  if (await missing(root)) return;
   if (
-    !expectedParents.includes(resolve(dirname(root))) ||
+    !expectedParents
+      .map((expectedParent) => resolve(expectedParent))
+      .includes(resolve(dirname(root))) ||
     resolve(await realpath(root)) !== resolve(root)
   ) {
     throw new Error(`Refusing unsafe discovery sentinel cleanup: ${root}`);
@@ -116,7 +134,32 @@ async function removeSentinel(root: string, owner: string): Promise<void> {
   ) {
     throw new Error(`Refusing unowned discovery sentinel cleanup: ${root}`);
   }
-  await rm(root, { force: true, recursive: true });
+  await realFileSystem.rm(root, { force: true, recursive: true });
+}
+
+async function removeCreatedEmptyParent(
+  path: string,
+  createdByInvocation: boolean,
+): Promise<void> {
+  if (!createdByInvocation) return;
+
+  const retryDelays = [0, 25, 100, 250, 500, 1_000] as const;
+  for (const [index, retryDelay] of retryDelays.entries()) {
+    if (retryDelay > 0) await delay(retryDelay);
+    try {
+      await rmdir(path);
+      return;
+    } catch (error) {
+      if (error instanceof Error && 'code' in error) {
+        if (error.code === 'ENOENT') return;
+        if (error.code === 'ENOTEMPTY' && index < retryDelays.length - 1) {
+          continue;
+        }
+        if (error.code === 'ENOTEMPTY') return;
+      }
+      throw error;
+    }
+  }
 }
 
 describe('nested development worktree discovery boundary', () => {
@@ -161,11 +204,11 @@ describe('nested development worktree discovery boundary', () => {
   it('self-cleans a sentinel root after partial setup failure', async () => {
     const invocationToken = `${process.pid}-${randomUUID()}`;
     const owner = `receipt-portfolio-tool-discovery-sentinel-v2:${invocationToken}`;
-    const root = join(
-      projectRoot,
-      'worktrees',
-      `sentinel-worktree-${invocationToken}`,
+    const temporaryRoot = await mkdtemp(
+      join(tmpdir(), 'receipt-discovery-partial-'),
     );
+    const parent = join(temporaryRoot, 'worktrees');
+    const root = join(parent, `sentinel-worktree-${invocationToken}`);
     const failingWriter = async (): Promise<never> => {
       throw new Error('synthetic sentinel setup failure');
     };
@@ -175,8 +218,49 @@ describe('nested development worktree discovery boundary', () => {
         createSentinel(root, owner, failingWriter),
       ).rejects.toThrow('synthetic sentinel setup failure');
       await expect(missing(root)).resolves.toBe(true);
+      await expect(missing(parent)).resolves.toBe(true);
     } finally {
       if (!(await missing(root))) await removeSentinel(root, owner);
+      await realFileSystem.rm(temporaryRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('removes only an empty parent created by this invocation', async () => {
+    const temporaryRoot = await mkdtemp(
+      join(tmpdir(), 'receipt-discovery-created-parent-'),
+    );
+    const parent = join(temporaryRoot, 'worktrees');
+    const root = join(parent, `sentinel-worktree-${randomUUID()}`);
+    const owner = `receipt-portfolio-tool-discovery-sentinel-v2:${randomUUID()}`;
+
+    try {
+      const parentCreated = await createSentinel(root, owner);
+      expect(parentCreated).toBe(true);
+      await removeSentinel(root, owner, [parent]);
+      await removeCreatedEmptyParent(parent, parentCreated === true);
+      await expect(missing(parent)).resolves.toBe(true);
+    } finally {
+      await realFileSystem.rm(temporaryRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('preserves a preexisting empty sentinel parent', async () => {
+    const temporaryRoot = await mkdtemp(
+      join(tmpdir(), 'receipt-discovery-existing-parent-'),
+    );
+    const parent = join(temporaryRoot, '.worktrees');
+    const root = join(parent, `sentinel-worktree-${randomUUID()}`);
+    const owner = `receipt-portfolio-tool-discovery-sentinel-v2:${randomUUID()}`;
+    await mkdir(parent);
+
+    try {
+      const parentCreated = await createSentinel(root, owner);
+      expect(parentCreated).toBe(false);
+      await removeSentinel(root, owner, [parent]);
+      await removeCreatedEmptyParent(parent, parentCreated === true);
+      await expect(missing(parent)).resolves.toBe(false);
+    } finally {
+      await realFileSystem.rm(temporaryRoot, { force: true, recursive: true });
     }
   });
 
@@ -188,10 +272,16 @@ describe('nested development worktree discovery boundary', () => {
       join(projectRoot, 'worktrees', `sentinel-worktree-${invocationToken}`),
     ] as const;
     const createdRoots: string[] = [];
+    const createdParents = new Map<string, boolean>();
 
     try {
       for (const root of sentinelRoots) {
-        await createSentinel(root, owner);
+        const parent = dirname(root);
+        const parentCreated = await createSentinel(root, owner);
+        createdParents.set(
+          parent,
+          (createdParents.get(parent) ?? false) || parentCreated,
+        );
         createdRoots.push(root);
       }
 
@@ -219,10 +309,14 @@ describe('nested development worktree discovery boundary', () => {
       const vitestBin = require.resolve('vitest/vitest.mjs');
       const sentinelTestPaths = sentinelRoots.map((root) =>
         join(root, 'test', 'integration', 'sentinel-failure.test.ts'),
+      ) as [string, string];
+      const childArgv = buildVitestDiscoveryArgv(
+        vitestBin,
+        sentinelTestPaths,
       );
       const result = await execFileAsync(
         process.execPath,
-        [vitestBin, 'run', ...sentinelTestPaths, '--passWithNoTests'],
+        childArgv,
         {
           cwd: projectRoot,
           timeout: 30_000,
@@ -234,6 +328,9 @@ describe('nested development worktree discovery boundary', () => {
     } finally {
       for (const root of createdRoots.toReversed()) {
         await removeSentinel(root, owner);
+      }
+      for (const [parent, parentCreated] of [...createdParents].toReversed()) {
+        await removeCreatedEmptyParent(parent, parentCreated);
       }
     }
   }, 45_000);
