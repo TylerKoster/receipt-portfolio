@@ -9,7 +9,6 @@ export interface VideoMoment {
   syntheticUrl: string;
   startSeconds: number;
   endSeconds: number;
-  replayObservedSeconds: number;
   text: string;
   topic: string;
   expectedClassification: MomentClassification;
@@ -83,8 +82,8 @@ export function validateLocalReplay(
   moment: VideoMoment,
   observedSeconds: number,
 ): { valid: boolean; deltaSeconds: number } {
-  const deltaSeconds = Math.abs(observedSeconds - moment.replayObservedSeconds);
-  return { valid: deltaSeconds < 2, deltaSeconds };
+  const deltaSeconds = Math.abs(observedSeconds - moment.startSeconds);
+  return { valid: deltaSeconds <= 2, deltaSeconds };
 }
 
 export function canonicalVideoPath(slug: string): string {
