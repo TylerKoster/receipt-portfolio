@@ -2,13 +2,36 @@
 
 ## Operator and workflow roles
 
-The active hourly autonomous operator inspects the implementation ledger, Git
-state, and last-known-good commit; continues the next incomplete bounded task
-through implementer/review/fix gates; runs deterministic tests, checks, evidence
-verification, and builds; commits only passing tasks; attempts configured static
-deployment only after release gates; contains source or verification failures,
-preserves last-good output, and publishes only source-bound `PASS` records while
-holding ambiguous records. It stops only for missing credentials, host, external
+The portfolio uses four permanent checkouts with single-writer ownership:
+
+- the Search Receipt operator owns `.worktrees/search-receipt-operator` and only
+  Search Receipt product paths;
+- the Workflow Test Lab operator owns
+  `.worktrees/workflow-test-lab-operator` and only Workflow Test Lab product
+  paths;
+- the SkillLedger operator owns `.worktrees/skillledger-operator` and only
+  SkillLedger product paths;
+- the release coordinator alone owns the primary checkout and `main`.
+
+Each product operator may run concurrently in its own permanent worktree. A
+worktree uses a new branch from the latest accepted `main` for each integration
+cycle; the prior branch remains available as evidence. A product operator never
+merges, pushes, deploys, or edits shared platform files. It emits an immutable
+integration receipt containing the base commit, candidate commit, owned paths,
+test evidence, reviewer verdict, and residual limits.
+
+Integration is event-driven and serial. A completed product receipt wakes the
+release coordinator; product operators do not trigger one another. The
+coordinator deduplicates receipts by candidate commit, integrates one candidate
+at a time, runs the combined release gates, deploys a passing `main`, and sends
+an acknowledgement or bounded failure packet to the originating operator. Only
+after that acknowledgement does the operator rotate its permanent worktree to a
+new branch from the accepted release head. The hourly schedules are recovery
+polls, not the primary handoff mechanism.
+
+The release coordinator contains source or verification failures, preserves
+last-good output, and publishes only source-bound `PASS` records while holding
+ambiguous records. It stops only for missing credentials, host, external
 authority, or an irreversible or security-sensitive choice without safe
 rollback.
 
@@ -60,14 +83,16 @@ release path and is not part of scheduled collection. The Pages workflow is a
 code-level adapter, not proof that its host, repository settings, workflow run,
 artifact, deployment, or public response has been verified.
 
-The planned production paths are:
+The production paths are:
 
 - `https://tylerkoster.github.io/receipt-portfolio/search-receipt/`;
 - `https://tylerkoster.github.io/receipt-portfolio/workflow-test-lab/`;
 - `https://tylerkoster.github.io/receipt-portfolio/skill-ledger/`.
 
-They remain pending until an authorized push and independent hosted
-verification produce provider and public-response evidence.
+GitHub Pages deployment run `33285717928` passed on 2026-08-29. The portfolio
+root and all three product paths subsequently returned HTTP 200. Hosted status
+must still be rechecked after every release; this receipt is not a promise of
+future availability.
 
 ## Failure containment
 
@@ -109,15 +134,13 @@ and public build-manifest digest in the release evidence. To recover locally,
 create a clean checkout or worktree at that exact commit or tag, run `npm ci`,
 collect and verify the controlled fixtures, rebuild, and confirm the recorded
 manifest digest. Do not reset the failed working tree or rewrite receipts as a
-rollback shortcut. A release candidate without a reviewed tag can be recovered
-only by its exact commit; `v0.1.0` remains unavailable until the whole-branch
-review and controller validation authorize tagging.
+rollback shortcut. Release tags `v0.1.0` and later identify reviewed public
+release points; use the newest tag whose workflow and hosted-response evidence
+both passed.
 
-## External hosting prerequisite
+## External hosting status
 
-The GitHub Pages artifact workflow is prepared, but this task did not create or
-configure a GitHub repository, enable Pages, push `main`, call the Pages API, or
-observe a deployment. Independent review and controller validation must approve
-those external actions and the rollback mechanism first. Local builds, Codex
-heartbeats, workflow source checks, and GitHub verification do not satisfy
-hosted verification.
+The public repository is `TylerKoster/receipt-portfolio`. GitHub Pages is
+configured for workflow deployment with enforced HTTPS. A successful workflow
+and HTTP checks are both required for a release receipt; local builds, Codex
+heartbeats, and workflow source checks alone do not satisfy hosted verification.
