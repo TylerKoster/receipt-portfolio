@@ -252,3 +252,75 @@ The exact `VIDEO_MOMENT_SEARCH_CLIENT` payload now proves:
 - The deterministic `node:vm` payload tests remain regression evidence, not a real-browser, assistive-technology, usability, demand, or WCAG-conformance result.
 - All controlled-fixture, no-live-library, no-permission, no-deploy, no-demand, and no-revenue limits remain unchanged.
 - Independent-main drift is a repository-state residual only: after the executable commit the branch reported `ahead 4, behind 1`. No fetch, merge, rebase, push, tag, deploy, or reconciliation was performed.
+
+## Whole-candidate fix round 3
+
+### Heads and exact paths
+
+- Old round-3 head: `c2a622fc8f7d420c285697c2822fd586005952b5`
+- Passing round-3 executable/lock head: `2346e86a023d8d1a047be305b5c4d590093700b7`
+- Exact executable/lock/test paths changed:
+  - `package-lock.json`
+  - `sites/shared/render.ts`
+  - `test/integration/video-moment-search-build.test.ts`
+- This report is the only additional documentation path changed after the executable/lock commit.
+
+No accepted core/fixture blob, video search renderer/client, builder behavior, rights data, query handling, timestamp route, SSR fallback, ingestion path, or other product lane changed in this round.
+
+### Round-3 RED evidence
+
+Clean-install RED at `c2a622fc8f7d420c285697c2822fd586005952b5`:
+
+`npm ci --dry-run --ignore-scripts --offline --json`
+
+Result: exit 1 on Node `v24.15.0` / npm `11.12.1` with `Missing: @receipt/video-moment-core@0.1.0 from lock file` (reported twice by npm). This blocked the documented clean-install/workflow entry point before verification.
+
+Four-product hub RED after adding the integration assertion:
+
+`npm test -- --run test/integration/video-moment-search-build.test.ts`
+
+Result: expected exit 1; 1 test passed and the enabled four-product build failed because the hub footer contained `not a fourth evidence product` instead of `not an additional evidence product`.
+
+### Mechanical lock repair evidence
+
+Authorized command:
+
+`npm install --package-lock-only --ignore-scripts --offline`
+
+Result: exit 0; no lifecycle scripts or network were used. The exact inspected `package-lock.json` diff was 11 added lines only:
+
+- One `node_modules/@receipt/video-moment-core` workspace link resolving to `packages/video-moment-core`.
+- One `packages/video-moment-core` package block with name `@receipt/video-moment-core`, version `0.1.0`, and the existing `zod` dependency range.
+
+No version, resolved URL, integrity value, or unrelated dependency changed.
+
+Post-repair installability:
+
+- `npm ci --dry-run --ignore-scripts --offline --json` → exit 0; exactly one workspace link add for `@receipt/video-moment-core@0.1.0`, zero dependency changes/removals.
+- `npm ci --ignore-scripts --offline` → exit 0; 159 packages installed and 162 audited from local cache, zero vulnerabilities reported, no lifecycle scripts or network.
+
+### Round-3 GREEN behavior evidence
+
+- Focused four-product hub integration: `npm test -- --run test/integration/video-moment-search-build.test.ts` → exit 0; 2/2 passed. The emitted hub includes `not an additional evidence product` and excludes `not a fourth evidence product`.
+- Three-site direct-builder semantics remain covered by the unchanged first integration test; four-site production semantics remain covered by the enabled build test.
+
+### Round-3 final gates
+
+- Focused core/search/site: `npm test -- --run packages/video-moment-core/src/contracts.test.ts packages/video-moment-core/src/search.test.ts sites/video-moment-search/site.test.ts` → exit 0; 3 files and 41/41 tests passed.
+- Combined new plus legacy build integration: `npm test -- --run test/integration/video-moment-search-build.test.ts test/integration/site-build.test.ts` → exit 0; 2 files and 30/30 tests passed.
+- Static check: `npm run check` → exit 0; TypeScript and ESLint passed.
+- Full suite: `npm test -- --run` → exit 0; 28 files and 306 tests passed.
+- Local fixture collection: `npm run evidence -- collect-fixtures` → exit 0.
+- Canonical local evidence verification: `npm run evidence -- verify --all` → exit 0.
+- Production build: `npm run build` → exit 0.
+- Emitted asset syntax: `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Emitted/tested equality: built `search-client.js` was byte-equal to `VIDEO_MOMENT_SEARCH_CLIENT`.
+- Fixed query proof: first result `moment-agent-evals`; anchor `https://video.example/watch/agent-evals?t=132`; every emitted result timestamp equaled its stored integer start second.
+- Hub proof: built hub contained the corrected additional-product boundary and excluded the stale ordinal wording.
+- Diff gate: `git diff --check` → exit 0 before the executable/lock commit, with only Git LF-to-CRLF warnings.
+
+### Round-3 residuals and authority boundary
+
+- All controlled-fixture, no-live-library, no-permission, no-deploy, no-usability, no-demand, and no-revenue limits remain unchanged.
+- `ecfa046` was not combined or reconciled; its four changed paths are disjoint from this round. The actual post-application combined-head gate remains coordinator-owned.
+- Independent-main drift remains repository state only: after the executable/lock commit this branch reported `ahead 6, behind 1`. No fetch, merge, rebase, push, tag, deploy, or reconciliation was performed.
