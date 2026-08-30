@@ -131,3 +131,67 @@ The three receipt sites retain their existing nonempty accepted-evidence loop an
 - No Task 3 ingestion or live source admission exists; adding any result requires the existing corpus validator to accept rights coverage and exact source-time routing.
 - The production build requires the repository's documented local receipt collection/verification precondition because accepted main intentionally contains only `evidence/.gitkeep`.
 - An initial mechanical patch targeted the generated chat workspace because the patch tool ignored the shell workdir. Those exact accidental files were removed before implementation; final checks confirmed both accidental paths absent and all task files confined to this worktree.
+
+## Independent-review fix round 1
+
+### Heads and scope
+
+- Old candidate head: `10388c3ef26d481e7e20cdbca0c97ab24fc6a2f1`
+- Passing executable-fix head: `99c505794072e2bb92cc6c0bba262b0a98c31140`
+- Exact executable paths changed:
+  - `sites/video-moment-search/search-client.ts`
+  - `sites/video-moment-search/site.test.ts`
+- This report is the only additional documentation path changed after the executable-fix commit.
+
+No other product lane, package, fixture, builder, ingestion, evidence-core, or shared path changed in this fix round.
+
+### RED evidence
+
+Command:
+
+`npm test -- --run sites/video-moment-search/site.test.ts`
+
+Result: expected exit 1; 10 existing tests passed and all 5 new shipped-payload regressions failed:
+
+- Submitted `agent evaluation` rendered no client article or anchor.
+- Shipped result order was empty instead of helper phrase-bonus order.
+- Wrong-shaped loaded JSON left the error state hidden.
+- A pre-load fallback remained visible after later valid loading.
+- A controlled submit-time DOM write error escaped uncaught.
+
+The runtime harness executes the exact `VIDEO_MOMENT_SEARCH_CLIENT` string in `node:vm` with deterministic DOM and deferred-fetch doubles; it does not test a reimplemented search helper and adds no runtime dependency.
+
+### GREEN behavior evidence
+
+Focused site command:
+
+`npm test -- --run sites/video-moment-search/site.test.ts`
+
+Result: exit 0; 1 file and 15 tests passed. The exact shipped payload now proves:
+
+- Typed/submitted `agent evaluation` renders `moment-agent-evals` first.
+- Its ordinary anchor href is exactly `https://video.example/watch/agent-evals?t=132`.
+- Unicode property and whitespace regexes tokenize the binding query at runtime.
+- Phrase bonuses and deterministic video-slug/start-second/moment-ID tie breakers match the exported helper/core contract for the multi-entry reorder fixture.
+- Every public-index field used by rendering is validated before the index is accepted.
+- Wrong-shaped, partially malformed, invalid source, and invalid timestamp entries enter the actionable fallback rather than a genuine zero-result or uncaught submit error.
+- A pre-load fallback clears after a later valid fetch, and the fixed query then completes.
+- Unexpected submit-time rendering errors enter the same fallback while the server-rendered initial-result sentinel remains unchanged.
+- Query text remains absent from URLs, storage, and telemetry.
+
+### Final fresh fix-round gates
+
+- Focused site runtime: `npm test -- --run sites/video-moment-search/site.test.ts` → exit 0; 15/15 passed.
+- Focused atomic integration: `npm test -- --run test/integration/video-moment-search-build.test.ts` → exit 0; 2/2 passed.
+- Static check: `npm run check` → exit 0; TypeScript and ESLint passed.
+- Full suite: `npm test -- --run` → exit 0; 28 files and 303 tests passed.
+- Production build: `npm run build` → exit 0.
+- Emitted syntax: `node --check dist/sites/video-moment-search/search-client.js` → exit 0.
+- Emitted/tested equality probe: built `search-client.js` was byte-equal to `VIDEO_MOMENT_SEARCH_CLIENT`; emitted token and whitespace regex checks were true.
+- Working diff: `git diff --check` → exit 0 before the executable-fix commit, with only Git LF-to-CRLF warnings.
+
+### Fix-round residuals and repository state
+
+- The deterministic `node:vm` harness validates shipped payload behavior but is not a real-browser, assistive-technology, usability, or WCAG-conformance result.
+- All original fixture-only, no-live-library, no-permission, no-deploy, no-demand, and no-revenue limits remain unchanged.
+- After the executable-fix commit, the local remote-tracking comparison showed the branch `ahead 2, behind 1`; no fetch, rebase, merge, or reconciliation was performed because those actions are outside this task's authority.
