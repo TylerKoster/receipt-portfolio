@@ -1,0 +1,54 @@
+{
+  "checklistId": "synthetic-video-moment-index-external-creator-opt-in-v1",
+  "scope": "Future external opt-in review only; this checklist is not a source manifest, source admission, creator consent, SEO, demand, or revenue proof.",
+  "items": [
+    {
+      "id": "identity-authority",
+      "requiredEvidence": "Verified identity and documented authority to grant permissions for the named content.",
+      "status": "BLOCKED",
+      "passRule": "An authorized person and the covered content are unambiguously identified in retained documentation."
+    },
+    {
+      "id": "rights-by-content-type",
+      "requiredEvidence": "Rights evidence mapped separately for video, audio, transcript, thumbnails, and derivative excerpts.",
+      "status": "BLOCKED",
+      "passRule": "Every planned content type has an explicit permitted-use statement from an authorized party."
+    },
+    {
+      "id": "scoped-consent",
+      "requiredEvidence": "A dated consent record specifying approved uses, surfaces, duration, territory, and exclusions.",
+      "status": "BLOCKED",
+      "passRule": "The proposed use is expressly within the documented scope and no exclusion applies."
+    },
+    {
+      "id": "timestamp-validation",
+      "requiredEvidence": "Authorized timestamp references and independently reproducible local validation observations.",
+      "status": "BLOCKED",
+      "passRule": "Each proposed moment has a bounded timestamp range and a retained validation result within the stated tolerance."
+    },
+    {
+      "id": "source-access-indexability",
+      "requiredEvidence": "Documented authorized access route and an explicit indexability decision for each proposed surface.",
+      "status": "BLOCKED",
+      "passRule": "Access is authorized and the indexability decision is explicitly recorded before any publication decision."
+    },
+    {
+      "id": "correction-removal-revocation",
+      "requiredEvidence": "A named contact path and procedure for corrections, removals, and consent revocation.",
+      "status": "BLOCKED",
+      "passRule": "A requested correction, removal, or revocation can be attributed, logged, and completed within the agreed process."
+    },
+    {
+      "id": "privacy-retention",
+      "requiredEvidence": "A data inventory stating personal data, retention period, access roles, and deletion method.",
+      "status": "BLOCKED",
+      "passRule": "No personal data is retained without a documented purpose, access boundary, retention limit, and deletion procedure."
+    },
+    {
+      "id": "demand-differentiation-evidence",
+      "requiredEvidence": "Separately collected, attributable research evidence with method, sample limits, and stated uncertainty.",
+      "status": "BLOCKED",
+      "passRule": "Evidence describes observed interest or differentiation limits without converting it into a demand, SEO, or revenue claim."
+    }
+  ]
+}
