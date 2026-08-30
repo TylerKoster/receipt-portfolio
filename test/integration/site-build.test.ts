@@ -10,6 +10,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -52,9 +53,27 @@ const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
+const require = createRequire(import.meta.url);
 const temporaryDirectories: string[] = [];
 let testEvidenceDirectory: string;
 let outputDirectory: string;
+
+type ProductionBuildExecutor = (
+  command: string,
+  arguments_: readonly string[],
+  options: {
+    readonly cwd: string;
+    readonly env: NodeJS.ProcessEnv;
+  },
+) => Promise<unknown>;
+
+const executeProductionBuild: ProductionBuildExecutor = async (
+  command,
+  arguments_,
+  options,
+) => {
+  await execFileAsync(command, [...arguments_], options);
+};
 
 async function searchReceiptEntries(): Promise<
   readonly { readonly path: string; readonly receipt: Receipt }[]
@@ -119,17 +138,23 @@ async function fileInventory(
 }
 
 async function runProductionBuild(options?: {
+  readonly executor?: ProductionBuildExecutor;
   readonly evidenceDirectory?: string;
   readonly outputDirectory?: string;
   readonly publicBaseUrl?: string;
+  readonly runtimeDirectory?: string;
 }): Promise<void> {
-  const command =
-    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
-  const arguments_ =
-    process.platform === 'win32'
+  const command = options?.runtimeDirectory
+    ? process.execPath
+    : process.platform === 'win32'
+      ? (process.env.ComSpec ?? 'cmd.exe')
+      : 'npm';
+  const arguments_ = options?.runtimeDirectory
+    ? [join(options.runtimeDirectory, 'scripts', 'build-sites.js')]
+    : process.platform === 'win32'
       ? ['/d', '/s', '/c', 'npm run build']
       : ['run', 'build'];
-  await execFileAsync(command, arguments_, {
+  await (options?.executor ?? executeProductionBuild)(command, arguments_, {
     cwd: projectRoot,
     env: {
       ...process.env,
@@ -141,6 +166,17 @@ async function runProductionBuild(options?: {
         : { [PUBLIC_BASE_URL_ENV]: options.publicBaseUrl }),
     },
   });
+}
+
+async function compileIsolatedProductionRuntime(
+  runtimeDirectory: string,
+): Promise<void> {
+  const tscBin = require.resolve('typescript/bin/tsc');
+  await execFileAsync(
+    process.execPath,
+    [tscBin, '-p', 'tsconfig.json', '--outDir', runtimeDirectory],
+    { cwd: projectRoot },
+  );
 }
 
 beforeEach(async () => {
@@ -655,15 +691,80 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('runs an isolated compiled runtime without invoking npm compilation', async () => {
+    const isolatedRuntime = join(dirname(outputDirectory), 'runtime-a');
+    const calls: unknown[][] = [];
+
+    await runProductionBuild({
+      executor: async (command, arguments_, options) => {
+        calls.push([command, arguments_, options.cwd]);
+      },
+      runtimeDirectory: isolatedRuntime,
+    });
+
+    expect(calls).toEqual([
+      [
+        process.execPath,
+        [join(isolatedRuntime, 'scripts', 'build-sites.js')],
+        projectRoot,
+      ],
+    ]);
+  });
+
   it('keeps canonical evidence byte-equal across concurrent production-build processes', async () => {
     const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
     const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
     const firstOutput = join(dirname(outputDirectory), 'concurrent-sites-a');
     const secondOutput = join(dirname(outputDirectory), 'concurrent-sites-b');
+    await realFileSystem.mkdir(join(projectRoot, 'dist'), { recursive: true });
+    const isolatedRuntimeRoot = await realFileSystem.mkdtemp(
+      join(projectRoot, 'dist', '.concurrent-runtime-'),
+    );
+    temporaryDirectories.push(isolatedRuntimeRoot);
+    const compiledRuntime = join(
+      isolatedRuntimeRoot,
+      'compiled-runtime-source',
+    );
+    const firstRuntime = join(isolatedRuntimeRoot, 'runtime-a');
+    const secondRuntime = join(isolatedRuntimeRoot, 'runtime-b');
+
+    await compileIsolatedProductionRuntime(compiledRuntime);
+    await Promise.all([
+      realFileSystem.cp(compiledRuntime, firstRuntime, { recursive: true }),
+      realFileSystem.cp(compiledRuntime, secondRuntime, { recursive: true }),
+    ]);
+    await Promise.all([
+      realFileSystem.cp(
+        join(projectRoot, 'manifests'),
+        join(firstRuntime, 'manifests'),
+        { recursive: true },
+      ),
+      realFileSystem.cp(
+        join(projectRoot, 'manifests'),
+        join(secondRuntime, 'manifests'),
+        { recursive: true },
+      ),
+    ]);
+    await Promise.all([
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'shared', 'styles.css'),
+        join(firstRuntime, 'sites', 'shared', 'styles.css'),
+      ),
+      realFileSystem.copyFile(
+        join(projectRoot, 'sites', 'shared', 'styles.css'),
+        join(secondRuntime, 'sites', 'shared', 'styles.css'),
+      ),
+    ]);
 
     await Promise.all([
-      runProductionBuild({ outputDirectory: firstOutput }),
-      runProductionBuild({ outputDirectory: secondOutput }),
+      runProductionBuild({
+        outputDirectory: firstOutput,
+        runtimeDirectory: firstRuntime,
+      }),
+      runProductionBuild({
+        outputDirectory: secondOutput,
+        runtimeDirectory: secondRuntime,
+      }),
     ]);
 
     expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
