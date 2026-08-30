@@ -11,5 +11,5 @@ export const skillLedgerSite: SiteDefinition = {
   interpretationBoundary:
     'A receipt records declared and statically observed metadata. It does not execute the package or determine how it behaves in another environment.',
   unknowns:
-    'No claim is made about runtime behavior, security posture, maintainability, or suitability for adoption.',
+    'The absence of a recorded static-risk flag or declared dependency is not evidence that a package is safe. Runtime behavior, security posture, maintainability, and suitability for adoption remain unknown.',
 };
