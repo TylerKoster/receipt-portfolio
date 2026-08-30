@@ -62,6 +62,18 @@
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
       "nextSafeAction": "Use the public disclosure to distinguish controlled examples from current incident evidence; do not infer demand or revenue without measured non-synthetic sessions."
+    },
+    {
+      "id": "evidence-to-investigation-guidance-v1",
+      "rank": 3,
+      "status": "ACTIVE_NO_MEASUREMENT",
+      "hypothesis": "Giving a visitor a bounded manual sequence to compare timestamp and status from a verified official source with their own site evidence before considering an investigation may support uncertainty-aware interpretation without claiming current status or cause.",
+      "firstUserOutcome": "Compare timestamp and status from a verified official source with their own site evidence before considering an investigation, while retaining uncertainty if no connection is established.",
+      "metric": "Unmeasured methodology-guidance comprehension after 10 observed non-synthetic sessions.",
+      "target": ">=60% after 10 observed non-synthetic sessions",
+      "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
+      "noDataBoundary": "No data means no demand or revenue conclusion.",
+      "nextSafeAction": "Use the methodology guidance to compare a verified official source's timestamp/status with site evidence before considering an investigation; retain uncertainty unless that comparison establishes a connection."
     }
   ]
 }

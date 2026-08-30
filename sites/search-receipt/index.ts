@@ -9,7 +9,7 @@ export const searchReceiptSite: SiteDefinition = {
   proposition:
     'Source-bound records do not establish the cause of a change on your own site; check a verified official source before investigating.',
   interpretationBoundary:
-    'A receipt records fields present in one accepted source observation. It can support a decision to investigate, but it does not identify the cause of changes on a particular site.',
+    "A receipt captures one admitted observation; it does not prove a current incident or cause for a site change. Before investigating, compare a verified official source's timestamp/status with one's own site evidence; retain uncertainty if that does not establish a connection.",
   unknowns:
     'No claim is made about traffic, search positions, effects on a specific site, or a recommended response.',
 };
