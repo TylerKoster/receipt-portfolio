@@ -52,6 +52,8 @@ const SITE_HEADINGS = {
   'workflow-test-lab': 'Workflow Test Lab',
 } as const;
 const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
+// Full TypeScript compilation can contend with other Vitest workers in CI.
+const PRODUCTION_BUILD_SUBPROCESS_TIMEOUT_MS = 15_000;
 
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -678,44 +680,52 @@ describe('static receipt site build', () => {
     ).toContain('Controlled fixture example');
   });
 
-  it('keeps compiler artifacts outside the real production site output', async () => {
-    const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
-    const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
-    await runProductionBuild();
+  it(
+    'keeps compiler artifacts outside the real production site output',
+    async () => {
+      const canonicalEvidenceDirectory = join(projectRoot, 'evidence');
+      const originalEvidence = await fileInventory(canonicalEvidenceDirectory);
+      await runProductionBuild();
 
-    expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
-      originalEvidence,
-    );
+      expect(await fileInventory(canonicalEvidenceDirectory)).toEqual(
+        originalEvidence,
+      );
 
-    const inventory = Object.keys(await fileInventory(outputDirectory));
-    expect(inventory).toContain('search-receipt/methodology/index.html');
-    expect(inventory).toContain('skill-ledger/sources/index.html');
-    expect(inventory).toContain('workflow-test-lab/sitemap.xml');
-    expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
-    await expect(
-      readFile(
-        join(projectRoot, 'dist', 'runtime', 'scripts', 'build-sites.js'),
+      const inventory = Object.keys(await fileInventory(outputDirectory));
+      expect(inventory).toContain('search-receipt/methodology/index.html');
+      expect(inventory).toContain('skill-ledger/sources/index.html');
+      expect(inventory).toContain('workflow-test-lab/sitemap.xml');
+      expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
+      await expect(
+        readFile(
+          join(projectRoot, 'dist', 'runtime', 'scripts', 'build-sites.js'),
+          'utf8',
+        ),
+      ).resolves.toContain('buildSites');
+    },
+    PRODUCTION_BUILD_SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'uses the CLI environment adapter for the production Pages base',
+    async () => {
+      await runProductionBuild({
+        publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
+      });
+
+      const home = await readFile(
+        join(outputDirectory, 'search-receipt', 'index.html'),
         'utf8',
-      ),
-    ).resolves.toContain('buildSites');
-  });
-
-  it('uses the CLI environment adapter for the production Pages base', async () => {
-    await runProductionBuild({
-      publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
-    });
-
-    const home = await readFile(
-      join(outputDirectory, 'search-receipt', 'index.html'),
-      'utf8',
-    );
-    expect(home).toContain(
-      '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/search-receipt/">',
-    );
-    expect(home).toContain(
-      'href="/receipt-portfolio/search-receipt/styles.css"',
-    );
-  });
+      );
+      expect(home).toContain(
+        '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/search-receipt/">',
+      );
+      expect(home).toContain(
+        'href="/receipt-portfolio/search-receipt/styles.css"',
+      );
+    },
+    PRODUCTION_BUILD_SUBPROCESS_TIMEOUT_MS,
+  );
 
   it('runs an isolated compiled runtime without invoking npm compilation', async () => {
     const isolatedRuntime = join(dirname(outputDirectory), 'runtime-a');
@@ -863,7 +873,7 @@ describe('static receipt site build', () => {
     await expect(
       readFile(join(secondOutput, 'search-receipt', 'index.html'), 'utf8'),
     ).resolves.toContain('Controlled fixture example');
-  });
+  }, PRODUCTION_BUILD_SUBPROCESS_TIMEOUT_MS);
 
   it('omits a REVIEW_REQUIRED record from public rendering', async () => {
     const receipt = (await searchReceiptEntries())[0]!.receipt;
