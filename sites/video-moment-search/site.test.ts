@@ -91,6 +91,8 @@ interface ClientHarness {
   readonly serverResults: FakeHTMLElement;
   readonly status: FakeHTMLElement;
   failNextRender(): void;
+  rejectFetch(): Promise<void>;
+  resolveNonOkFetch(): Promise<void>;
   resolveIndex(value: unknown): Promise<void>;
   submit(query: string): void;
 }
@@ -122,11 +124,13 @@ function executeClientPayload(): ClientHarness {
     readonly ok: boolean;
     json(): Promise<unknown>;
   }) => void;
+  let rejectFetch!: (error: Error) => void;
   const fetchPromise = new Promise<{
     readonly ok: boolean;
     json(): Promise<unknown>;
-  }>((resolve) => {
+  }>((resolve, reject) => {
     resolveFetch = resolve;
+    rejectFetch = reject;
   });
   const selectors = new Map<string, FakeHTMLElement>([
     ['[data-moment-search]', form],
@@ -157,6 +161,14 @@ function executeClientPayload(): ClientHarness {
     status,
     failNextRender: () => {
       results.failNextReplace = true;
+    },
+    rejectFetch: async () => {
+      rejectFetch(new Error('controlled fetch rejection'));
+      await flushClientPromises();
+    },
+    resolveNonOkFetch: async () => {
+      resolveFetch({ ok: false, json: async () => ({}) });
+      await flushClientPromises();
     },
     resolveIndex: async (value: unknown) => {
       resolveFetch({ ok: true, json: async () => value });
@@ -399,6 +411,80 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual(expectedOrder);
   });
 
+  it('keeps all shipped equal-score tie breakers equal to the helper/core order', async () => {
+    const baseEntry = serializePublicSearchIndex(fixture, searchIndex).entries[0]!;
+    const tiedEntries = [
+      {
+        ...baseEntry,
+        momentId: 'moment-z',
+        videoId: 'video-b',
+        videoSlug: 'b-video',
+        sourceUrl: 'https://video.example/watch/b-video',
+        videoTitle: 'Agent note',
+        startSeconds: 5,
+        endSeconds: 15,
+        timestampUrl: 'https://video.example/watch/b-video?t=5',
+      },
+      {
+        ...baseEntry,
+        momentId: 'moment-c',
+        videoId: 'video-a-later',
+        videoSlug: 'a-video',
+        sourceUrl: 'https://video.example/watch/a-video-later',
+        videoTitle: 'Agent note',
+        startSeconds: 20,
+        endSeconds: 30,
+        timestampUrl: 'https://video.example/watch/a-video-later?t=20',
+      },
+      {
+        ...baseEntry,
+        momentId: 'moment-b',
+        videoId: 'video-a-same-b',
+        videoSlug: 'a-video',
+        sourceUrl: 'https://video.example/watch/a-video-same-b',
+        videoTitle: 'Agent note',
+        startSeconds: 10,
+        endSeconds: 15,
+        timestampUrl: 'https://video.example/watch/a-video-same-b?t=10',
+      },
+      {
+        ...baseEntry,
+        momentId: 'moment-a',
+        videoId: 'video-a-same-a',
+        videoSlug: 'a-video',
+        sourceUrl: 'https://video.example/watch/a-video-same-a',
+        videoTitle: 'Agent note',
+        startSeconds: 10,
+        endSeconds: 15,
+        timestampUrl: 'https://video.example/watch/a-video-same-a?t=10',
+      },
+    ];
+    const publicIndex = {
+      schemaVersion: 1 as const,
+      corpusId: 'tie-break-parity-fixture',
+      entries: tiedEntries,
+    };
+    const expectedOrder = searchPublicIndex(publicIndex, 'agent').map(
+      (entry) => entry.momentId,
+    );
+    expect(expectedOrder).toEqual([
+      'moment-a',
+      'moment-b',
+      'moment-c',
+      'moment-z',
+    ]);
+    const harness = executeClientPayload();
+    await harness.resolveIndex(publicIndex);
+
+    harness.submit('agent');
+
+    expect(
+      descendants(harness.results, 'article').map(
+        (article) => article.dataset.momentId,
+      ),
+    ).toEqual(expectedOrder);
+  });
+
   it('routes wrong-shaped and partially malformed loaded indexes to client-error recovery', async () => {
     const wrongShape = executeClientPayload();
     await wrongShape.resolveIndex({ entries: 'not-an-array' });
@@ -426,6 +512,56 @@ describe('AI Moment Index public search surface', () => {
     );
   });
 
+  it('rejects invalid source and mismatched timestamp indexes in the shipped payload', async () => {
+    const validIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const invalidSource = executeClientPayload();
+    await invalidSource.resolveIndex({
+      ...validIndex,
+      entries: validIndex.entries.map((entry) => ({
+        ...entry,
+        sourceUrl: 'javascript:alert(1)',
+        timestampUrl: 'javascript:alert(1)',
+      })),
+    });
+    expect(invalidSource.error.hidden).toBe(false);
+    expect(invalidSource.status.textContent).toContain(
+      'initial reviewed moments remain below',
+    );
+
+    const mismatchedTimestamp = executeClientPayload();
+    await mismatchedTimestamp.resolveIndex({
+      ...validIndex,
+      entries: validIndex.entries.map((entry) => ({
+        ...entry,
+        timestampUrl: 'https://video.example/watch/agent-evals?t=133',
+      })),
+    });
+    expect(mismatchedTimestamp.error.hidden).toBe(false);
+    expect(mismatchedTimestamp.results.children).toEqual([]);
+  });
+
+  it('recovers deterministically from rejected and non-OK index fetches', async () => {
+    const rejected = executeClientPayload();
+    await rejected.rejectFetch();
+    expect(rejected.error.hidden).toBe(false);
+    expect(rejected.status.textContent).toBe(
+      'Interactive search is unavailable; initial reviewed moments remain below.',
+    );
+    expect(rejected.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
+
+    const nonOk = executeClientPayload();
+    await nonOk.resolveNonOkFetch();
+    expect(nonOk.error.hidden).toBe(false);
+    expect(nonOk.status.textContent).toBe(
+      'Interactive search is unavailable; initial reviewed moments remain below.',
+    );
+    expect(nonOk.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
+  });
+
   it('clears a transient pre-load fallback after valid loading and completes the fixed flow', async () => {
     const harness = executeClientPayload();
     harness.submit('agent evaluation');
@@ -438,6 +574,9 @@ describe('AI Moment Index public search surface', () => {
       serializePublicSearchIndex(fixture, searchIndex),
     );
     expect(harness.error.hidden).toBe(true);
+    expect(harness.status.textContent).toBe(
+      'Search is ready. Enter a phrase such as “agent evaluation”.',
+    );
 
     harness.submit('agent evaluation');
     expect(

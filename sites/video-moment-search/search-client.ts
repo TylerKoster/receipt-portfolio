@@ -294,6 +294,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       if (!validIndex(value)) throw new Error('index validation failed');
       index = value;
       error.hidden = true;
+      status.textContent = 'Search is ready. Enter a phrase such as “agent evaluation”.';
     })
     .catch(() => {
       index = null;
