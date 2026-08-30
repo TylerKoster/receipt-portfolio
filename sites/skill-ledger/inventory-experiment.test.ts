@@ -5,7 +5,9 @@ import {
   filterSkillInventory,
   recordSyntheticOfferEvent,
   sourceBoundSkillInventory,
+  summarizeSyntheticOfferEvents,
   type SourceBoundSkillReceipt,
+  type SyntheticOfferEvent,
 } from './inventory-experiment.js';
 
 const receiptA = {
@@ -160,5 +162,86 @@ describe('source-bound SkillLedger inventory experiment', () => {
     expect(STATIC_SIGNAL_BOUNDARY).toBe(
       'Static-risk flags are limited signals, not a security assessment.',
     );
+  });
+
+  it('summarizes controlled synthetic offer events in fixed offer order', () => {
+    const events = [
+      {
+        offerId: 'team-inventory',
+        action: 'selected',
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+      },
+      {
+        offerId: 'watchlist',
+        action: 'viewed',
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+      },
+      {
+        offerId: 'watchlist',
+        action: 'selected',
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+      },
+      {
+        offerId: 'watchlist',
+        action: 'viewed',
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+      },
+    ] satisfies readonly SyntheticOfferEvent[];
+
+    expect(summarizeSyntheticOfferEvents(events)).toEqual([
+      {
+        offerId: 'watchlist',
+        viewed: 2,
+        selected: 1,
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+        interpretationBoundary:
+          'Synthetic event counts are not real demand, adoption, conversion, revenue, or willingness-to-pay evidence.',
+      },
+      {
+        offerId: 'team-inventory',
+        viewed: 0,
+        selected: 1,
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+        interpretationBoundary:
+          'Synthetic event counts are not real demand, adoption, conversion, revenue, or willingness-to-pay evidence.',
+      },
+    ]);
+  });
+
+  it('returns ordered zero-count rows for absent controlled synthetic events', () => {
+    expect(summarizeSyntheticOfferEvents([])).toEqual([
+      {
+        offerId: 'watchlist',
+        viewed: 0,
+        selected: 0,
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+        interpretationBoundary:
+          'Synthetic event counts are not real demand, adoption, conversion, revenue, or willingness-to-pay evidence.',
+      },
+      {
+        offerId: 'team-inventory',
+        viewed: 0,
+        selected: 0,
+        evidenceClass: 'synthetic-only',
+        identityCaptured: false,
+        persisted: false,
+        interpretationBoundary:
+          'Synthetic event counts are not real demand, adoption, conversion, revenue, or willingness-to-pay evidence.',
+      },
+    ]);
   });
 });

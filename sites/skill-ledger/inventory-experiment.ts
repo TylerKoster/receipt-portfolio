@@ -71,6 +71,19 @@ export type SyntheticOfferEvent = Readonly<{
   persisted: false;
 }>;
 
+export const SYNTHETIC_OFFER_EVENT_INTERPRETATION_BOUNDARY =
+  'Synthetic event counts are not real demand, adoption, conversion, revenue, or willingness-to-pay evidence.';
+
+export type SyntheticOfferEventSummary = Readonly<{
+  offerId: SyntheticOfferEvent['offerId'];
+  viewed: number;
+  selected: number;
+  evidenceClass: 'synthetic-only';
+  identityCaptured: false;
+  persisted: false;
+  interpretationBoundary: typeof SYNTHETIC_OFFER_EVENT_INTERPRETATION_BOUNDARY;
+}>;
+
 function isAcceptedSkillLedgerReceipt(
   receipt: SourceBoundSkillReceipt,
 ): boolean {
@@ -175,4 +188,22 @@ export function recordSyntheticOfferEvent(
     identityCaptured: false,
     persisted: false,
   };
+}
+
+export function summarizeSyntheticOfferEvents(
+  events: readonly SyntheticOfferEvent[],
+): readonly SyntheticOfferEventSummary[] {
+  return (['watchlist', 'team-inventory'] as const).map((offerId) => ({
+    offerId,
+    viewed: events.filter(
+      (event) => event.offerId === offerId && event.action === 'viewed',
+    ).length,
+    selected: events.filter(
+      (event) => event.offerId === offerId && event.action === 'selected',
+    ).length,
+    evidenceClass: 'synthetic-only',
+    identityCaptured: false,
+    persisted: false,
+    interpretationBoundary: SYNTHETIC_OFFER_EVENT_INTERPRETATION_BOUNDARY,
+  }));
 }
