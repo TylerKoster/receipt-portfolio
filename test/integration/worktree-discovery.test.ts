@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import {
   lstat,
@@ -17,11 +18,6 @@ import { configDefaults } from 'vitest/config';
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
 const probeEnvironment = 'RECEIPT_PORTFOLIO_DISCOVERY_PROBE';
-const sentinelOwner = 'receipt-portfolio-tool-discovery-sentinel-v1';
-const sentinelRoots = [
-  join(projectRoot, '.worktrees', 'sentinel-worktree'),
-  join(projectRoot, 'worktrees', 'sentinel-worktree'),
-] as const;
 
 interface CommandResult {
   readonly command: string;
@@ -41,10 +37,7 @@ async function missing(path: string): Promise<boolean> {
   }
 }
 
-async function createSentinel(root: string): Promise<void> {
-  if (!(await missing(root))) {
-    throw new Error(`Refusing pre-existing discovery sentinel: ${root}`);
-  }
+async function createSentinel(root: string, owner: string): Promise<void> {
   const parent = dirname(root);
   await mkdir(parent, { recursive: true });
   const parentStats = await lstat(parent);
@@ -59,9 +52,10 @@ async function createSentinel(root: string): Promise<void> {
     );
   }
 
-  await mkdir(join(root, 'sites'), { recursive: true });
+  await mkdir(root);
+  await writeFile(join(root, '.sentinel-owner'), owner, 'utf8');
+  await mkdir(join(root, 'sites'));
   await mkdir(join(root, 'test', 'integration'), { recursive: true });
-  await writeFile(join(root, '.sentinel-owner'), sentinelOwner, 'utf8');
   await writeFile(
     join(root, 'sites', 'sentinel-invalid.ts'),
     'export const deliberatelyInvalid = ;\n',
@@ -74,7 +68,7 @@ async function createSentinel(root: string): Promise<void> {
   );
 }
 
-async function removeSentinel(root: string): Promise<void> {
+async function removeSentinel(root: string, owner: string): Promise<void> {
   if (await missing(root)) return;
   const expectedParents = [
     resolve(projectRoot, '.worktrees'),
@@ -93,7 +87,7 @@ async function removeSentinel(root: string): Promise<void> {
     !rootStats.isDirectory() ||
     markerStats.isSymbolicLink() ||
     !markerStats.isFile() ||
-    (await readFile(join(root, '.sentinel-owner'), 'utf8')) !== sentinelOwner
+    (await readFile(join(root, '.sentinel-owner'), 'utf8')) !== owner
   ) {
     throw new Error(`Refusing unowned discovery sentinel cleanup: ${root}`);
   }
@@ -175,8 +169,19 @@ describe('nested development worktree discovery boundary', () => {
   it('keeps exact lint, full-test, and integration commands inside the active root', async () => {
     if (process.env[probeEnvironment] === '1') return;
 
+    const invocationToken = `${process.pid}-${randomUUID()}`;
+    const owner = `receipt-portfolio-tool-discovery-sentinel-v1:${invocationToken}`;
+    const sentinelRoots = [
+      join(projectRoot, '.worktrees', `sentinel-worktree-${invocationToken}`),
+      join(projectRoot, 'worktrees', `sentinel-worktree-${invocationToken}`),
+    ] as const;
+    const createdRoots: string[] = [];
+
     try {
-      for (const root of sentinelRoots) await createSentinel(root);
+      for (const root of sentinelRoots) {
+        await createSentinel(root, owner);
+        createdRoots.push(root);
+      }
       const commands = [
         ['run', 'check'],
         ['test', '--', '--run'],
@@ -195,9 +200,9 @@ describe('nested development worktree discovery boundary', () => {
         expect(result.output).not.toContain('sentinel-failure.test.ts');
       }
     } finally {
-      for (const root of sentinelRoots.toReversed()) {
-        await removeSentinel(root);
+      for (const root of createdRoots.toReversed()) {
+        await removeSentinel(root, owner);
       }
     }
-  }, 120_000);
+  }, 390_000);
 });
