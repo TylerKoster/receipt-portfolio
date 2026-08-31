@@ -53,9 +53,18 @@ import { skillLedgerSite } from '../sites/skill-ledger/index.js';
 import { videoMomentSearchSite } from '../sites/video-moment-search/index.js';
 import { VIDEO_MOMENT_SEARCH_CLIENT } from '../sites/video-moment-search/search-client.js';
 import {
+  renderCreatorPage,
+  renderMomentPage,
+  renderVideoPage,
   renderVideoMomentHome,
   serializePublicSearchIndex,
 } from '../sites/video-moment-search/render.js';
+import {
+  renderAtomFeed,
+  renderSitemap as renderVideoMomentSitemap,
+  renderSitemapIndex as renderVideoMomentSitemapIndex,
+} from '../sites/video-moment-search/seo.js';
+import { validateCommonsSourceEvidence } from '../sites/video-moment-search/source-evidence.js';
 import { workflowTestLabSite } from '../sites/workflow-test-lab/index.js';
 import { loadVerifiedReceipts } from './evidence-cli.js';
 
@@ -525,6 +534,15 @@ async function writeSiteTree(
         'utf8',
       ).then((content) => JSON.parse(content) as unknown),
     ]);
+    const sourceEvidenceValidation = validateCommonsSourceEvidence(
+      fixture,
+      sourceRightsEvidence,
+    );
+    if (!sourceEvidenceValidation.ok) {
+      throw new Error(
+        `AI Moment Index source evidence is not admitted: ${sourceEvidenceValidation.diagnostics.join(', ')}`,
+      );
+    }
     const index = buildSearchIndex(fixture);
     const directory = join(outputDirectory, videoMomentSearchSite.siteId);
     await mkdir(directory, { recursive: true });
@@ -553,6 +571,56 @@ async function writeSiteTree(
         join(directory, 'styles.css'),
       ),
     ]);
+
+    const publicVideos = new Map(
+      index.entries.map((entry) => [entry.video.id, entry.video]),
+    );
+    const publicMoments = new Map(
+      index.entries.map((entry) => [entry.moment.id, entry.moment]),
+    );
+    const publicCreatorIds = new Set(
+      index.entries.map((entry) => entry.video.creatorId),
+    );
+
+    await Promise.all([
+      writeFile(
+        join(directory, 'sitemap.xml'),
+        renderVideoMomentSitemap(fixture, publicBaseUrl),
+      ),
+      writeFile(
+        join(directory, 'sitemap-index.xml'),
+        renderVideoMomentSitemapIndex(publicBaseUrl),
+      ),
+      writeFile(
+        join(directory, 'feed.xml'),
+        renderAtomFeed(fixture, publicBaseUrl),
+      ),
+    ]);
+
+    for (const video of publicVideos.values()) {
+      const pageDirectory = join(directory, 'videos', video.slug);
+      await mkdir(pageDirectory, { recursive: true });
+      await writeFile(
+        join(pageDirectory, 'index.html'),
+        renderVideoPage(fixture, index, video.id, publicBaseUrl),
+      );
+    }
+    for (const moment of publicMoments.values()) {
+      const pageDirectory = join(directory, 'moments', moment.id);
+      await mkdir(pageDirectory, { recursive: true });
+      await writeFile(
+        join(pageDirectory, 'index.html'),
+        renderMomentPage(fixture, index, moment.id, publicBaseUrl),
+      );
+    }
+    for (const creatorId of publicCreatorIds) {
+      const pageDirectory = join(directory, 'creators', creatorId);
+      await mkdir(pageDirectory, { recursive: true });
+      await writeFile(
+        join(pageDirectory, 'index.html'),
+        renderCreatorPage(fixture, index, creatorId, publicBaseUrl),
+      );
+    }
   }
 }
 

@@ -1,18 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  type VideoCorpus,
-  type VideoMoment,
-  type VideoRecord,
-} from '../../packages/video-moment-core/src/index.js';
+import { type VideoCorpus } from '../../packages/video-moment-core/src/index.js';
 import {
   isDiscoveryPageEligible,
   renderAtomFeed,
   renderSitemap,
   renderSitemapIndex,
-  renderVideoSitemap,
   validateUniqueSeoDocuments,
-  videoStructuredData,
 } from './seo.js';
 
 const corpus = JSON.parse(
@@ -25,28 +19,6 @@ const corpus = JSON.parse(
   ),
 ) as VideoCorpus;
 const baseUrl = 'https://receipt-portfolio.example/';
-
-const video: VideoRecord = {
-  id: 'video-agent-evals',
-  slug: 'agent-evals',
-  title: 'Practical agent evaluations',
-  creatorId: 'creator-lab',
-  creatorName: 'Creator Lab',
-  sourceUrl: 'https://video.example/agent-evals',
-  durationSeconds: 600,
-};
-const activeMoments: readonly VideoMoment[] = [
-  {
-    id: 'moment-agent-evals-scorecard',
-    videoId: video.id,
-    startSeconds: 132,
-    endSeconds: 188,
-    excerpt: 'A reviewed explanation of a practical evaluation scorecard.',
-    topicSlugs: ['agent-evals'],
-    state: 'active',
-    rightsGrantId: 'rights-agent-evals',
-  },
-];
 
 function twoSourceCorpus(): VideoCorpus {
   const firstVideo = corpus.videos[0]!;
@@ -117,65 +89,11 @@ function twoSourceCorpus(): VideoCorpus {
 }
 
 describe('video moment search SEO', () => {
-  it('emits source-bound VideoObject and Clip data for a watch page', () => {
-    const data = videoStructuredData(video, activeMoments, baseUrl);
-    expect(data['@type']).toBe('VideoObject');
-    expect(data.hasPart[0]).toMatchObject({
-      '@type': 'Clip',
-      startOffset: 132,
-      endOffset: 188,
-      url: 'https://video.example/agent-evals?t=132',
-    });
-    expect(data).not.toHaveProperty('contentUrl');
-  });
-
-  it('never emits the production bare media URL as structured content', () => {
-    const productionVideo = corpus.videos[0]!;
-    const data = videoStructuredData(productionVideo, corpus.moments, baseUrl);
-    const serialized = JSON.stringify(data);
-    expect(serialized).not.toContain(
-      `"contentUrl":"${productionVideo.sourceUrl}"`,
-    );
-    expect(serialized).not.toContain(`"${productionVideo.sourceUrl}"`);
-    expect(data.hasPart[0]!.url).toBe(`${productionVideo.sourceUrl}#t=132`);
-  });
-
-  it('omits structured fields that have no source evidence', () => {
-    const data = videoStructuredData(video, activeMoments, baseUrl);
-    expect(data).not.toHaveProperty('thumbnailUrl');
-    expect(data).not.toHaveProperty('uploadDate');
-    expect(data).not.toHaveProperty('embedUrl');
-  });
-
-  it('lists every canonical watch page in both normal and video sitemaps', () => {
-    expect(renderVideoSitemap(corpus, baseUrl)).toContain(
-      '/videos/robots-under-control/',
-    );
-    expect(renderSitemap(corpus, baseUrl)).toContain(
-      '/videos/robots-under-control/',
-    );
-  });
-
-  it('omits an arbitrary thumbnail URL that has no source-bound review evidence', () => {
-    const renderWithUnsupportedThumbnailInput =
-      renderVideoSitemap as unknown as (
-        corpus: VideoCorpus,
-        origin: string,
-        unsupported: unknown,
-      ) => string;
-    const xml = renderWithUnsupportedThumbnailInput(corpus, baseUrl, {
-      'video-robots-under-control': {
-        thumbnailUrl: 'https://images.example/synthetic-reviewed-thumbnail.jpg',
-      },
-    });
-    expect(xml).not.toContain(
-      'https://images.example/synthetic-reviewed-thumbnail.jpg',
-    );
-    expect(xml).toContain('<video:player_loc>');
-  });
-
-  it('preserves the accepted exact integer timestamp in discovery output', () => {
-    expect(renderVideoSitemap(corpus, baseUrl)).toContain('#t=132');
+  it('indexes the substantive canonical moment without unsupported aggregate or rich-video URLs', () => {
+    const sitemap = renderSitemap(corpus, baseUrl);
+    expect(sitemap).toContain('/moments/moment-robots-control/');
+    expect(sitemap).not.toContain('/videos/robots-under-control/');
+    expect(sitemap).not.toContain('/creators/university-of-the-netherlands/');
     expect(renderAtomFeed(corpus, baseUrl)).toContain('#t=132');
   });
 
@@ -270,7 +188,7 @@ describe('video moment search SEO', () => {
   it('renders a stable sitemap index without inventing query URLs', () => {
     const xml = renderSitemapIndex(baseUrl);
     expect(xml).toContain('/sitemap.xml');
-    expect(xml).toContain('/video-sitemap.xml');
+    expect(xml).not.toContain('/video-sitemap.xml');
     expect(xml).not.toContain('?q=');
   });
 

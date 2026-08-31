@@ -3,7 +3,6 @@ import {
   validateVideoCorpus,
   type VideoCorpus,
   type VideoMoment,
-  type VideoRecord,
 } from '../../packages/video-moment-core/src/index.js';
 import { normalizePublicBaseUrl } from '../shared/render.js';
 
@@ -23,24 +22,6 @@ export interface SeoDocument {
 export interface SeoValidation {
   readonly ok: boolean;
   readonly diagnostics: readonly string[];
-}
-
-export interface ClipStructuredData {
-  readonly '@type': 'Clip';
-  readonly name: string;
-  readonly startOffset: number;
-  readonly endOffset: number;
-  readonly url: string;
-}
-
-export interface VideoObjectStructuredData {
-  readonly '@context': 'https://schema.org';
-  readonly '@type': 'VideoObject';
-  readonly name: string;
-  readonly description?: string;
-  readonly duration: string;
-  readonly url: string;
-  readonly hasPart: readonly ClipStructuredData[];
 }
 
 export interface FeedGuide {
@@ -100,10 +81,6 @@ function xml(value: string): string {
     .replaceAll("'", '&apos;');
 }
 
-function isoDuration(seconds: number): string {
-  return `PT${seconds}S`;
-}
-
 function formatSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
@@ -124,36 +101,6 @@ function hasCompleteFeedMetadata(guide: FeedGuide): boolean {
     guide.summary.trim().length > 0 &&
     isCanonicalTimestamp(guide.updatedAt)
   );
-}
-
-export function videoStructuredData(
-  video: VideoRecord,
-  moments: readonly VideoMoment[],
-  origin: string,
-): VideoObjectStructuredData {
-  const publicMoments = moments
-    .filter((moment) => moment.videoId === video.id && isPublicMoment(moment))
-    .toSorted(
-      (left, right) =>
-        left.startSeconds - right.startSeconds ||
-        left.id.localeCompare(right.id),
-    );
-  const description = publicMoments[0]?.excerpt;
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'VideoObject',
-    name: video.title,
-    ...(description === undefined ? {} : { description }),
-    duration: isoDuration(video.durationSeconds),
-    url: canonicalUrl(origin, `videos/${encodeURIComponent(video.slug)}/`),
-    hasPart: publicMoments.map((moment) => ({
-      '@type': 'Clip',
-      name: moment.excerpt,
-      startOffset: moment.startSeconds,
-      endOffset: moment.endSeconds,
-      url: buildTimestampUrl(video, moment.startSeconds),
-    })),
-  };
 }
 
 function normalizedWords(value: string): readonly string[] {
@@ -289,7 +236,7 @@ export function eligibleDiscoveryRoutes(
       const topicName = topic.slug.replaceAll('-', ' ');
       return {
         title: `${topicName} video moments | AI Moment Index`,
-        description: `A project-original comparison of independently sourced, reviewed ${topicName} moments.`,
+        description: `A project-original comparison of reviewed ${topicName} moments from different source URLs.`,
         canonical: canonicalUrl(origin, `topics/${topic.slug}/`),
         body: topic.synthesis.text,
       };
@@ -315,22 +262,10 @@ export function renderSitemap(
 ): string {
   assertValidCorpus(corpus);
   const publicMoments = corpus.moments.filter(isPublicMoment);
-  const videoIds = new Set(publicMoments.map((moment) => moment.videoId));
-  const creatorIds = new Set(
-    corpus.videos
-      .filter((video) => videoIds.has(video.id))
-      .map((video) => video.creatorId),
-  );
   const discovery = eligibleDiscoveryRoutes(corpus, origin, discoveryRoutes);
   const locations = [
-    ...corpus.videos
-      .filter((video) => videoIds.has(video.id))
-      .map((video) => canonicalUrl(origin, `videos/${video.slug}/`)),
     ...publicMoments.map((moment) =>
       canonicalUrl(origin, `moments/${moment.id}/`),
-    ),
-    ...[...creatorIds].map((creatorId) =>
-      canonicalUrl(origin, `creators/${creatorId}/`),
     ),
     ...discovery.topics.map((topic) =>
       canonicalUrl(origin, `topics/${topic.slug}/`),
@@ -342,32 +277,8 @@ export function renderSitemap(
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locations.map((location) => `  <url><loc>${xml(location)}</loc></url>`).join('\n')}\n</urlset>\n`;
 }
 
-export function renderVideoSitemap(
-  corpus: VideoCorpus,
-  origin: string,
-): string {
-  assertValidCorpus(corpus);
-  const urls = corpus.videos.flatMap((video) => {
-    const moments = corpus.moments
-      .filter((moment) => moment.videoId === video.id && isPublicMoment(moment))
-      .toSorted(
-        (left, right) =>
-          left.startSeconds - right.startSeconds ||
-          left.id.localeCompare(right.id),
-      );
-    if (moments.length === 0) return [];
-    const first = moments[0]!;
-    return [
-      `  <url>\n    <loc>${xml(canonicalUrl(origin, `videos/${video.slug}/`))}</loc>\n    <video:video>\n      <video:title>${xml(video.title)}</video:title>\n      <video:description>${xml(first.excerpt)}</video:description>\n      <video:player_loc>${xml(buildTimestampUrl(video, first.startSeconds))}</video:player_loc>\n      <video:duration>${video.durationSeconds}</video:duration>\n    </video:video>\n  </url>`,
-    ];
-  });
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${urls.join('\n')}\n</urlset>\n`;
-}
-
 export function renderSitemapIndex(origin: string): string {
-  const sitemaps = ['sitemap.xml', 'video-sitemap.xml'].map((file) =>
-    canonicalUrl(origin, file),
-  );
+  const sitemaps = [canonicalUrl(origin, 'sitemap.xml')];
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemaps.map((location) => `  <sitemap><loc>${xml(location)}</loc></sitemap>`).join('\n')}\n</sitemapindex>\n`;
 }
 

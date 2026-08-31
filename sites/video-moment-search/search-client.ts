@@ -459,7 +459,10 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
         entry.reviewEvidence.productBoundary.excluded.join(', '));
     }
     addText(metadata, 'Correction state', entry.correctionState);
-    article.append(heading, metadata);
+    const related = document.createElement('a');
+    related.href = 'moments/' + encodeURIComponent(entry.momentId) + '/';
+    related.textContent = 'Open the evidence-bound moment page';
+    article.append(heading, metadata, related);
     return article;
   };
   const showLoadError = () => {

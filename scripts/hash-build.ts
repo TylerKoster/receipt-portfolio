@@ -33,9 +33,12 @@ const REQUIRED_SITE_FILES: Readonly<
   ],
   'skill-ledger': RECEIPT_SITE_FILES,
   'video-moment-search': [
+    'feed.xml',
     'index.html',
     'search-client.js',
     'search-index.json',
+    'sitemap-index.xml',
+    'sitemap.xml',
     'styles.css',
   ],
   'workflow-test-lab': RECEIPT_SITE_FILES,
@@ -81,11 +84,14 @@ function allowedSiteFile(
 ): boolean {
   return (
     REQUIRED_SITE_FILES[siteRoot].includes(siteRelativePath) ||
-    (siteRoot !== 'video-moment-search' &&
-      (/^receipts\/[a-f0-9]{64}\/index\.html$/.test(siteRelativePath) ||
+    (siteRoot === 'video-moment-search'
+      ? /^(?:creators|moments|videos)\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(
+          siteRelativePath,
+        )
+      : /^receipts\/[a-f0-9]{64}\/index\.html$/.test(siteRelativePath) ||
         /^topics\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(
           siteRelativePath,
-        )))
+        ))
   );
 }
 
@@ -183,6 +189,15 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
       throw new Error(
         `Incomplete public output: ${siteRoot} has no topic page`,
       );
+    }
+    if (siteRoot === 'video-moment-search') {
+      for (const route of ['creators', 'moments', 'videos'] as const) {
+        if (!siteFiles.some((path) => path.startsWith(`${route}/`))) {
+          throw new Error(
+            `Incomplete public output: ${siteRoot} has no ${route} page`,
+          );
+        }
+      }
     }
   }
   return files.sort((left, right) =>

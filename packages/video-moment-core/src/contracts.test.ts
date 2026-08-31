@@ -269,6 +269,18 @@ describe('rights-bound video corpus contracts', () => {
     );
   });
 
+  it('rejects distinct videos that would overwrite the same canonical slug route', () => {
+    const candidate = cloneValidCorpus();
+    candidate.videos.push({
+      ...candidate.videos[0]!,
+      id: 'video-agent-evals-copy',
+    });
+
+    expect(validateVideoCorpus(candidate).diagnostics).toContain(
+      'VIDEO_SLUG_DUPLICATE:agent-evals',
+    );
+  });
+
   it('rejects an unsupported moment state', () => {
     const candidate = cloneValidCorpus();
     candidate.moments[0]!.state = 'published' as never;

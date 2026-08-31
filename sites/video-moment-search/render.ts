@@ -10,7 +10,6 @@ import { videoMomentSearchSite } from './index.js';
 import type { PublicSearchEntry, PublicSearchIndex } from './search-client.js';
 import {
   eligibleDiscoveryRoutes,
-  videoStructuredData,
   type DiscoveryRoutes,
   type EligibleDiscoveryRoutes,
   type FeedGuide,
@@ -465,7 +464,7 @@ export function renderSearchShell(
   <section aria-labelledby="initial-heading" data-server-results>
     <p class="eyebrow">Available without JavaScript</p>
     <h2 id="initial-heading">${escapeHtml(initialHeading)}</h2>
-    ${renderEntries(initial)}
+    ${renderEntries(initial, baseUrl)}
   </section>`;
   return page(videoMomentSearchSite.title, body, baseUrl, '', true);
 }
@@ -514,19 +513,39 @@ function filteredPage(
   customBody?: string,
   openGraphType?: PageMetadata['openGraphType'],
   discovery: EligibleDiscoveryRoutes = noDiscoveryRoutes,
+  indexable = entries.length > 0,
 ): string {
   const content =
     entries.length === 0
       ? '<p class="guidance">No controlled fixture moments are available for this view.</p>'
       : renderEntries(entries, baseUrl, discovery);
+  const reviewedOnDates = [
+    ...new Set(
+      entries.flatMap((entry) =>
+        entry.reviewEvidence === undefined
+          ? []
+          : [entry.reviewEvidence.reviewedOn],
+      ),
+    ),
+  ].sort();
+  const currentnessBoundary =
+    reviewedOnDates.length === 0
+      ? 'Review status is unavailable for this controlled page.'
+      : `Source and license availability was reviewed on ${reviewedOnDates.join(', ')}; this is historical evidence, not current verification.`;
+  const directPageHowTo = [
+    'Review the excerpt and evidence details.',
+    'Inspect the rights, provenance, and correction state.',
+    'Open the exact source-time link and confirm the surrounding context.',
+  ];
+  const orientation = `<section class="information-panel" aria-labelledby="direct-page-start-heading"><h2 id="direct-page-start-heading">How to use this evidence-bound page</h2><p><strong>For:</strong> ${escapeHtml(videoMomentSearchSite.audience)}</p><p><strong>Use this when:</strong> ${escapeHtml(videoMomentSearchSite.useCase)}</p><h3>How to use it</h3><ol>${directPageHowTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol><p><a href="${escapeHtml(routeUrl(baseUrl, ''))}">Search another phrase</a></p><p class="boundary"><strong>Currentness boundary:</strong> ${escapeHtml(currentnessBoundary)}</p></section>`;
   return page(
     title,
-    customBody ?? `<section><h2>${escapeHtml(title)}</h2>${content}</section>`,
+    `${orientation}${customBody ?? `<section><h2>${escapeHtml(title)}</h2>${content}</section>`}`,
     baseUrl,
     suffix,
     false,
     {
-      indexable: entries.length > 0,
+      indexable,
       description,
       structuredData,
       openGraphType,
@@ -565,17 +584,11 @@ export function renderVideoPage(
     entries,
     baseUrl,
     suffix,
-    [
-      breadcrumbs(baseUrl, video.title, suffix),
-      videoStructuredData(
-        video,
-        corpus.moments.filter((moment) => moment.videoId === video.id),
-        baseUrl,
-      ),
-    ],
+    [breadcrumbs(baseUrl, video.title, suffix)],
     undefined,
-    'video.other',
+    undefined,
     discovery,
+    false,
   );
 }
 
@@ -646,7 +659,7 @@ export function renderTopicPage(
   const body = `<article><h2>${escapeHtml(title)}</h2><p>${escapeHtml(admittedTopic.synthesis.text)}</p>${renderEntries(entries, baseUrl, discovery)}</article>`;
   return filteredPage(
     title,
-    `A project-original comparison of independently sourced, reviewed ${topicName} moments.`,
+    `A project-original comparison of reviewed moments from different source URLs about ${topicName}.`,
     entries,
     baseUrl,
     suffix,
@@ -680,6 +693,7 @@ export function renderCreatorPage(
     undefined,
     undefined,
     discovery,
+    false,
   );
 }
 

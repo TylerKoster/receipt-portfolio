@@ -34,10 +34,16 @@ const EXPECTED_PATHS = [
   'skill-ledger/sources/index.html',
   'skill-ledger/styles.css',
   'skill-ledger/topics/example-topic/index.html',
+  'video-moment-search/creators/university-of-the-netherlands/index.html',
+  'video-moment-search/feed.xml',
   'video-moment-search/index.html',
+  'video-moment-search/moments/moment-robots-control/index.html',
   'video-moment-search/search-client.js',
   'video-moment-search/search-index.json',
+  'video-moment-search/sitemap-index.xml',
+  'video-moment-search/sitemap.xml',
   'video-moment-search/styles.css',
+  'video-moment-search/videos/robots-under-control/index.html',
   'workflow-test-lab/index.html',
   'workflow-test-lab/methodology/index.html',
   `workflow-test-lab/receipts/${'c'.repeat(64)}/index.html`,
@@ -48,7 +54,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '0a47b9b0e947ed13b2178c5b1b715962e014b01a5d3c87a5e11bc9162ce477d4';
+  '5fb576593b84d19b1103140924dfa350156e621ed33959dffd956a05f93dd94d';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -126,6 +132,20 @@ describe('public build manifest', () => {
 
   it('rejects a missing AI Moment Index artifact', async () => {
     await rm(join(outputDirectory, 'video-moment-search', 'search-index.json'));
+
+    await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+      /incomplete public output/i,
+    );
+  });
+
+  it.each([
+    'creators/university-of-the-netherlands',
+    'moments/moment-robots-control',
+    'videos/robots-under-control',
+  ])('rejects a missing AI Moment Index discovery route: %s', async (path) => {
+    await rm(join(outputDirectory, 'video-moment-search', path), {
+      recursive: true,
+    });
 
     await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
       /incomplete public output/i,

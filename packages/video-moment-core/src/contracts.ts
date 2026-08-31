@@ -325,6 +325,11 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     diagnostics,
   );
   addDuplicateDiagnostic(corpus.videos, 'VIDEO_ID_DUPLICATE', diagnostics);
+  addDuplicateDiagnostic(
+    corpus.videos.map((video) => ({ id: video.slug })),
+    'VIDEO_SLUG_DUPLICATE',
+    diagnostics,
+  );
   addDuplicateDiagnostic(corpus.rights, 'RIGHTS_ID_DUPLICATE', diagnostics);
   addDuplicateDiagnostic(corpus.cues, 'CUE_ID_DUPLICATE', diagnostics);
   addDuplicateDiagnostic(corpus.moments, 'MOMENT_ID_DUPLICATE', diagnostics);

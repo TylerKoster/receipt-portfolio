@@ -873,11 +873,14 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
-  it('keeps search noindex while canonical video, moment, and creator pages are indexable', () => {
+  it('indexes only the canonical moment while aggregate pages remain noindex and fully oriented', () => {
     const search = renderVideoMomentHome(fixture, searchIndex, baseUrl);
     expect(search).toContain('<meta name="robots" content="noindex,nofollow">');
     expect(search).toContain(
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/">',
+    );
+    expect(search).toContain(
+      'href="https://receipt-portfolio.example/video-moment-search/moments/moment-robots-control/"',
     );
 
     const video = renderVideoPage(
@@ -887,14 +890,12 @@ describe('AI Moment Index public search surface', () => {
       baseUrl,
     );
     expect(video).toContain('How can we keep robots under control?');
-    expect(video).toContain('<meta name="robots" content="index,follow">');
+    expect(video).toContain('<meta name="robots" content="noindex,nofollow">');
     expect(video).toContain(
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/videos/robots-under-control/">',
     );
-    expect(video).toContain('property="og:type" content="video.other"');
-    expect(video).toContain('property="og:title"');
-    expect(video).toContain('name="twitter:card"');
-    expect(video).toContain('"@type":"VideoObject"');
+    expect(video).not.toContain('"@type":"VideoObject"');
+    expect(video).not.toContain('"@type":"Clip"');
 
     const moment = renderMomentPage(
       fixture,
@@ -913,7 +914,26 @@ describe('AI Moment Index public search surface', () => {
       baseUrl,
     );
     expect(creator).toContain('University of the Netherlands');
-    expect(creator).toContain('<meta name="robots" content="index,follow">');
+    expect(creator).toContain(
+      '<meta name="robots" content="noindex,nofollow">',
+    );
+
+    for (const directPage of [video, moment, creator]) {
+      expect(directPage).toContain('<strong>For:</strong>');
+      expect(directPage).toContain('<strong>Use this when:</strong>');
+      expect(directPage).toContain('How to use it');
+      expect(directPage).toContain('Review the excerpt and evidence details.');
+      expect(directPage).toContain(
+        'Open the exact source-time link and confirm the surrounding context.',
+      );
+      expect(directPage).toContain('Search another phrase');
+      expect(directPage).not.toContain(
+        'Enter the idea or phrase you remember.',
+      );
+      expect(directPage).toContain(
+        'historical evidence, not current verification',
+      );
+    }
 
     expect(
       renderTopicPage(fixture, searchIndex, 'robots-control', baseUrl),
@@ -987,6 +1007,8 @@ describe('AI Moment Index public search surface', () => {
     expect(topic).toContain('<meta name="robots" content="index,follow">');
     expect(topic).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(topic).not.toContain('<script>alert(1)</script>');
+    expect(topic).toContain('different source URLs');
+    expect(topic).not.toContain('independently sourced');
     expect(topic).toContain('/moments/moment-independent-source/');
     expect(topic).toContain('/guides/compare-annotations/');
     expect(guide).toContain('<meta name="robots" content="index,follow">');
@@ -1080,6 +1102,7 @@ describe('AI Moment Index public search surface', () => {
     expect(descendants(articles[0]!, 'a').map((anchor) => anchor.href)).toEqual(
       [
         'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+        'moments/moment-robots-control/',
       ],
     );
     expect(harness.status.textContent).toBe('Showing 1 moment.');

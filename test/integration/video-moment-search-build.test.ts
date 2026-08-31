@@ -95,4 +95,76 @@ describe('atomic AI Moment Index build', () => {
     );
     expect(hub).not.toContain('not a fourth evidence product');
   });
+
+  it('emits only evidence-admitted canonical discovery pages and exact-moment feeds', async () => {
+    await buildSites({
+      evidenceDirectory,
+      outputDirectory,
+      includeVideoMomentSearch: true,
+      publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
+    });
+
+    const routeDirectory = join(outputDirectory, 'video-moment-search');
+    const [video, moment, creator, sitemap, sitemapIndex, feed] =
+      await Promise.all([
+        readFile(
+          join(routeDirectory, 'videos', 'robots-under-control', 'index.html'),
+          'utf8',
+        ),
+        readFile(
+          join(
+            routeDirectory,
+            'moments',
+            'moment-robots-control',
+            'index.html',
+          ),
+          'utf8',
+        ),
+        readFile(
+          join(
+            routeDirectory,
+            'creators',
+            'university-of-the-netherlands',
+            'index.html',
+          ),
+          'utf8',
+        ),
+        readFile(join(routeDirectory, 'sitemap.xml'), 'utf8'),
+        readFile(join(routeDirectory, 'sitemap-index.xml'), 'utf8'),
+        readFile(join(routeDirectory, 'feed.xml'), 'utf8'),
+      ]);
+
+    expect(video).toContain(
+      'rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/"',
+    );
+    expect(video).not.toContain('"@type":"VideoObject"');
+    expect(video).not.toContain('"@type":"Clip"');
+    expect(video).not.toContain('"contentUrl"');
+    expect(moment).toContain(
+      'How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(creator).toContain(
+      'rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/video-moment-search/creators/university-of-the-netherlands/"',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/</loc>',
+    );
+    expect(sitemapIndex).not.toContain('video-sitemap.xml');
+    expect(feed).toContain(
+      '<link rel="related" href="https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"/>',
+    );
+    await expect(
+      readFile(join(routeDirectory, 'video-sitemap.xml'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readdir(join(routeDirectory, 'topics'))).rejects.toMatchObject(
+      {
+        code: 'ENOENT',
+      },
+    );
+    await expect(readdir(join(routeDirectory, 'guides'))).rejects.toMatchObject(
+      {
+        code: 'ENOENT',
+      },
+    );
+  });
 });
