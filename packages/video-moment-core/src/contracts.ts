@@ -58,7 +58,9 @@ function isStrictCalendarDate(value: unknown): value is string {
     return false;
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
 }
 
 export function isReviewedSourceEvidenceSubstantive(
@@ -146,9 +148,7 @@ const VideoRecordSchema = z
     creatorName: z.string().min(1),
     sourceUrl: z.string().min(1),
     durationSeconds: z.number(),
-    timestampStrategy: z
-      .enum(['query-parameter', 'media-fragment'])
-      .optional(),
+    timestampStrategy: z.enum(['query-parameter', 'media-fragment']).optional(),
     reviewEvidenceId: IdentifierSchema.optional(),
   })
   .strict();
@@ -385,8 +385,8 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     if (
       grant.coveredVideoIds.length === 0 ||
       grant.coveredSourceUrls.length === 0 ||
-      grant.coveredCaptionHashes.length === 0 &&
-      (grant.coveredAnnotationHashes?.length ?? 0) === 0
+      (grant.coveredCaptionHashes.length === 0 &&
+        (grant.coveredAnnotationHashes?.length ?? 0) === 0)
     ) {
       diagnostics.push(`RIGHTS_COVERAGE_INVALID:${grant.id}`);
     }

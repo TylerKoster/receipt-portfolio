@@ -22,9 +22,7 @@ export interface SiteDefinition {
   readonly primaryAction: {
     readonly label: string;
     readonly targetId:
-      | 'search-controls'
-      | 'receipts-heading'
-      | 'moment-search-controls';
+      'search-controls' | 'receipts-heading' | 'moment-search-controls';
   };
   readonly interpretationBoundary: string;
   readonly unknowns: string;

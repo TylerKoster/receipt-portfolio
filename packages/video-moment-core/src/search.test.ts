@@ -148,26 +148,77 @@ function cloneCorpus(): VideoCorpus {
 }
 
 const benchmarkCases: readonly BenchmarkCase[] = [
-  { query: 'agent evaluation', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'evaluation datasets', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
-  { query: 'tool-using agents', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'repeatable test cases', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
-  { query: 'tool-call failures', expectedTopThreeMomentIds: ['moment-agent-observability'] },
-  { query: 'agent traces', expectedTopThreeMomentIds: ['moment-agent-observability'] },
-  { query: 'agent benchmarking', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'repeatable agents', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
+  {
+    query: 'agent evaluation',
+    expectedTopThreeMomentIds: ['moment-agent-evals'],
+  },
+  {
+    query: 'evaluation datasets',
+    expectedTopThreeMomentIds: ['moment-eval-datasets'],
+  },
+  {
+    query: 'tool-using agents',
+    expectedTopThreeMomentIds: ['moment-agent-evals'],
+  },
+  {
+    query: 'repeatable test cases',
+    expectedTopThreeMomentIds: ['moment-eval-datasets'],
+  },
+  {
+    query: 'tool-call failures',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
+  {
+    query: 'agent traces',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
+  {
+    query: 'agent benchmarking',
+    expectedTopThreeMomentIds: ['moment-agent-evals'],
+  },
+  {
+    query: 'repeatable agents',
+    expectedTopThreeMomentIds: ['moment-eval-datasets'],
+  },
   { query: 'score agents', expectedTopThreeMomentIds: ['moment-agent-evals'] },
   { query: 'test cases', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
-  { query: 'observable', expectedTopThreeMomentIds: ['moment-agent-observability'] },
-  { query: 'observability', expectedTopThreeMomentIds: ['moment-agent-observability'] },
-  { query: 'agent evaluation mechanics', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'evaluation dataset design', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
-  { query: 'traces tool call', expectedTopThreeMomentIds: ['moment-agent-observability'] },
+  {
+    query: 'observable',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
+  {
+    query: 'observability',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
+  {
+    query: 'agent evaluation mechanics',
+    expectedTopThreeMomentIds: ['moment-agent-evals'],
+  },
+  {
+    query: 'evaluation dataset design',
+    expectedTopThreeMomentIds: ['moment-eval-datasets'],
+  },
+  {
+    query: 'traces tool call',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
   { query: 'benchmarking', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'evaluation-datasets', expectedTopThreeMomentIds: ['moment-eval-datasets'] },
-  { query: 'agent-observability', expectedTopThreeMomentIds: ['moment-agent-observability'] },
-  { query: 'agents evaluation', expectedTopThreeMomentIds: ['moment-agent-evals'] },
-  { query: 'failures observable', expectedTopThreeMomentIds: ['moment-agent-observability'] },
+  {
+    query: 'evaluation-datasets',
+    expectedTopThreeMomentIds: ['moment-eval-datasets'],
+  },
+  {
+    query: 'agent-observability',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
+  {
+    query: 'agents evaluation',
+    expectedTopThreeMomentIds: ['moment-agent-evals'],
+  },
+  {
+    query: 'failures observable',
+    expectedTopThreeMomentIds: ['moment-agent-observability'],
+  },
 ];
 
 describe('deterministic rights-bound moment search', () => {
@@ -194,7 +245,11 @@ describe('deterministic rights-bound moment search', () => {
       endSeconds: 350,
       state: 'quarantined',
     });
-    const results = searchMoments(buildSearchIndex(statefulCorpus), 'agent', 20);
+    const results = searchMoments(
+      buildSearchIndex(statefulCorpus),
+      'agent',
+      20,
+    );
     expect(
       results.every(
         (result) => result.state === 'active' || result.state === 'corrected',
@@ -333,11 +388,16 @@ describe('deterministic rights-bound moment search', () => {
   });
 
   it('reports a fixed synthetic researcher benchmark with top-three recall and zero timestamp landing error', () => {
-    const result = evaluateBenchmark(buildSearchIndex(validCorpus), benchmarkCases);
+    const result = evaluateBenchmark(
+      buildSearchIndex(validCorpus),
+      benchmarkCases,
+    );
     expect(benchmarkCases).toHaveLength(20);
     expect(result.topThreeRecall).toBeGreaterThanOrEqual(0.8);
     expect(result.maximumTimestampLandingErrorSeconds).toBe(0);
-    expect(result.cases.every((entry) => entry.timestampLandingErrorSeconds === 0)).toBe(true);
+    expect(
+      result.cases.every((entry) => entry.timestampLandingErrorSeconds === 0),
+    ).toBe(true);
   });
 
   it('fails the aggregate timestamp gate when a matched result anchor is unparseable', () => {

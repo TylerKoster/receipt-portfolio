@@ -15,9 +15,14 @@ beforeEach(async () => {
   temporaryDirectories.push(directory);
   evidenceDirectory = join(directory, 'evidence');
   outputDirectory = join(directory, 'sites');
-  await collectFixturePair('search-receipt', 'status-v1.json', 'status-v2.json', {
-    evidenceDirectory,
-  });
+  await collectFixturePair(
+    'search-receipt',
+    'status-v1.json',
+    'status-v2.json',
+    {
+      evidenceDirectory,
+    },
+  );
   await collectFixturePair(
     'workflow-test-lab',
     undefined,

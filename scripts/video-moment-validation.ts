@@ -42,7 +42,10 @@ export function playwrightCliInvocation(
   platform: NodeJS.Platform,
   nodeExecutable: string,
   projectDirectory = '.',
-): { readonly executable: string; readonly leadingArguments: readonly string[] } {
+): {
+  readonly executable: string;
+  readonly leadingArguments: readonly string[];
+} {
   const path = platform === 'win32' ? win32 : posix;
   return {
     executable: nodeExecutable,
@@ -58,9 +61,7 @@ export function playwrightCliInvocation(
   };
 }
 
-export function validatePlaywrightCliPackage(
-  value: unknown,
-): ValidationResult {
+export function validatePlaywrightCliPackage(value: unknown): ValidationResult {
   if (typeof value !== 'object' || value === null) {
     return { ok: false, diagnostics: ['PLAYWRIGHT_CLI_PACKAGE_INVALID'] };
   }
@@ -105,7 +106,9 @@ export function validateLiveSourceFacts(
   if (facts.status !== 206) diagnostics.push('LIVE_SOURCE_STATUS_MISMATCH');
   if (facts.finalUrl !== VIDEO_MOMENT_SOURCE_URL)
     diagnostics.push('LIVE_SOURCE_URL_MISMATCH');
-  if (facts.contentType?.split(';', 1)[0]?.trim().toLowerCase() !== 'video/webm')
+  if (
+    facts.contentType?.split(';', 1)[0]?.trim().toLowerCase() !== 'video/webm'
+  )
     diagnostics.push('LIVE_SOURCE_CONTENT_TYPE_MISMATCH');
   if (facts.acceptRanges?.trim().toLowerCase() !== 'bytes')
     diagnostics.push('LIVE_SOURCE_ACCEPT_RANGES_MISMATCH');

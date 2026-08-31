@@ -33,12 +33,7 @@ function cli(cwd: string, ...args: readonly string[]): Promise<string> {
   return new Promise((resolveOutput, reject) => {
     const child = spawn(
       invocation.executable,
-      [
-        ...invocation.leadingArguments,
-        '--session',
-        SESSION,
-        ...args,
-      ],
+      [...invocation.leadingArguments, '--session', SESSION, ...args],
       { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let stdout = '';
@@ -54,7 +49,10 @@ function cli(cwd: string, ...args: readonly string[]): Promise<string> {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) resolveOutput(stdout);
-      else reject(new Error(`playwright-cli exit ${String(code)}: ${stderr || stdout}`));
+      else
+        reject(
+          new Error(`playwright-cli exit ${String(code)}: ${stderr || stdout}`),
+        );
     });
   });
 }
@@ -90,7 +88,12 @@ function markedJson(output: string, marker: string): Record<string, unknown> {
 }
 
 async function localServer(): Promise<{ server: Server; url: string }> {
-  const routeRoot = resolve(projectRoot(), 'dist', 'sites', 'video-moment-search');
+  const routeRoot = resolve(
+    projectRoot(),
+    'dist',
+    'sites',
+    'video-moment-search',
+  );
   const assets = new Map<string, readonly [string, string]>([
     ['/video-moment-search/', ['index.html', 'text/html; charset=utf-8']],
     [
@@ -101,7 +104,10 @@ async function localServer(): Promise<{ server: Server; url: string }> {
       '/video-moment-search/search-client.js',
       ['search-client.js', 'text/javascript; charset=utf-8'],
     ],
-    ['/video-moment-search/styles.css', ['styles.css', 'text/css; charset=utf-8']],
+    [
+      '/video-moment-search/styles.css',
+      ['styles.css', 'text/css; charset=utf-8'],
+    ],
   ]);
   const server = createServer(async (request, response) => {
     try {
@@ -118,7 +124,9 @@ async function localServer(): Promise<{ server: Server; url: string }> {
       });
       response.end(await readFile(path));
     } catch (error) {
-      response.writeHead(500).end(error instanceof Error ? error.message : 'error');
+      response
+        .writeHead(500)
+        .end(error instanceof Error ? error.message : 'error');
     }
   });
   await new Promise<void>((resolveListen, reject) => {
@@ -147,7 +155,9 @@ export async function checkVideoMomentBrowserJourney(): Promise<BrowserJourneyFa
     );
   }
   await verifyPinnedPlaywrightCli();
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), 'ai-moment-browser-'));
+  const temporaryDirectory = await mkdtemp(
+    join(tmpdir(), 'ai-moment-browser-'),
+  );
   const canonicalTemporary = await realpath(temporaryDirectory);
   if (dirname(canonicalTemporary) !== resolve(tmpdir())) {
     throw new Error('Unexpected browser temporary directory');
@@ -159,13 +169,17 @@ export async function checkVideoMomentBrowserJourney(): Promise<BrowserJourneyFa
     const searchOutput = await cli(
       temporaryDirectory,
       'run-code',
-      playwrightPageFunction(`const input = page.getByLabel('What explanation do you remember?'); await input.fill('${VIDEO_MOMENT_QUERY}'); await input.press('Enter'); const cards = page.locator('[data-client-results] article'); await cards.first().waitFor({ state: 'visible' }); const first = cards.first(); const anchor = first.getByRole('link'); return 'AI_MOMENT_SEARCH:' + JSON.stringify({ query: await input.inputValue(), visibleResultCount: await cards.count(), firstMomentId: await first.getAttribute('data-moment-id'), anchorHref: await anchor.getAttribute('href') });`),
+      playwrightPageFunction(
+        `const input = page.getByLabel('What explanation do you remember?'); await input.fill('${VIDEO_MOMENT_QUERY}'); await input.press('Enter'); const cards = page.locator('[data-client-results] article'); await cards.first().waitFor({ state: 'visible' }); const first = cards.first(); const anchor = first.getByRole('link'); return 'AI_MOMENT_SEARCH:' + JSON.stringify({ query: await input.inputValue(), visibleResultCount: await cards.count(), firstMomentId: await first.getAttribute('data-moment-id'), anchorHref: await anchor.getAttribute('href') });`,
+      ),
     );
     const searchFacts = markedJson(searchOutput, 'AI_MOMENT_SEARCH:');
     const mediaOutput = await cli(
       temporaryDirectory,
       'run-code',
-      playwrightPageFunction(`const anchor = page.locator('[data-client-results] article').first().getByRole('link'); const destination = await anchor.getAttribute('href'); if (!destination) throw new Error('missing destination'); const mediaResponses = []; page.on('response', (response) => { if (response.url().split('#', 1)[0] !== destination.split('#', 1)[0]) return; const headers = response.headers(); mediaResponses.push({ mediaResponseStatus: response.status(), mediaResponseContentRange: headers['content-range'] || null, mediaResponseAcceptRanges: headers['accept-ranges'] || null, mediaResponseContentType: headers['content-type'] || null }); }); await anchor.click(); const video = page.locator('video'); await video.waitFor({ state: 'attached', timeout: 60000 }); await video.evaluate((element) => element.pause()); await page.waitForFunction(() => { const element = document.querySelector('video'); return element && element.readyState >= 1; }, null, { timeout: 60000 }); await page.waitForFunction(() => { const element = document.querySelector('video'); return element && !element.seeking && element.readyState >= 2 && Math.abs(element.currentTime - 132) <= 2; }, null, { timeout: 15000 }).catch(() => undefined); await page.waitForTimeout(250); const partial = mediaResponses.findLast((response) => response.mediaResponseStatus === 206 && response.mediaResponseContentRange !== null) || mediaResponses.at(-1) || { mediaResponseStatus: 0, mediaResponseContentRange: null, mediaResponseAcceptRanges: null, mediaResponseContentType: null }; return 'AI_MOMENT_MEDIA:' + JSON.stringify({ ...(await video.evaluate((element) => ({ locationHref: location.href, currentSrc: element.currentSrc, currentTime: element.currentTime, duration: element.duration, seeking: element.seeking, readyState: element.readyState, paused: element.paused, error: element.error === null ? null : element.error.message, videoWidth: element.videoWidth, videoHeight: element.videoHeight }))), ...partial });`),
+      playwrightPageFunction(
+        `const anchor = page.locator('[data-client-results] article').first().getByRole('link'); const destination = await anchor.getAttribute('href'); if (!destination) throw new Error('missing destination'); const mediaResponses = []; page.on('response', (response) => { if (response.url().split('#', 1)[0] !== destination.split('#', 1)[0]) return; const headers = response.headers(); mediaResponses.push({ mediaResponseStatus: response.status(), mediaResponseContentRange: headers['content-range'] || null, mediaResponseAcceptRanges: headers['accept-ranges'] || null, mediaResponseContentType: headers['content-type'] || null }); }); await anchor.click(); const video = page.locator('video'); await video.waitFor({ state: 'attached', timeout: 60000 }); await video.evaluate((element) => element.pause()); await page.waitForFunction(() => { const element = document.querySelector('video'); return element && element.readyState >= 1; }, null, { timeout: 60000 }); await page.waitForFunction(() => { const element = document.querySelector('video'); return element && !element.seeking && element.readyState >= 2 && Math.abs(element.currentTime - 132) <= 2; }, null, { timeout: 15000 }).catch(() => undefined); await page.waitForTimeout(250); const partial = mediaResponses.findLast((response) => response.mediaResponseStatus === 206 && response.mediaResponseContentRange !== null) || mediaResponses.at(-1) || { mediaResponseStatus: 0, mediaResponseContentRange: null, mediaResponseAcceptRanges: null, mediaResponseContentType: null }; return 'AI_MOMENT_MEDIA:' + JSON.stringify({ ...(await video.evaluate((element) => ({ locationHref: location.href, currentSrc: element.currentSrc, currentTime: element.currentTime, duration: element.duration, seeking: element.seeking, readyState: element.readyState, paused: element.paused, error: element.error === null ? null : element.error.message, videoWidth: element.videoWidth, videoHeight: element.videoHeight }))), ...partial });`,
+      ),
     );
     const mediaFacts = markedJson(mediaOutput, 'AI_MOMENT_MEDIA:');
     const facts = {

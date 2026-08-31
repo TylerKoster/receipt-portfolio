@@ -81,7 +81,10 @@ function containsPhrase(value: string, phrase: string): boolean {
 
 function scoreEntry(entry: SearchIndexEntry, query: string): number {
   const queryTokens = tokens(query);
-  if (queryTokens.length === 0 || !queryTokens.every((token) => entry.tokens.has(token))) {
+  if (
+    queryTokens.length === 0 ||
+    !queryTokens.every((token) => entry.tokens.has(token))
+  ) {
     return 0;
   }
 
@@ -89,25 +92,35 @@ function scoreEntry(entry: SearchIndexEntry, query: string): number {
     (containsPhrase(entry.title, query) ? 10_000 : 0) +
     (containsPhrase(entry.topics, query) ? 10_000 : 0) +
     (containsPhrase(entry.excerpt, query) ? 10_000 : 0);
-  const titleTokenScore = queryTokens.filter((token) =>
-    tokens(entry.title).includes(token),
-  ).length * 100;
-  const topicTokenScore = queryTokens.filter((token) =>
-    tokens(entry.topics).includes(token),
-  ).length * 50;
-  const excerptTokenScore = queryTokens.filter((token) =>
-    tokens(entry.excerpt).includes(token),
-  ).length * 10;
+  const titleTokenScore =
+    queryTokens.filter((token) => tokens(entry.title).includes(token)).length *
+    100;
+  const topicTokenScore =
+    queryTokens.filter((token) => tokens(entry.topics).includes(token)).length *
+    50;
+  const excerptTokenScore =
+    queryTokens.filter((token) => tokens(entry.excerpt).includes(token))
+      .length * 10;
 
-  return exactPhraseScore + titleTokenScore + topicTokenScore + excerptTokenScore;
+  return (
+    exactPhraseScore + titleTokenScore + topicTokenScore + excerptTokenScore
+  );
 }
 
 function compareResults(left: SearchResult, right: SearchResult): number {
   return (
     right.score - left.score ||
-    (left.videoSlug < right.videoSlug ? -1 : left.videoSlug > right.videoSlug ? 1 : 0) ||
+    (left.videoSlug < right.videoSlug
+      ? -1
+      : left.videoSlug > right.videoSlug
+        ? 1
+        : 0) ||
     left.startSeconds - right.startSeconds ||
-    (left.momentId < right.momentId ? -1 : left.momentId > right.momentId ? 1 : 0)
+    (left.momentId < right.momentId
+      ? -1
+      : left.momentId > right.momentId
+        ? 1
+        : 0)
   );
 }
 
@@ -115,7 +128,9 @@ function timestampFromUrl(url: string): number | null {
   try {
     const parsed = new URL(url);
     const value =
-      parsed.searchParams.get('t') ?? parsed.hash.match(/^#t=(\d+)$/u)?.[1] ?? null;
+      parsed.searchParams.get('t') ??
+      parsed.hash.match(/^#t=(\d+)$/u)?.[1] ??
+      null;
     if (value === null || !/^\d+$/u.test(value)) return null;
     const seconds = Number(value);
     return Number.isSafeInteger(seconds) ? seconds : null;
@@ -143,18 +158,25 @@ export function buildTimestampUrl(
 export function buildSearchIndex(corpus: VideoCorpus): SearchIndex {
   const validation = validateVideoCorpus(corpus);
   if (!validation.ok) {
-    throw new Error(`Invalid video corpus: ${validation.diagnostics.join(', ')}`);
+    throw new Error(
+      `Invalid video corpus: ${validation.diagnostics.join(', ')}`,
+    );
   }
 
   const videosById = new Map(corpus.videos.map((video) => [video.id, video]));
   const entries = corpus.moments
     .filter(
-      (moment): moment is VideoMoment & { readonly state: 'active' | 'corrected' } =>
+      (
+        moment,
+      ): moment is VideoMoment & { readonly state: 'active' | 'corrected' } =>
         moment.state === 'active' || moment.state === 'corrected',
     )
     .map((moment) => {
       const video = videosById.get(moment.videoId);
-      if (!video) throw new Error(`Invalid video corpus: missing video ${moment.videoId}`);
+      if (!video)
+        throw new Error(
+          `Invalid video corpus: missing video ${moment.videoId}`,
+        );
       const title = normalize(video.title);
       const topics = normalize(moment.topicSlugs.join(' '));
       const excerpt = normalize(moment.excerpt);
@@ -237,8 +259,11 @@ export function evaluateBenchmark(
     topThreeRecall:
       results.length === 0
         ? 0
-        : results.filter((result) => result.topThreeHit).length / results.length,
+        : results.filter((result) => result.topThreeHit).length /
+          results.length,
     maximumTimestampLandingErrorSeconds:
-      observedLandingErrors.length === 0 ? 0 : Math.max(...observedLandingErrors),
+      observedLandingErrors.length === 0
+        ? 0
+        : Math.max(...observedLandingErrors),
   };
 }
