@@ -143,8 +143,8 @@ function hasExactRunLine(step: Step, line: string): boolean {
   return (step.run ?? '').split('\n').some((candidate) => candidate === line);
 }
 
-function requiredRunLine(step: Step, line: string): void {
-  expect(hasExactRunLine(step, line), `missing exact ${line}`).toBe(true);
+function requiredRunBlock(step: Step, lines: readonly string[]): void {
+  expect(step.run, `unexpected ${step.name} run block`).toBe(lines.join('\n'));
 }
 
 function orderedCommands(job: Job, commands: readonly string[]): void {
@@ -205,22 +205,31 @@ function assertVerifyContract(workflow: string): void {
     'npm run build',
     'npm run build:manifest > artifacts/build-manifest-first.txt',
   ]);
-  requiredRunLine(
-    requiredStep(verify, 'Build first clean static tree'),
+  const firstBuild = requiredStep(verify, 'Build first clean static tree');
+  const secondBuild = requiredStep(verify, 'Build second clean static tree');
+  const compareBuilds = requiredStep(
+    verify,
+    'Compare deterministic build manifests',
+  );
+  requiredRunBlock(firstBuild, [
     'rm -rf dist/sites',
-  );
-  requiredRunLine(
-    requiredStep(verify, 'Build first clean static tree'),
+    'npm run build',
+    'mkdir -p artifacts',
     'npm run build:manifest > artifacts/build-manifest-first.txt',
-  );
-  requiredRunLine(
-    requiredStep(verify, 'Build second clean static tree'),
+  ]);
+  requiredRunBlock(secondBuild, [
+    'rm -rf dist/sites',
+    'npm run build',
     'npm run build:manifest > artifacts/build-manifest-second.txt',
-  );
-  expect(
-    requiredStep(verify, 'Compare deterministic build manifests').run,
-  ).toBe(
+  ]);
+  expect(compareBuilds.run).toBe(
     'cmp artifacts/build-manifest-first.txt artifacts/build-manifest-second.txt',
+  );
+  expect(verify.steps.indexOf(secondBuild)).toBeGreaterThan(
+    verify.steps.indexOf(firstBuild),
+  );
+  expect(verify.steps.indexOf(compareBuilds)).toBeGreaterThan(
+    verify.steps.indexOf(secondBuild),
   );
 }
 
@@ -300,16 +309,24 @@ function assertDeployContract(workflow: string): void {
     publicHealth,
     'Verify AI Moment Index public routes and timestamp documents',
   );
-  for (const route of publicRoutes) requiredRunLine(health, `  '${route}' \\`);
-  requiredRunLine(health, `source_timestamp='${sourceTimestamp}'`);
-  requiredRunLine(
-    health,
+  requiredRunBlock(health, [
+    'home_document="$(mktemp)"',
+    'video_document="$(mktemp)"',
+    'moment_document="$(mktemp)"',
+    'trap \'rm -f "$home_document" "$video_document" "$moment_document"\' EXIT',
+    'curl --fail --show-error --silent --location \\',
+    `  '${publicRoutes[0]}' \\`,
+    '  > "$home_document"',
+    'curl --fail --show-error --silent --location \\',
+    `  '${publicRoutes[1]}' \\`,
+    '  > "$video_document"',
+    'curl --fail --show-error --silent --location \\',
+    `  '${publicRoutes[2]}' \\`,
+    '  > "$moment_document"',
+    `source_timestamp='${sourceTimestamp}'`,
     'grep --fixed-strings -- "$source_timestamp" "$video_document"',
-  );
-  requiredRunLine(
-    health,
     'grep --fixed-strings -- "$source_timestamp" "$moment_document"',
-  );
+  ]);
 }
 
 const verifyWorkflow = readFileSync(
@@ -396,6 +413,66 @@ describe('AI Moment Index release workflow contract', () => {
         verifyWorkflow.replace(
           'permissions:\n  contents: read\n\njobs:',
           'jobs:',
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a second deterministic build without a clean output reset', () => {
+    expect(() =>
+      assertVerifyContract(
+        verifyWorkflow.replace(
+          '      - name: Build second clean static tree\n        shell: bash\n        run: |\n          rm -rf dist/sites\n',
+          '      - name: Build second clean static tree\n        shell: bash\n        run: |\n',
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a second deterministic build ordered before the first', () => {
+    const firstStart = verifyWorkflow.indexOf(
+      '      - name: Build first clean static tree',
+    );
+    const secondStart = verifyWorkflow.indexOf(
+      '      - name: Build second clean static tree',
+    );
+    const compareStart = verifyWorkflow.indexOf(
+      '      - name: Compare deterministic build manifests',
+    );
+    const reordered =
+      verifyWorkflow.slice(0, firstStart) +
+      verifyWorkflow.slice(secondStart, compareStart) +
+      verifyWorkflow.slice(firstStart, secondStart) +
+      verifyWorkflow.slice(compareStart);
+
+    expect(() => assertVerifyContract(reordered)).toThrow();
+  });
+
+  it('rejects aliased public-health temporary documents', () => {
+    expect(() =>
+      assertDeployContract(
+        deployWorkflow.replace(
+          'moment_document="$(mktemp)"',
+          'moment_document="$video_document"',
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects multiple public routes redirected to one document', () => {
+    expect(() =>
+      assertDeployContract(
+        deployWorkflow.replace('> "$moment_document"', '> "$video_document"'),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a home health fetch that permits HTTP errors', () => {
+    expect(() =>
+      assertDeployContract(
+        deployWorkflow.replace(
+          "curl --fail --show-error --silent --location \\\n            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/'",
+          "curl --show-error --silent --location \\\n            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/'",
         ),
       ),
     ).toThrow();
