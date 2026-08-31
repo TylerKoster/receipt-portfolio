@@ -191,13 +191,43 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function hasOnlyExpectedEnumerableArrayEntries(
+  value: readonly unknown[],
+  expectedLength: number,
+): boolean {
+  const enumerableKeys = Reflect.ownKeys(value).filter((key) =>
+    Object.prototype.propertyIsEnumerable.call(value, key),
+  );
+  if (enumerableKeys.length !== expectedLength) {
+    return false;
+  }
+
+  for (let index = 0; index < expectedLength; index += 1) {
+    if (!Object.hasOwn(value, index)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function exactValueMatches(value: unknown, expected: unknown): boolean {
   if (Array.isArray(expected)) {
-    return (
-      Array.isArray(value) &&
-      value.length === expected.length &&
-      value.every((entry, index) => exactValueMatches(entry, expected[index]))
-    );
+    if (
+      !Array.isArray(value) ||
+      value.length !== expected.length ||
+      !hasOnlyExpectedEnumerableArrayEntries(value, expected.length)
+    ) {
+      return false;
+    }
+
+    for (let index = 0; index < expected.length; index += 1) {
+      if (!exactValueMatches(value[index], expected[index])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   if (isRecord(expected)) {
@@ -282,17 +312,23 @@ export function validateSourceBoundInvestigationHandoff(
     diagnostics.push('HANDOFF_IDENTITY_INVALID');
   }
 
-  for (const binding of sourceBindings) {
-    const sourceId = binding.sourceId;
+  for (let index = 0; index < sourceBindings.length; index += 1) {
+    const binding = sourceBindings[index];
+    if (!Object.hasOwn(sourceBindings, index) || !isRecord(binding)) {
+      diagnostics.push(`SOURCE_BINDING_INVALID:${index}`);
+      continue;
+    }
+    const sourceBinding = binding as SourceBindingCandidate;
+    const sourceId = sourceBinding.sourceId;
     const expectedEndpoint =
       sourceId === undefined ? undefined : approvedSourceBindings[sourceId];
     const manifest = sourceId === undefined ? undefined : manifests[sourceId];
     if (
       !nonEmptyString(sourceId) ||
       !expectedEndpoint ||
-      binding.endpoint !== expectedEndpoint ||
-      !nonEmptyString(binding.purpose) ||
-      !nonEmptyString(binding.citation) ||
+      sourceBinding.endpoint !== expectedEndpoint ||
+      !nonEmptyString(sourceBinding.purpose) ||
+      !nonEmptyString(sourceBinding.citation) ||
       manifest?.sourceId !== sourceId ||
       manifest?.endpoint !== expectedEndpoint
     ) {
@@ -342,23 +378,27 @@ export function validateSourceBoundInvestigationHandoff(
     { kind: 'own-site-dated-evidence', sourceBindingIds: undefined },
     { kind: 'unknowns-no-causation', sourceBindingIds: undefined },
   ];
-  if (
-    checklist.length !== expectedChecklist.length ||
-    checklist.some((item, index) => {
-      const expected = expectedChecklist[index];
-      return (
-        item?.step !== index + 1 ||
-        item?.kind !== expected.kind ||
-        !nonEmptyString(item?.instruction) ||
-        (expected.sourceBindingIds === undefined
-          ? item?.sourceBindingIds !== undefined
-          : !sourceBindingIdsMatch(
-              item?.sourceBindingIds,
-              expected.sourceBindingIds,
-            ))
-      );
-    })
-  ) {
+  let checklistInvalid = checklist.length !== expectedChecklist.length;
+  for (let index = 0; index < expectedChecklist.length; index += 1) {
+    const expected = expectedChecklist[index];
+    const item = checklist[index];
+    if (
+      !Object.hasOwn(checklist, index) ||
+      item?.step !== index + 1 ||
+      item?.kind !== expected.kind ||
+      !nonEmptyString(item?.instruction) ||
+      (expected.sourceBindingIds === undefined
+        ? item?.sourceBindingIds !== undefined
+        : !sourceBindingIdsMatch(
+            item?.sourceBindingIds,
+            expected.sourceBindingIds,
+          ))
+    ) {
+      checklistInvalid = true;
+      break;
+    }
+  }
+  if (checklistInvalid) {
     diagnostics.push('HANDOFF_CHECKLIST_INVALID');
   }
 

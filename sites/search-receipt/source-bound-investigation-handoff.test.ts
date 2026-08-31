@@ -206,6 +206,54 @@ describe('Search Receipt source-bound investigation handoff contract', () => {
     });
   });
 
+  it('fails closed with diagnostics for sparse or enumerable-additive contract arrays', () => {
+    const sparseChecklist = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    delete sparseChecklist.checklist[2];
+
+    const sparseSourceBindings = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    delete sparseSourceBindings.sourceBindings[0];
+
+    const sparseFactualStatements = JSON.parse(
+      readFileSync(handoffPath, 'utf8'),
+    );
+    delete sparseFactualStatements.factualStatements[1];
+
+    const sparseUnknowns = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    delete sparseUnknowns.boundaries.unknowns[1];
+
+    const sparseFaqBindingIds = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    delete sparseFaqBindingIds.faqs[0].sourceBindingIds[0];
+
+    const enumerableChecklistProperty = JSON.parse(
+      readFileSync(handoffPath, 'utf8'),
+    );
+    enumerableChecklistProperty.checklist.unapprovedProperty =
+      'Current incident confirmed.';
+
+    const mutations = [
+      sparseChecklist,
+      sparseSourceBindings,
+      sparseFactualStatements,
+      sparseUnknowns,
+      sparseFaqBindingIds,
+      enumerableChecklistProperty,
+    ];
+
+    for (const mutation of mutations) {
+      expect(() =>
+        validateSourceBoundInvestigationHandoff(mutation, admittedManifests()),
+      ).not.toThrow();
+      expect(
+        validateSourceBoundInvestigationHandoff(mutation, admittedManifests()),
+      ).toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          'IMMUTABLE_HANDOFF_CONTRACT_INVALID',
+        ]),
+      });
+    }
+  });
+
   it('fails closed if the handoff is presented as released without coordinator evidence', () => {
     const handoff = JSON.parse(readFileSync(handoffPath, 'utf8'));
     const unsupportedRelease = structuredClone(handoff);
