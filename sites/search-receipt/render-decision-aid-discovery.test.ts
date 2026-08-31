@@ -95,6 +95,25 @@ describe('Search Receipt decision-aid discovery route', () => {
   });
 
   it.each([
+    ['exact', coordinatorReleaseEvidence],
+    ['malformed', { releaseHead: 'not-a-release-head' }],
+  ])(
+    'refuses integrated-pending state with %s coordinator release evidence',
+    (_name, evidence) => {
+      const pendingRelease = structuredClone(discovery);
+      pendingRelease.publication.status = 'ROUTE_INTEGRATED_PENDING_RELEASE';
+      pendingRelease.publication.coordinatorReleaseEvidence = evidence;
+
+      expect(() =>
+        renderSearchReceiptDecisionAidDiscovery(
+          searchReceiptSite,
+          pendingRelease,
+        ),
+      ).toThrow(/must not claim coordinator release evidence/i);
+    },
+  );
+
+  it.each([
     ['missing', undefined],
     [
       'stale head',
