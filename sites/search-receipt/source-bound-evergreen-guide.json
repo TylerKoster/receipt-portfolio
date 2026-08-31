@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "id": "source-bound-evergreen-guide-v1",
+  "queryIntent": "Is Google Search down, or is the problem on my site?",
+  "intendedAudience": "Site owners and search practitioners deciding which evidence to inspect first when they notice a change on their own site.",
+  "decision": "Decide whether to check the official Google Search Status source for a current incident and separately gather own-site evidence, without treating a historical controlled record as a cause.",
+  "metadata": {
+    "title": "Is Google Search down, or is the problem on my site?",
+    "description": "A source-bound three-step guide for checking official Google Search status, historical controlled examples, and your own-site evidence without making a causal claim.",
+    "canonicalSlugProposal": "/guides/is-google-search-down-or-my-site"
+  },
+  "publication": {
+    "status": "ROUTE_UNPUBLISHED",
+    "coordinatorDependency": "A shared public-route adapter is coordinator-owned; this lane does not publish the guide."
+  },
+  "sourceBindings": [
+    {
+      "sourceId": "google-search-status",
+      "endpoint": "https://status.search.google.com/incidents.json",
+      "purpose": "Official Google Search Status source to check directly at decision time."
+    },
+    {
+      "sourceId": "google-search-central-blog",
+      "endpoint": "https://feeds.feedburner.com/blogspot/amDG",
+      "purpose": "Official Google Search Central source material for source-bound context."
+    }
+  ],
+  "factualStatements": [
+    {
+      "text": "The guide binds its current-status check to the admitted official Google Search Status endpoint.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "text": "The guide binds its Search Central context to the admitted official Google Search Central feed endpoint.",
+      "sourceBindingIds": ["google-search-central-blog"]
+    },
+    {
+      "text": "Search Receipt records are controlled historical examples rather than current incident evidence.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    }
+  ],
+  "workflow": [
+    {
+      "step": 1,
+      "instruction": "Check the admitted official Google Search Status source directly at decision time; record only what that source shows then.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "step": 2,
+      "instruction": "Use Search Receipt only to inspect controlled historical examples and source-bound context; do not treat a matching record as current incident evidence.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    },
+    {
+      "step": 3,
+      "instruction": "Compare timing and observations from your own site evidence with the official source, and retain uncertainty when the comparison does not establish a connection.",
+      "sourceBindingIds": ["google-search-status"]
+    }
+  ],
+  "boundaries": {
+    "currentOfficialStatus": "Check the official Google Search Status source directly at decision time. This guide does not report a current status or incident.",
+    "historicalControlledExamples": "Search Receipt records are controlled historical examples, not current incident evidence.",
+    "ownSiteEvidence": "Your own site evidence is separate from official status and controlled examples; your own site evidence comparison that does not establish a connection remains uncertain.",
+    "noCausation": "A matching record does not explain a change on your own site.",
+    "unknowns": [
+      "This guide cannot determine whether Google Search is currently down.",
+      "This guide cannot establish the cause of a change on your own site.",
+      "This guide does not establish a connection when timing or observations do not support one."
+    ]
+  },
+  "faqs": [
+    {
+      "question": "Is Google Search down right now?",
+      "answer": "Check the admitted official Google Search Status source directly at decision time. This guide does not state the source's present result.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "question": "Does a matching Search Receipt record explain my site's change?",
+      "answer": "No. Records are controlled historical examples and do not establish the cause of a change on your own site.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    },
+    {
+      "question": "What should I compare before investigating?",
+      "answer": "Compare the official source observed at decision time with dated evidence from your own site, and retain uncertainty if the comparison does not establish a connection.",
+      "sourceBindingIds": ["google-search-status"]
+    }
+  ],
+  "correctionAndCurrentnessPolicy": "Check the official source directly at decision time because this guide does not carry current incident state. If a source binding or guide statement needs correction, correct the contract before any route proposal and preserve the boundary that it does not explain an own-site change."
+}

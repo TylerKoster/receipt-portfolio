@@ -39,17 +39,17 @@ describe('Search Receipt evidence-to-investigation guidance', () => {
     expect(retrievalFilterOffer).toMatchObject({
       id: 'retrieval-filter-offer-v1',
       rank: 1,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
     });
     expect(currentnessDisclosure).toMatchObject({
       id: 'currentness-disclosure-v1',
       rank: 2,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
     });
     expect(investigationGuidance).toMatchObject({
       id: 'evidence-to-investigation-guidance-v1',
       rank: 3,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'Giving a visitor a bounded manual sequence to compare timestamp and status from a verified official source with their own site evidence before considering an investigation may support uncertainty-aware interpretation without claiming current status or cause.',
       firstUserOutcome:

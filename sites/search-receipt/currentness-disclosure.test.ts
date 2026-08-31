@@ -45,12 +45,12 @@ describe('Search Receipt currentness disclosure', () => {
     expect(retrievalFilterOffer).toMatchObject({
       id: 'retrieval-filter-offer-v1',
       rank: 1,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
     });
     expect(currentnessDisclosure).toMatchObject({
       id: 'currentness-disclosure-v1',
       rank: 2,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'Clearly distinguishing controlled examples from current incident evidence before a visitor considers investigating their own site may prevent unsupported causal interpretation.',
       firstUserOutcome:

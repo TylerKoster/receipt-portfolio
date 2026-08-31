@@ -41,7 +41,7 @@
     {
       "id": "retrieval-filter-offer-v1",
       "rank": 1,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "A source-bound retrieval surface may help visitors inspect records without converting records into causal claims about their own sites.",
       "firstUserOutcome": "Enter a query/filter over source-bound records with explicit empty and error states.",
       "metric": "Unmeasured filter-to-record completion after 10 observed non-synthetic sessions.",
@@ -58,103 +58,125 @@
         "offer": "The alert/report interaction is an in-page non-operational preview: it creates no alert or report and sends or retains no data.",
         "measurement": "No telemetry, session, or interest measurement exists; no real demand or revenue conclusion."
       },
-      "nextSafeAction": "Keep the shipped retrieval surface under bounded observation; do not infer demand or revenue unless authorized non-synthetic measurement becomes available."
+      "nextSafeAction": "Keep the shipped retrieval surface under bounded observation; do not infer demand or revenue unless authorized non-synthetic measurement becomes available.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "currentness-disclosure-v1",
       "rank": 2,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "Clearly distinguishing controlled examples from current incident evidence before a visitor considers investigating their own site may prevent unsupported causal interpretation.",
       "firstUserOutcome": "Recognize that controlled examples are not current incident evidence before considering an investigation of their own site.",
       "metric": "Unmeasured currentness-disclosure comprehension after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Use the public disclosure to distinguish controlled examples from current incident evidence; do not infer demand or revenue without measured non-synthetic sessions."
+      "nextSafeAction": "Use the public disclosure to distinguish controlled examples from current incident evidence; do not infer demand or revenue without measured non-synthetic sessions.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "evidence-to-investigation-guidance-v1",
       "rank": 3,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "Giving a visitor a bounded manual sequence to compare timestamp and status from a verified official source with their own site evidence before considering an investigation may support uncertainty-aware interpretation without claiming current status or cause.",
       "firstUserOutcome": "Compare timestamp and status from a verified official source with their own site evidence before considering an investigation, while retaining uncertainty if no connection is established.",
       "metric": "Unmeasured methodology-guidance comprehension after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Use the methodology guidance to compare a verified official source's timestamp/status with site evidence before considering an investigation; retain uncertainty unless that comparison establishes a connection."
+      "nextSafeAction": "Use the methodology guidance to compare a verified official source's timestamp/status with site evidence before considering an investigation; retain uncertainty unless that comparison establishes a connection.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "no-result-recovery-v1",
       "rank": 4,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "A visible clear-filters action may help a visitor return to all source-bound records after a no-match state without retaining or sending their query/filter input.",
       "firstUserOutcome": "Return to all source-bound records after a no-match without retaining or sending query/filter input.",
       "metric": "Unmeasured no-result recovery after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the clear-filters recovery action under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the clear-filters recovery action under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "interaction-currentness-boundary-v1",
       "rank": 5,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "Placing a clear controlled-example/no-causation boundary at the search interaction may help visitors interpret matching records without treating them as current incident evidence or an explanation for their own site.",
       "firstUserOutcome": "Recognize that a filtered record is a controlled example, not current incident evidence or an explanation for their own-site change.",
       "metric": "Unmeasured interaction-boundary comprehension after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the interaction boundary under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the interaction boundary under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "search-scope-discoverability-v1",
       "rank": 6,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "Clearly naming phrase/topic search in the visible header may help a visitor find the available retrieval action while retaining currentness/no-causation limits.",
       "firstUserOutcome": "Recognize that they can search controlled examples by phrase or topic and that a result is not current incident evidence or proof of their own-site cause.",
       "metric": "Unmeasured search-scope comprehension after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the header search-scope disclosure under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the header search-scope disclosure under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "offer-preview-clarity-v1",
       "rank": 7,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "An explicit local-only preview outcome may help a visitor understand that activating the preview does not retain interest or create a service.",
       "firstUserOutcome": "Recognize that a preview click is confirmed locally only and does not send/store data or create an alert/report.",
       "metric": "Unmeasured offer-preview limit comprehension after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the local-only preview outcome under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the local-only preview outcome under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "query-formulation-guidance-v1",
       "rank": 8,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "Naming the indexed source, topic, publisher, status, service, interpretation, and stated unknowns as source-bound query inputs may help visitors formulate a retrieval query and refine it by topic without treating a match as current evidence or a causal explanation.",
       "firstUserOutcome": "Formulate a source-bound query using the source, topic, publisher, status, service, interpretation, or stated unknowns in a record, then refine it by topic.",
       "metric": "Unmeasured query-formulation completion after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the source-bound query guidance under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the source-bound query guidance under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
     },
     {
       "id": "shareable-filter-view-v1",
       "rank": 9,
-      "status": "ACTIVE_NO_MEASUREMENT",
+      "status": "OBSERVATION_BLOCKED",
       "hypothesis": "A fragment-only link to the current source-bound query and topic filter may let visitors reproduce or share a retrieval view without transmitting, retaining, or measuring their input.",
       "firstUserOutcome": "Open a link that restores the same source-bound query and topic filter without sending or retaining input.",
       "metric": "Unmeasured shareable-filter completion after 10 observed non-synthetic sessions.",
       "target": ">=60% after 10 observed non-synthetic sessions",
       "stopRule": "<30% after 10 sessions retires or reframes the experiment.",
       "noDataBoundary": "No data means no demand or revenue conclusion.",
-      "nextSafeAction": "Keep the fragment-only filtered-view link under bounded observation only; no data means no demand or revenue conclusion."
+      "nextSafeAction": "Keep the fragment-only filtered-view link under bounded observation only; no data means no demand or revenue conclusion.",
+      "blockedBy": "No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand."
+    },
+    {
+      "id": "source-bound-evergreen-guide-v1",
+      "rank": 10,
+      "status": "READY_FOR_COORDINATOR_ROUTE_ADAPTER",
+      "hypothesis": "A narrowly scoped source-bound guide may help a visitor choose what to inspect first without claiming current incident state, cause, search traffic, demand, conversion, revenue, or another commercial outcome.",
+      "firstUserOutcome": "Use a three-step separation of official current-status checking, historical controlled examples, and own-site evidence while retaining uncertainty about cause.",
+      "metric": "Deterministic admission of every required guide-contract element and source binding.",
+      "target": "100% deterministic admission before any public-route proposal.",
+      "stopRule": "Stop publication preparation if a required boundary or source binding cannot be admitted.",
+      "noDataBoundary": "Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.",
+      "coordinatorDependency": "A shared public-route adapter is coordinator-owned; this lane does not publish the guide.",
+      "nextSafeAction": "Provide the admitted route-unpublished contract to the coordinator; do not claim public availability or commercial outcomes."
     }
   ]
 }

@@ -3,6 +3,135 @@ import { describe, expect, it } from 'vitest';
 
 const ledgerPath = new URL('./product-experiment-ledger.json', import.meta.url);
 
+const observationBlocker =
+  'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
+
+const sessionExperimentHistory = [
+  {
+    id: 'retrieval-filter-offer-v1',
+    rank: 1,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured filter-to-record completion after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'currentness-disclosure-v1',
+    rank: 2,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured currentness-disclosure comprehension after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'evidence-to-investigation-guidance-v1',
+    rank: 3,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured methodology-guidance comprehension after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'no-result-recovery-v1',
+    rank: 4,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured no-result recovery after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'interaction-currentness-boundary-v1',
+    rank: 5,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured interaction-boundary comprehension after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'search-scope-discoverability-v1',
+    rank: 6,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured search-scope comprehension after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'offer-preview-clarity-v1',
+    rank: 7,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured offer-preview limit comprehension after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'query-formulation-guidance-v1',
+    rank: 8,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured query-formulation completion after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+  {
+    id: 'shareable-filter-view-v1',
+    rank: 9,
+    status: 'OBSERVATION_BLOCKED',
+    metric:
+      'Unmeasured shareable-filter completion after 10 observed non-synthetic sessions.',
+    target: '>=60% after 10 observed non-synthetic sessions',
+    stopRule: '<30% after 10 sessions retires or reframes the experiment.',
+    noDataBoundary: 'No data means no demand or revenue conclusion.',
+    blockedBy: observationBlocker,
+  },
+];
+
+function assertSessionExperimentsRemainObservationBlocked(
+  experiments: Array<Record<string, unknown>>,
+) {
+  const sessionExperiments = experiments
+    .filter((experiment) => {
+      const rank = experiment.rank;
+      return typeof rank === 'number' && rank >= 1 && rank <= 9;
+    })
+    .sort((left, right) => Number(left.rank) - Number(right.rank));
+
+  expect(
+    sessionExperiments.map((experiment) => ({
+      id: experiment.id,
+      rank: experiment.rank,
+      status: experiment.status,
+      metric: experiment.metric,
+      target: experiment.target,
+      stopRule: experiment.stopRule,
+      noDataBoundary: experiment.noDataBoundary,
+      blockedBy: experiment.blockedBy,
+    })),
+  ).toEqual(sessionExperimentHistory);
+}
+
 describe('Search Receipt product experiment ledger', () => {
   it('preserves synthetic usability evidence and records the shipped retrieval surface without claiming measurement', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
@@ -47,7 +176,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[0]).toMatchObject({
       id: 'retrieval-filter-offer-v1',
       rank: 1,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       firstUserOutcome:
         'Enter a query/filter over source-bound records with explicit empty and error states.',
       metric:
@@ -69,7 +198,10 @@ describe('Search Receipt product experiment ledger', () => {
           'No telemetry, session, or interest measurement exists; no real demand or revenue conclusion.',
       },
     });
-    expect(ledger.experiments[0]).not.toHaveProperty('blockedBy');
+    expect(ledger.experiments[0]).toMatchObject({
+      blockedBy:
+        'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.',
+    });
   });
 
   it('records the interaction currentness boundary without claiming measurement', () => {
@@ -78,7 +210,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[4]).toMatchObject({
       id: 'interaction-currentness-boundary-v1',
       rank: 5,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'Placing a clear controlled-example/no-causation boundary at the search interaction may help visitors interpret matching records without treating them as current incident evidence or an explanation for their own site.',
       firstUserOutcome:
@@ -104,7 +236,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[5]).toMatchObject({
       id: 'search-scope-discoverability-v1',
       rank: 6,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'Clearly naming phrase/topic search in the visible header may help a visitor find the available retrieval action while retaining currentness/no-causation limits.',
       firstUserOutcome:
@@ -124,11 +256,11 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'An explicit local-only preview outcome may help a visitor understand that activating the preview does not retain interest or create a service.',
       firstUserOutcome:
@@ -148,11 +280,11 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       hypothesis:
         'Naming the indexed source, topic, publisher, status, service, interpretation, and stated unknowns as source-bound query inputs may help visitors formulate a retrieval query and refine it by topic without treating a match as current evidence or a causal explanation.',
       firstUserOutcome:
@@ -172,16 +304,63 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(ledger.experiments[8]).toMatchObject({
       id: 'shareable-filter-view-v1',
       rank: 9,
-      status: 'ACTIVE_NO_MEASUREMENT',
+      status: 'OBSERVATION_BLOCKED',
       metric:
         'Unmeasured shareable-filter completion after 10 observed non-synthetic sessions.',
       target: '>=60% after 10 observed non-synthetic sessions',
       stopRule: '<30% after 10 sessions retires or reframes the experiment.',
       noDataBoundary: 'No data means no demand or revenue conclusion.',
     });
+  });
+
+  it('marks session-dependent experiments observation-blocked without treating missing measurement as failure', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankFive = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 5,
+    );
+
+    rankFive.status = 'ACTIVE_NO_MEASUREMENT';
+
+    assertSessionExperimentsRemainObservationBlocked(ledger.experiments);
+    expect(() =>
+      assertSessionExperimentsRemainObservationBlocked(
+        mutatedLedger.experiments,
+      ),
+    ).toThrow();
+    expect(ledger.experiments[9]).toMatchObject({
+      id: 'source-bound-evergreen-guide-v1',
+      rank: 10,
+      status: 'READY_FOR_COORDINATOR_ROUTE_ADAPTER',
+      metric:
+        'Deterministic admission of every required guide-contract element and source binding.',
+      target: '100% deterministic admission before any public-route proposal.',
+      stopRule:
+        'Stop publication preparation if a required boundary or source binding cannot be admitted.',
+      noDataBoundary:
+        'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
+      coordinatorDependency:
+        'A shared public-route adapter is coordinator-owned; this lane does not publish the guide.',
+    });
+  });
+
+  it('fails closed when a historical session experiment metric drifts', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankFive = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 5,
+    );
+
+    rankFive.metric = 'A replacement metric that must not rewrite history.';
+
+    expect(() =>
+      assertSessionExperimentsRemainObservationBlocked(
+        mutatedLedger.experiments,
+      ),
+    ).toThrow();
   });
 });
