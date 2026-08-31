@@ -278,6 +278,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
 
   let index = null;
   let shown = [];
+  let handoffRevision = 0;
   const selected = new Map();
   handoffText.readOnly = true;
   copy.disabled = true;
@@ -482,6 +483,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   };
   const changeSelection = (entry, control) => {
     if (!entry.reviewEvidence) return;
+    handoffRevision += 1;
     if (selected.has(entry.momentId)) {
       selected.delete(entry.momentId);
       handoffStatus.textContent = 'Removed the selected moment from this temporary handoff.';
@@ -551,18 +553,24 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
 
   copy.addEventListener('click', () => {
     if (handoffText.value.length === 0) return;
+    const copyRevision = ++handoffRevision;
     if (!globalThis.isSecureContext || !navigator.clipboard ||
         typeof navigator.clipboard.writeText !== 'function') {
       handoffStatus.textContent = 'Copy is unavailable; the plain text remains visible for manual copying.';
       return;
     }
     navigator.clipboard.writeText(handoffText.value).then(() => {
-      handoffStatus.textContent = 'Handoff text copied for this temporary use.';
+      if (copyRevision === handoffRevision) {
+        handoffStatus.textContent = 'Handoff text copied for this temporary use.';
+      }
     }).catch(() => {
-      handoffStatus.textContent = 'Copy did not complete; the plain text remains visible for manual copying.';
+      if (copyRevision === handoffRevision) {
+        handoffStatus.textContent = 'Copy did not complete; the plain text remains visible for manual copying.';
+      }
     });
   });
   clear.addEventListener('click', () => {
+    handoffRevision += 1;
     selected.clear();
     renderHandoff();
     renderShown();

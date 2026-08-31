@@ -286,6 +286,9 @@ interface ClientHarness {
   readonly status: FakeHTMLElement;
   failNextRender(): void;
   failCopy(): void;
+  deferCopy(): void;
+  resolveCopy(): void;
+  rejectCopy(): void;
   rejectFetch(): Promise<void>;
   resolveNonOkFetch(): Promise<void>;
   resolveIndex(value: unknown): Promise<void>;
@@ -378,6 +381,9 @@ function executeClientPayload(): ClientHarness {
     ['[data-clear-handoff]', clear],
   ]);
   let copyFails = false;
+  let copyDeferred = false;
+  let resolveCopy!: () => void;
+  let rejectCopy!: (error: Error) => void;
   const document = {
     createElement: (tagName: string) => new FakeHTMLElement(tagName),
     querySelector: (selector: string) => selectors.get(selector) ?? null,
@@ -397,9 +403,14 @@ function executeClientPayload(): ClientHarness {
     navigator: {
       clipboard: {
         writeText: () =>
-          copyFails
-            ? Promise.reject(new Error('controlled clipboard failure'))
-            : Promise.resolve(),
+          copyDeferred
+            ? new Promise<void>((resolve, reject) => {
+                resolveCopy = resolve;
+                rejectCopy = reject;
+              })
+            : copyFails
+              ? Promise.reject(new Error('controlled clipboard failure'))
+              : Promise.resolve(),
       },
     },
     URL,
@@ -424,6 +435,15 @@ function executeClientPayload(): ClientHarness {
     },
     failCopy: () => {
       copyFails = true;
+    },
+    deferCopy: () => {
+      copyDeferred = true;
+    },
+    resolveCopy: () => {
+      resolveCopy();
+    },
+    rejectCopy: () => {
+      rejectCopy(new Error('controlled clipboard failure'));
     },
     rejectFetch: async () => {
       rejectFetch(new Error('controlled fetch rejection'));
@@ -1428,6 +1448,60 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.handoffStatus.textContent).toContain('cleared');
     expect(harness.handoffStatus.focusCount).toBeGreaterThan(0);
     expect(executeClientPayload().handoffList.children).toEqual([]);
+  });
+
+  it('keeps Clear authoritative when a deferred clipboard copy resolves afterward', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+    );
+    harness.submit('robots control');
+    byText(
+      descendants(harness.results, 'article')[0]!,
+      'button',
+      'Add to temporary handoff',
+    )?.click();
+    harness.deferCopy();
+    harness.copy.click();
+    harness.clear.click();
+
+    harness.resolveCopy();
+    await flushClientPromises();
+
+    expect(harness.handoffStatus.textContent).toBe(
+      'Temporary handoff cleared.',
+    );
+    expect(harness.handoffList.children).toEqual([]);
+    expect(harness.handoffText.value).toBe('');
+    expect(harness.clear.disabled).toBe(true);
+    expect(FakeHTMLElement.activeElement).toBe(harness.handoffStatus);
+  });
+
+  it('keeps Clear authoritative when a deferred clipboard copy rejects afterward', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+    );
+    harness.submit('robots control');
+    byText(
+      descendants(harness.results, 'article')[0]!,
+      'button',
+      'Add to temporary handoff',
+    )?.click();
+    harness.deferCopy();
+    harness.copy.click();
+    harness.clear.click();
+
+    harness.rejectCopy();
+    await flushClientPromises();
+
+    expect(harness.handoffStatus.textContent).toBe(
+      'Temporary handoff cleared.',
+    );
+    expect(harness.handoffList.children).toEqual([]);
+    expect(harness.handoffText.value).toBe('');
+    expect(harness.clear.disabled).toBe(true);
+    expect(FakeHTMLElement.activeElement).toBe(harness.handoffStatus);
   });
 
   it('updates the focused handoff control in place for add and remove', async () => {
