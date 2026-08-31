@@ -297,6 +297,7 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.textContent).toContain('Raw SHA-256');
     expect(root.textContent).toContain('Normalized SHA-256');
     expect(root.textContent).toContain('Contents SHA-256');
+    expect(root.textContent).toContain('Receipt IDcontrolled-alpha-receipt');
     expect(root.textContent).toContain('Declared license');
     expect(root.textContent).toContain('Declared dependencies');
     expect(root.textContent).toContain('Static-signal presence');
@@ -449,6 +450,26 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.attributes.get('data-skill-ledger-state')).toBe('error');
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
     expect(root.textContent).not.toContain('https://?');
+  });
+
+  it('fails closed when supplied controlled records share a receipt identity', () => {
+    const document = new FakeDocument();
+    const root = document.createElement('section');
+    const duplicateIdentityRecords = [
+      records[0],
+      { ...records[1], receiptId: 'receipt-a' },
+    ];
+
+    initializePublicSkillLedgerInventory(
+      root as unknown as PublicSkillLedgerRoot,
+      duplicateIdentityRecords,
+    );
+    expect(root.attributes.get('data-skill-ledger-state')).toBe('error');
+    expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
+    expect(root.querySelector('[data-skill-ledger-error]')?.hidden).toBe(false);
+    expect(root.querySelector('[data-skill-ledger-error]')?.textContent).toBe(
+      'Supplied records failed controlled-only validation and were not shown.',
+    );
   });
 
   it('contains no network, persistence, navigation, telemetry, or HTML-string sinks', async () => {

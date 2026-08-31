@@ -346,6 +346,7 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
   );
 
   const details = documentOwner.createElement('dl');
+  appendDetail(documentOwner, details, 'Receipt ID', record.receiptId);
   appendDetail(documentOwner, details, 'Evidence class', record.evidenceClass);
   appendDetail(documentOwner, details, 'Source ID', record.source.sourceId);
   appendDetail(documentOwner, details, 'Source URL', record.source.url);
@@ -473,7 +474,9 @@ export function initializePublicSkillLedgerInventory(
   }
 
   const recordsAreControlled =
-    Array.isArray(records) && records.every(isControlledPublicSkillRecord);
+    Array.isArray(records) &&
+    records.every(isControlledPublicSkillRecord) &&
+    new Set(records.map((record) => record.receiptId)).size === records.length;
   const sourceRecords = recordsAreControlled ? [...records] : [];
   root.textContent = '';
   root.setAttribute('data-skill-ledger-public-inventory', '');
