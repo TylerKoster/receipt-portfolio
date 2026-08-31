@@ -474,7 +474,13 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     clear.disabled = entries.length === 0;
   };
   const renderShown = () => results.replaceChildren(...shown.map(card));
-  const changeSelection = (entry) => {
+  const updateSelectionControl = (control, isSelected) => {
+    control.textContent = isSelected
+      ? 'Remove from temporary handoff'
+      : 'Add to temporary handoff';
+    control.focus();
+  };
+  const changeSelection = (entry, control) => {
     if (!entry.reviewEvidence) return;
     if (selected.has(entry.momentId)) {
       selected.delete(entry.momentId);
@@ -484,7 +490,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       handoffStatus.textContent = 'Added one reviewed moment to this temporary handoff.';
     }
     renderHandoff();
-    renderShown();
+    updateSelectionControl(control, selected.has(entry.momentId));
   };
   const card = (entry) => {
     const article = document.createElement('article');
@@ -529,7 +535,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       select.textContent = alreadySelected
         ? 'Remove from temporary handoff'
         : 'Add to temporary handoff';
-      select.addEventListener('click', () => changeSelection(entry));
+      select.addEventListener('click', () => changeSelection(entry, select));
       article.append(select);
     }
     return article;

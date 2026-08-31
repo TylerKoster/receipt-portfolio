@@ -124,6 +124,7 @@ type Mutable<Value> = {
 type SubmitListener = (event: { preventDefault(): void }) => void;
 
 class FakeHTMLElement {
+  static activeElement: FakeHTMLElement | null = null;
   readonly children: FakeHTMLElement[] = [];
   readonly dataset: Record<string, string> = {};
   private readonly clickListeners = new Map<string, (() => void)[]>();
@@ -132,6 +133,8 @@ class FakeHTMLElement {
   disabled = false;
   hidden = false;
   href = '';
+  isConnected = false;
+  parentElement: FakeHTMLElement | null = null;
   readOnly = false;
   textContent = '';
   type = '';
@@ -141,6 +144,10 @@ class FakeHTMLElement {
   constructor(readonly tagName = 'div') {}
 
   append(...children: FakeHTMLElement[]): void {
+    children.forEach((child) => {
+      child.parentElement = this;
+      child.setConnected(this.isConnected);
+    });
     this.children.push(...children);
   }
 
@@ -149,7 +156,20 @@ class FakeHTMLElement {
       this.failNextReplace = false;
       throw new Error('controlled DOM write failure');
     }
+    this.children.forEach((child) => {
+      child.parentElement = null;
+      child.setConnected(false);
+    });
+    children.forEach((child) => {
+      child.parentElement = this;
+      child.setConnected(this.isConnected);
+    });
     this.children.splice(0, this.children.length, ...children);
+  }
+
+  setConnected(isConnected: boolean): void {
+    this.isConnected = isConnected;
+    this.children.forEach((child) => child.setConnected(isConnected));
   }
 
   addEventListener(type: string, listener: () => void): void {
@@ -166,6 +186,7 @@ class FakeHTMLElement {
 
   focus(): void {
     this.focusCount += 1;
+    if (this.isConnected) FakeHTMLElement.activeElement = this;
   }
 
   get value(): string {
@@ -296,6 +317,7 @@ async function flushClientPromises(): Promise<void> {
 }
 
 function executeClientPayload(): ClientHarness {
+  FakeHTMLElement.activeElement = null;
   const initializationOrder: string[] = [];
   const form = new FakeHTMLFormElement(initializationOrder);
   const input = new FakeHTMLInputElement(initializationOrder, () =>
@@ -313,6 +335,19 @@ function executeClientPayload(): ClientHarness {
   const handoff = new FakeHTMLElement('section');
   handoff.dataset.momentPageBase =
     'https://receipt-portfolio.example/video-moment-search/moments/';
+  [
+    form,
+    input,
+    status,
+    results,
+    error,
+    handoffList,
+    handoffText,
+    handoffStatus,
+    copy,
+    clear,
+    handoff,
+  ].forEach((element) => element.setConnected(true));
   const serverResults = new FakeHTMLElement('section');
   serverResults.textContent = 'server-rendered initial result';
   let resolveFetch!: (response: {
@@ -1393,6 +1428,36 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.handoffStatus.textContent).toContain('cleared');
     expect(harness.handoffStatus.focusCount).toBeGreaterThan(0);
     expect(executeClientPayload().handoffList.children).toEqual([]);
+  });
+
+  it('updates the focused handoff control in place for add and remove', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+    );
+    harness.submit('robots control');
+    const control = byText(
+      descendants(harness.results, 'article')[0]!,
+      'button',
+      'Add to temporary handoff',
+    );
+    expect(control).toBeDefined();
+    if (control === undefined) throw new Error('expected the handoff control');
+
+    control.focus();
+    expect(FakeHTMLElement.activeElement).toBe(control);
+    control.click();
+    expect(control.isConnected).toBe(true);
+    expect(FakeHTMLElement.activeElement).toBe(control);
+    expect(control.textContent).toBe('Remove from temporary handoff');
+    expect(harness.handoffList.children).toHaveLength(1);
+
+    control.click();
+    expect(harness.handoffList.children).toEqual([]);
+    expect(harness.handoffText.value).toBe('');
+    expect(control.isConnected).toBe(true);
+    expect(FakeHTMLElement.activeElement).toBe(control);
+    expect(control.textContent).toBe('Add to temporary handoff');
   });
 
   it('does not expose a handoff add control for unreviewed or malformed public-index entries', async () => {
