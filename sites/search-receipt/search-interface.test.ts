@@ -357,7 +357,7 @@ describe('Search Receipt query and offer adapter', () => {
     const reset = elements.get('[data-search-reset]');
     expect(reset?.textContent).toBe('Clear filters');
     expect(initializeSearchReceipt(root)).toBe(true);
-    expect(form.appendCount).toBe(3);
+    expect(form.appendCount).toBe(4);
     expect(reset?.listeners.get('click')).toHaveLength(1);
     reset?.listeners
       .get('click')
@@ -555,6 +555,305 @@ describe('Search Receipt query and offer adapter', () => {
     );
   });
 
+  it('keeps the filtered-view link and address bar synchronized through reset and reload', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    interface FakeElement {
+      addEventListener(type: string, listener: Listener): void;
+      append(child: FakeElement): void;
+      attributes: Map<string, string>;
+      dataset: Record<string, string>;
+      getAttribute(name: string): string | null;
+      hidden: boolean;
+      listeners: Map<string, Listener[]>;
+      setAttribute(name: string, value: string): void;
+      textContent: string;
+      type: string;
+      value: string;
+    }
+    const location = {
+      hash: '#search?query=resolved&topic=search-status',
+      pathname: '/search-receipt/',
+      search: '?external=1',
+    };
+    const historyCalls: string[] = [];
+    const createRoot = () => {
+      const elements = new Map<string, FakeElement>();
+      const element = (): FakeElement => ({
+        addEventListener(type: string, listener: Listener) {
+          this.listeners.set(type, [
+            ...(this.listeners.get(type) ?? []),
+            listener,
+          ]);
+        },
+        append(child: FakeElement) {
+          const selector = [...child.attributes.keys()].find((name) =>
+            name.startsWith('data-'),
+          );
+          if (selector) elements.set(`[${selector}]`, child);
+        },
+        attributes: new Map(),
+        dataset: {},
+        getAttribute(name: string) {
+          return this.attributes.get(name) ?? null;
+        },
+        hidden: false,
+        listeners: new Map<string, Listener[]>(),
+        setAttribute(name: string, value: string) {
+          this.attributes.set(name, value);
+        },
+        textContent: '',
+        type: '',
+        value: '',
+      });
+      const form = element();
+      const history = {
+        replaceState(_state: null, _title: string, target: string) {
+          historyCalls.push(target);
+          location.hash = target.includes('#')
+            ? `#${target.split('#')[1]}`
+            : '';
+        },
+      };
+      Object.assign(form, {
+        ownerDocument: {
+          createElement: () => element(),
+          defaultView: { history, location },
+        },
+      });
+      const query = element();
+      const topic = element();
+      const status = element();
+      const empty = element();
+      const error = element();
+      const cards = [
+        {
+          dataset: {
+            searchText: 'google crawling resolved',
+            searchTopic: 'search-status',
+          },
+          hidden: false,
+        },
+        {
+          dataset: {
+            searchText: 'central blog robots guidance',
+            searchTopic: 'guidance',
+          },
+          hidden: false,
+        },
+      ];
+      return {
+        elements,
+        form,
+        query,
+        root: {
+          history,
+          location,
+          querySelector: (selector: string) => {
+            const values = new Map([
+              ['[data-search-controls]', form],
+              ['[data-search-query]', query],
+              ['[data-search-topic-filter]', topic],
+              ['[data-search-status]', status],
+              ['[data-search-empty]', empty],
+              ['[data-search-error]', error],
+            ]);
+            return values.get(selector) ?? elements.get(selector) ?? null;
+          },
+          querySelectorAll: () => cards,
+        } as unknown as SearchRoot,
+        topic,
+      };
+    };
+    const current = createRoot();
+
+    expect(initializeSearchReceipt(current.root)).toBe(true);
+    const link = current.elements.get('[data-search-share-link]');
+    expect(current.query.value).toBe('resolved');
+    expect(current.topic.value).toBe('search-status');
+    expect(link?.attributes.get('href')).toBe(
+      '#search?query=resolved&topic=search-status',
+    );
+    expect(location.hash).toBe('#search?query=resolved&topic=search-status');
+
+    current.elements
+      .get('[data-search-reset]')
+      ?.listeners.get('click')
+      ?.forEach((listener) => listener({ preventDefault() {} }));
+    expect(current.query.value).toBe('');
+    expect(current.topic.value).toBe('');
+    expect(link?.attributes.get('href')).toBe('/search-receipt/');
+    expect(location.hash).toBe('');
+    expect(historyCalls).toEqual(['/search-receipt/']);
+
+    const reloaded = createRoot();
+    expect(initializeSearchReceipt(reloaded.root)).toBe(true);
+    expect(reloaded.query.value).toBe('');
+    expect(reloaded.topic.value).toBe('');
+
+    current.query.value = 'Crawling status';
+    current.topic.value = 'search-status';
+    current.form?.listeners
+      .get('submit')
+      ?.forEach((listener: Listener) => listener({ preventDefault() {} }));
+    expect(link?.attributes.get('href')).toBe(
+      '#search?query=Crawling+status&topic=search-status',
+    );
+    expect(location.hash).toBe(
+      '#search?query=Crawling+status&topic=search-status',
+    );
+
+    current.query.value = 'service & status';
+    current.query.listeners
+      .get('input')
+      ?.forEach((listener) => listener({ preventDefault() {} }));
+    expect(link?.attributes.get('href')).toBe(
+      '#search?query=service+%26+status&topic=search-status',
+    );
+    expect(location.hash).toBe(
+      '#search?query=service+%26+status&topic=search-status',
+    );
+
+    current.topic.value = 'guidance';
+    current.topic.listeners
+      .get('change')
+      ?.forEach((listener) => listener({ preventDefault() {} }));
+    expect(link?.attributes.get('href')).toBe(
+      '#search?query=service+%26+status&topic=guidance',
+    );
+    expect(location.hash).toBe(
+      '#search?query=service+%26+status&topic=guidance',
+    );
+  });
+
+  it('fails safe for malformed, duplicate, and unknown search fragments', () => {
+    type Listener = (event: { preventDefault(): void }) => void;
+    const createRoot = (hash: string) => {
+      const location = { hash, pathname: '/search-receipt/', search: '' };
+      const historyCalls: string[] = [];
+      const elements = new Map<
+        string,
+        {
+          addEventListener(type: string, listener: Listener): void;
+          append(child: unknown): void;
+          attributes: Map<string, string>;
+          dataset: Record<string, string>;
+          hidden: boolean;
+          listeners: Map<string, Listener[]>;
+          setAttribute(name: string, value: string): void;
+          textContent: string;
+          type: string;
+          value: string;
+        }
+      >();
+      const element = () => ({
+        addEventListener(type: string, listener: Listener) {
+          this.listeners.set(type, [
+            ...(this.listeners.get(type) ?? []),
+            listener,
+          ]);
+        },
+        append(child: { attributes: Map<string, string> }) {
+          const selector = [...child.attributes.keys()].find((name) =>
+            name.startsWith('data-'),
+          );
+          if (selector) elements.set(`[${selector}]`, child as never);
+        },
+        attributes: new Map<string, string>(),
+        dataset: {},
+        hidden: false,
+        listeners: new Map<string, Listener[]>(),
+        setAttribute(name: string, value: string) {
+          this.attributes.set(name, value);
+        },
+        textContent: '',
+        type: '',
+        value: '',
+      });
+      const form = element();
+      const history = {
+        replaceState(_state: null, _title: string, target: string) {
+          historyCalls.push(target);
+          location.hash = target.includes('#')
+            ? `#${target.split('#')[1]}`
+            : '';
+        },
+      };
+      Object.assign(form, {
+        ownerDocument: {
+          createElement: element,
+          defaultView: { history, location },
+        },
+      });
+      const query = element();
+      const topic = element();
+      const status = element();
+      const empty = element();
+      const error = element();
+      return {
+        elements,
+        historyCalls,
+        location,
+        query,
+        root: {
+          history,
+          location,
+          querySelector: (selector: string) => {
+            const values = new Map([
+              ['[data-search-controls]', form],
+              ['[data-search-query]', query],
+              ['[data-search-topic-filter]', topic],
+              ['[data-search-status]', status],
+              ['[data-search-empty]', empty],
+              ['[data-search-error]', error],
+            ]);
+            return values.get(selector) ?? elements.get(selector) ?? null;
+          },
+          querySelectorAll: () => [
+            {
+              dataset: {
+                searchText: 'google crawling resolved',
+                searchTopic: 'search-status',
+              },
+              hidden: false,
+            },
+          ],
+        } as unknown as SearchRoot,
+        topic,
+      };
+    };
+
+    for (const hash of [
+      '#search?unknown=value',
+      '#search?query=crawling&topic=unknown',
+      '#search?query=%E0%A4%A&topic=search-status',
+      '#search?query=crawling&topic=search-status&topic=guidance',
+    ]) {
+      const invalid = createRoot(hash);
+      expect(initializeSearchReceipt(invalid.root)).toBe(true);
+      expect(invalid.query.value).toBe('');
+      expect(invalid.topic.value).toBe('');
+      expect(
+        invalid.elements
+          .get('[data-search-share-link]')
+          ?.attributes.get('href'),
+      ).toBe('/search-receipt/');
+      expect(invalid.historyCalls).toEqual(['/search-receipt/']);
+      expect(invalid.location.hash).toBe('');
+    }
+
+    const unrelated = createRoot('#other-state');
+    expect(initializeSearchReceipt(unrelated.root)).toBe(true);
+    expect(unrelated.query.value).toBe('');
+    expect(unrelated.topic.value).toBe('');
+    expect(
+      unrelated.elements
+        .get('[data-search-share-link]')
+        ?.attributes.get('href'),
+    ).toBe('/search-receipt/');
+    expect(unrelated.historyCalls).toEqual([]);
+    expect(unrelated.location.hash).toBe('#other-state');
+  });
+
   it('keeps a visible fallback when initialization cannot bind required controls', () => {
     const html = renderSite(searchReceiptSite, [receipt()]);
     expect(html).toContain(
@@ -577,6 +876,7 @@ describe('Search Receipt query and offer adapter', () => {
     );
     expect(source).not.toMatch(/fetch\s*\(|XMLHttpRequest|sendBeacon/);
     expect(source).not.toMatch(/localStorage|sessionStorage|document\.cookie/);
+    expect(source).not.toMatch(/history\.pushState/);
     expect(source).not.toMatch(/innerHTML|insertAdjacentHTML/);
   });
 
