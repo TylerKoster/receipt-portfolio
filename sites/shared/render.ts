@@ -23,6 +23,7 @@ export interface SiteDefinition {
     readonly label: string;
     readonly targetId:
       'search-controls' | 'receipts-heading' | 'moment-search-controls';
+    readonly path?: string;
   };
   readonly interpretationBoundary: string;
   readonly unknowns: string;
@@ -291,6 +292,7 @@ export function renderStaticPage(
     <p class="proposition">${escapeHtml(site.proposition)}</p>
     <nav aria-label="Primary navigation">
       <a href="${escapeHtml(sitePath(site, '/', publicBaseUrl))}">Receipts</a>
+      ${site.siteId === 'skill-ledger' ? `<a href="${escapeHtml(sitePath(site, '/inventory/', publicBaseUrl))}">Inventory</a>` : ''}
       <a href="${escapeHtml(sitePath(site, '/methodology/', publicBaseUrl))}">Methodology</a>
       <a href="${escapeHtml(sitePath(site, '/sources/', publicBaseUrl))}">Sources</a>
     </nav>
@@ -311,6 +313,12 @@ export function renderSite(
       readonly path: string;
       readonly title: string;
       readonly description: string;
+    };
+    readonly featuredUtility?: {
+      readonly path: string;
+      readonly title: string;
+      readonly description: string;
+      readonly label: string;
     };
   } = {},
 ): string {
@@ -363,18 +371,22 @@ export function renderSite(
     <h3>How to use it</h3><ol>${site.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
     <p><strong>What you get:</strong> ${escapeHtml(site.outcome)}</p>
     <p><strong>What it cannot tell you:</strong> ${escapeHtml(site.unknowns)}</p>
-    <p><a class="primary-action" href="#${site.primaryAction.targetId}">${escapeHtml(site.primaryAction.label)}</a></p></section>`;
+    <p><a class="primary-action" href="${escapeHtml(site.primaryAction.path === undefined ? `#${site.primaryAction.targetId}` : sitePath(site, site.primaryAction.path, publicBaseUrl))}">${escapeHtml(site.primaryAction.label)}</a></p></section>`;
   const featuredGuide =
     options.featuredGuide === undefined
       ? ''
       : `<section class="information-panel" aria-labelledby="featured-guide-heading"><p class="eyebrow">Source-bound guide</p><h2 id="featured-guide-heading">${escapeHtml(options.featuredGuide.title)}</h2><p>${escapeHtml(options.featuredGuide.description)}</p><p><a class="primary-action" href="${escapeHtml(sitePath(site, options.featuredGuide.path, publicBaseUrl))}">Read the three-step guide</a></p></section>`;
+  const featuredUtility =
+    options.featuredUtility === undefined
+      ? ''
+      : `<section class="information-panel" aria-labelledby="featured-utility-heading"><p class="eyebrow">Interactive utility</p><h2 id="featured-utility-heading">${escapeHtml(options.featuredUtility.title)}</h2><p>${escapeHtml(options.featuredUtility.description)}</p><p><a class="primary-action" href="${escapeHtml(sitePath(site, options.featuredUtility.path, publicBaseUrl))}">${escapeHtml(options.featuredUtility.label)}</a></p></section>`;
   return renderStaticPage(
     site,
     {
       path: '/',
       title: site.title,
       description: site.description,
-      body: `${startHere}${featuredGuide}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
+      body: `${startHere}${featuredGuide}${featuredUtility}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
     <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>${offer}`,
       scriptPath: assetPolicy.scriptPath,
       stylePath: assetPolicy.stylePath,
@@ -539,7 +551,7 @@ export function renderPortfolioHub(
   const productLinks = sites
     .map(
       (site) =>
-        `<article class="receipt-card"><h3>${escapeHtml(site.name)}</h3><p><strong>For:</strong> ${escapeHtml(site.audience)}</p><p><strong>Use it when:</strong> ${escapeHtml(site.useCase)}</p><p><strong>Expected output:</strong> ${escapeHtml(site.outcome)}</p><p><a class="primary-action" href="${escapeHtml(`${basePath}${site.siteId}/#${site.primaryAction.targetId}`)}">${escapeHtml(site.primaryAction.label)}</a></p></article>`,
+        `<article class="receipt-card"><h3>${escapeHtml(site.name)}</h3><p><strong>For:</strong> ${escapeHtml(site.audience)}</p><p><strong>Use it when:</strong> ${escapeHtml(site.useCase)}</p><p><strong>Expected output:</strong> ${escapeHtml(site.outcome)}</p><p><a class="primary-action" href="${escapeHtml(site.primaryAction.path === undefined ? `${basePath}${site.siteId}/#${site.primaryAction.targetId}` : sitePath(site, site.primaryAction.path, base))}">${escapeHtml(site.primaryAction.label)}</a></p></article>`,
     )
     .join('\n');
   return `<!doctype html>

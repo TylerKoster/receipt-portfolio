@@ -31,7 +31,11 @@ const REQUIRED_SITE_FILES: Readonly<
     'search-interface.css',
     'search-interface.js',
   ],
-  'skill-ledger': RECEIPT_SITE_FILES,
+  'skill-ledger': [
+    ...RECEIPT_SITE_FILES,
+    'inventory/index.html',
+    'public-inventory-adapter.js',
+  ],
   'video-moment-search': [
     'feed.xml',
     'index.html',

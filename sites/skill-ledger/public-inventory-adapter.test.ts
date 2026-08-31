@@ -279,7 +279,7 @@ describe('SkillLedger public inventory adapter', () => {
       root
         .querySelector('[data-skill-ledger-query]')
         ?.attributes.get('aria-label'),
-    ).toBe('Search controlled package or source records');
+    ).toBeUndefined();
     expect(
       root.querySelector('[data-skill-ledger-license-filter]')?.tagName,
     ).toBe('select');
@@ -349,7 +349,14 @@ describe('SkillLedger public inventory adapter', () => {
     ).toContain('Source URL');
     expect(
       root.querySelector('[data-skill-ledger-comparison]')?.textContent,
-    ).toContain('Left: https://example.invalid/alpha-package; Right:');
+    ).toContain(
+      'Different — Left: https://example.invalid/alpha-package; Right:',
+    );
+    expect(
+      root.querySelector('[data-skill-ledger-comparison]')?.textContent,
+    ).toContain(
+      'Same — Left: 2026-08-30T12:00:00.000Z; Right: 2026-08-30T12:00:00.000Z',
+    );
 
     selections[2].checked = true;
     selections[2].dispatch('change');

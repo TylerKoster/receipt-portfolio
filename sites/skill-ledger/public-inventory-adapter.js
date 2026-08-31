@@ -454,7 +454,7 @@ function renderComparison(documentOwner, comparisonRoot, comparison) {
       documentOwner,
       details,
       label,
-      `Left: ${leftValue}; Right: ${rightValue}`,
+      `${leftValue === rightValue ? 'Same' : 'Different'} — Left: ${leftValue}; Right: ${rightValue}`,
     );
   }
   comparisonRoot.append(details);
@@ -522,10 +522,6 @@ export function initializePublicSkillLedgerInventory(
   const query = documentOwner.createElement('input');
   query.setAttribute('data-skill-ledger-query', '');
   query.setAttribute('type', 'search');
-  query.setAttribute(
-    'aria-label',
-    'Search controlled package or source records',
-  );
   query.type = 'search';
 
   const license = documentOwner.createElement('select');

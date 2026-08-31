@@ -27,7 +27,9 @@ const EXPECTED_PATHS = [
   'search-receipt/styles.css',
   'search-receipt/topics/example-topic/index.html',
   'skill-ledger/index.html',
+  'skill-ledger/inventory/index.html',
   'skill-ledger/methodology/index.html',
+  'skill-ledger/public-inventory-adapter.js',
   `skill-ledger/receipts/${'b'.repeat(64)}/index.html`,
   'skill-ledger/robots.txt',
   'skill-ledger/sitemap.xml',
@@ -54,7 +56,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '5fb576593b84d19b1103140924dfa350156e621ed33959dffd956a05f93dd94d';
+  '73720e19fee609ab436ed20182022f031fd418db1505f3f17181a072c52d9fb7';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -129,6 +131,17 @@ describe('public build manifest', () => {
       /incomplete public output/i,
     );
   });
+
+  it.each(['inventory/index.html', 'public-inventory-adapter.js'])(
+    'rejects a missing SkillLedger inventory artifact: %s',
+    async (relativePath) => {
+      await rm(join(outputDirectory, 'skill-ledger', relativePath));
+
+      await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+        /incomplete public output/i,
+      );
+    },
+  );
 
   it('rejects a missing AI Moment Index artifact', async () => {
     await rm(join(outputDirectory, 'video-moment-search', 'search-index.json'));

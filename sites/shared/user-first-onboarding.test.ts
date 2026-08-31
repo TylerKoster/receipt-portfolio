@@ -93,8 +93,12 @@ describe('user-first product orientation', () => {
       expect(html).toContain(`<strong>Use this when:</strong> ${site.useCase}`);
       expect(html).toContain('<h3>How to use it</h3><ol>');
       expect(html).toContain(`<strong>What you get:</strong> ${site.outcome}`);
+      const expectedActionHref =
+        site.primaryAction.path === undefined
+          ? `#${site.primaryAction.targetId}`
+          : `/${site.siteId}${site.primaryAction.path}`;
       expect(html).toContain(
-        `class="primary-action" href="#${site.primaryAction.targetId}"`,
+        `class="primary-action" href="${expectedActionHref}"`,
       );
       expect(html).toContain(`>${site.primaryAction.label}</a>`);
     }
@@ -118,8 +122,9 @@ describe('user-first product orientation', () => {
     expect(skillLedgerSite.audience).toContain('team lead');
     expect(skillLedgerSite.useCase).toContain('install');
     expect(skillLedgerSite.primaryAction).toEqual({
-      label: 'Inspect the package example',
+      label: 'Open the interactive inventory',
       targetId: 'receipts-heading',
+      path: '/inventory/',
     });
   });
 
@@ -163,8 +168,12 @@ describe('user-first product orientation', () => {
       expect(html).toContain(site.name);
       expect(html).toContain(`<strong>For:</strong> ${site.audience}`);
       expect(html).toContain(`<strong>Use it when:</strong> ${site.useCase}`);
+      const expectedActionPath =
+        site.primaryAction.path === undefined
+          ? `/tools/${site.siteId}/#${site.primaryAction.targetId}`
+          : `/tools/${site.siteId}${site.primaryAction.path}`;
       expect(html).toContain(
-        `<a class="primary-action" href="/tools/${site.siteId}/#${site.primaryAction.targetId}">${site.primaryAction.label}</a>`,
+        `<a class="primary-action" href="${expectedActionPath}">${site.primaryAction.label}</a>`,
       );
     }
     expect(html).not.toContain('<strong>Use it to:</strong>');

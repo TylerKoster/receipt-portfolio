@@ -49,7 +49,10 @@ import {
   renderSources,
   renderTopic,
 } from '../sites/shared/render.js';
-import { skillLedgerSite } from '../sites/skill-ledger/index.js';
+import {
+  renderSkillLedgerPublicInventory,
+  skillLedgerSite,
+} from '../sites/skill-ledger/index.js';
 import { videoMomentSearchSite } from '../sites/video-moment-search/index.js';
 import { VIDEO_MOMENT_SEARCH_CLIENT } from '../sites/video-moment-search/search-client.js';
 import {
@@ -454,6 +457,24 @@ async function writeSiteTree(
         ),
       ]);
     }
+    if (site.siteId === 'skill-ledger') {
+      await mkdir(join(directory, 'inventory'), { recursive: true });
+      await Promise.all([
+        copyFile(
+          join(
+            projectRoot(),
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
+          join(directory, 'public-inventory-adapter.js'),
+        ),
+        writeFile(
+          join(directory, 'inventory', 'index.html'),
+          renderSkillLedgerPublicInventory(publicBaseUrl),
+        ),
+      ]);
+    }
     await writeFile(
       join(directory, 'index.html'),
       renderSite(
@@ -468,7 +489,17 @@ async function writeSiteTree(
                 description: searchGuide.metadata.description,
               },
             }
-          : {},
+          : site.siteId === 'skill-ledger'
+            ? {
+                featuredUtility: {
+                  path: '/inventory/',
+                  title: 'Filter and compare controlled skill records',
+                  description:
+                    'Use an enterable, in-page inventory to screen declared metadata and compare two source-bound controlled examples.',
+                  label: 'Open the interactive inventory',
+                },
+              }
+            : {},
       ),
     );
     await writeFile(
@@ -485,7 +516,11 @@ async function writeSiteTree(
         site,
         visible,
         publicBaseUrl,
-        site.siteId === 'search-receipt' ? [guidePath] : [],
+        site.siteId === 'search-receipt'
+          ? [guidePath]
+          : site.siteId === 'skill-ledger'
+            ? ['/inventory/']
+            : [],
       ),
     );
     await writeFile(

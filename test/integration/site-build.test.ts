@@ -377,6 +377,66 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('publishes the controlled SkillLedger inventory as a first-party interactive route', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const [portfolio, home, inventory, emittedAdapter, sourceAdapter, sitemap] =
+      await Promise.all([
+        readFile(join(outputDirectory, 'index.html'), 'utf8'),
+        readFile(join(outputDirectory, 'skill-ledger', 'index.html'), 'utf8'),
+        readFile(
+          join(outputDirectory, 'skill-ledger', 'inventory', 'index.html'),
+          'utf8',
+        ),
+        readFile(
+          join(outputDirectory, 'skill-ledger', 'public-inventory-adapter.js'),
+          'utf8',
+        ),
+        readFile(
+          join(
+            projectRoot,
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
+          'utf8',
+        ),
+        readFile(join(outputDirectory, 'skill-ledger', 'sitemap.xml'), 'utf8'),
+      ]);
+
+    expect(emittedAdapter).toBe(sourceAdapter);
+    expect(inventory).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/skill-ledger/inventory/">',
+    );
+    expect(inventory).toContain('data-skill-ledger-public-inventory');
+    expect(inventory).toContain(
+      '<script type="module" src="/skill-ledger/public-inventory-adapter.js"></script>',
+    );
+    expect(inventory).toContain("script-src 'self'");
+    expect(home).toContain('href="/skill-ledger/inventory/"');
+    expect(home).toContain('Open the interactive inventory');
+    expect(portfolio).toContain(
+      'href="/skill-ledger/inventory/">Open the interactive inventory</a>',
+    );
+    expect(inventory).toContain('>Inventory</a>');
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/skill-ledger/inventory/</loc>',
+    );
+
+    await expect(
+      readFile(
+        join(
+          outputDirectory,
+          'workflow-test-lab',
+          'public-inventory-adapter.js',
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('normalizes a production base and includes its project path exactly once on every URL surface', async () => {
     const publicBaseUrl = 'https://tylerkoster.github.io/receipt-portfolio////';
     const productionBase = 'https://tylerkoster.github.io/receipt-portfolio/';
@@ -489,8 +549,12 @@ describe('static receipt site build', () => {
     for (const site of SITE_DEFINITIONS) {
       expect(hub).toContain(`<strong>For:</strong> ${site.audience}`);
       expect(hub).toContain(`<strong>Use it when:</strong> ${site.useCase}`);
+      const expectedActionPath =
+        site.primaryAction.path === undefined
+          ? `/receipt-portfolio/${site.siteId}/#${site.primaryAction.targetId}`
+          : `/receipt-portfolio/${site.siteId}${site.primaryAction.path}`;
       expect(hub).toContain(
-        `<a class="primary-action" href="/receipt-portfolio/${site.siteId}/#${site.primaryAction.targetId}">${site.primaryAction.label}</a>`,
+        `<a class="primary-action" href="${expectedActionPath}">${site.primaryAction.label}</a>`,
       );
     }
     expect(hub).not.toContain('<strong>Use it to:</strong>');
@@ -932,6 +996,36 @@ describe('static receipt site build', () => {
         realFileSystem.copyFile(
           join(projectRoot, 'sites', 'shared', 'styles.css'),
           join(secondRuntime, 'sites', 'shared', 'styles.css'),
+        ),
+      ]);
+      await Promise.all([
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'skill-ledger',
+            'public-inventory-adapter.js',
+          ),
         ),
       ]);
       await Promise.all([
