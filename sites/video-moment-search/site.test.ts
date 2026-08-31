@@ -149,30 +149,78 @@ class FakeHTMLElement {
 
 class FakeHTMLFormElement extends FakeHTMLElement {
   private readonly listeners = new Map<string, SubmitListener>();
+  private submissionActive = false;
+  readonly initializationOrder: string[];
+  readonly lastSubmissionOrder: string[] = [];
+  lastSubmissionPrevented = false;
+  nativeSubmissionCount = 0;
 
-  constructor() {
+  constructor(initializationOrder: string[] = []) {
     super('form');
+    this.initializationOrder = initializationOrder;
   }
 
   addEventListener(type: string, listener: SubmitListener): void {
+    if (type === 'submit') {
+      this.initializationOrder.push('submit-listener-installed');
+    }
     this.listeners.set(type, listener);
   }
 
+  recordSubmissionEvent(event: string): void {
+    if (this.submissionActive) this.lastSubmissionOrder.push(event);
+  }
+
   submit(): void {
-    this.listeners.get('submit')?.({ preventDefault() {} });
+    this.lastSubmissionOrder.splice(0);
+    this.lastSubmissionPrevented = false;
+    this.submissionActive = true;
+    this.listeners.get('submit')?.({
+      preventDefault: () => {
+        this.lastSubmissionPrevented = true;
+        this.lastSubmissionOrder.push('preventDefault');
+      },
+    });
+    this.submissionActive = false;
+    if (!this.lastSubmissionPrevented) this.nativeSubmissionCount += 1;
   }
 }
 
 class FakeHTMLInputElement extends FakeHTMLElement {
-  value = '';
+  private controlName = '';
+  private controlValue = '';
 
-  constructor() {
+  constructor(
+    private readonly initializationOrder: string[] = [],
+    private readonly recordRead: () => void = () => {},
+  ) {
     super('input');
+  }
+
+  get name(): string {
+    return this.controlName;
+  }
+
+  set name(value: string) {
+    this.controlName = value;
+    this.initializationOrder.push(`input-name:${value}`);
+  }
+
+  get value(): string {
+    this.recordRead();
+    return this.controlValue;
+  }
+
+  set value(value: string) {
+    this.controlValue = value;
   }
 }
 
 interface ClientHarness {
   readonly error: FakeHTMLElement;
+  readonly form: FakeHTMLFormElement;
+  readonly initializationOrder: readonly string[];
+  readonly input: FakeHTMLInputElement;
   readonly results: FakeHTMLElement;
   readonly serverResults: FakeHTMLElement;
   readonly status: FakeHTMLElement;
@@ -198,8 +246,11 @@ async function flushClientPromises(): Promise<void> {
 }
 
 function executeClientPayload(): ClientHarness {
-  const form = new FakeHTMLFormElement();
-  const input = new FakeHTMLInputElement();
+  const initializationOrder: string[] = [];
+  const form = new FakeHTMLFormElement(initializationOrder);
+  const input = new FakeHTMLInputElement(initializationOrder, () =>
+    form.recordSubmissionEvent('input-value-read'),
+  );
   const status = new FakeHTMLElement('p');
   const results = new FakeHTMLElement('div');
   const error = new FakeHTMLElement('p');
@@ -233,7 +284,10 @@ function executeClientPayload(): ClientHarness {
 
   runInNewContext(VIDEO_MOMENT_SEARCH_CLIENT, {
     document,
-    fetch: () => fetchPromise,
+    fetch: () => {
+      initializationOrder.push('fetch-started');
+      return fetchPromise;
+    },
     HTMLElement: FakeHTMLElement,
     HTMLFormElement: FakeHTMLFormElement,
     HTMLInputElement: FakeHTMLInputElement,
@@ -242,6 +296,9 @@ function executeClientPayload(): ClientHarness {
 
   return {
     error,
+    form,
+    initializationOrder,
+    input,
     results,
     serverResults,
     status,
@@ -274,14 +331,21 @@ describe('AI Moment Index public search surface', () => {
       '<a class="skip-link" href="#main-content">Skip to main content</a>',
     );
     expect(html).toContain('<input');
-    expect(html).toContain('name="q"');
+    expect(html).not.toContain('name="q"');
+    expect(html).toContain('method="get"');
+    expect(html).toContain(
+      'action="https://receipt-portfolio.example/video-moment-search/"',
+    );
+    expect(html).toContain(
+      'Interactive search requires JavaScript; the admitted initial moments remain available below without sending your query.',
+    );
     expect(html).toContain('Search moments');
     expect(html).toContain('#t=132');
     expect(html.indexOf('<strong>For:</strong>')).toBeLessThan(
-      html.indexOf('name="q"'),
+      html.indexOf('data-moment-query'),
     );
     expect(html.indexOf('<h3>How to use it</h3>')).toBeLessThan(
-      html.indexOf('name="q"'),
+      html.indexOf('data-moment-query'),
     );
   });
 
@@ -308,6 +372,7 @@ describe('AI Moment Index public search surface', () => {
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/">',
     );
     expect(html).not.toContain('?q=');
+    expect(html).not.toContain('name="q"');
     expect(VIDEO_MOMENT_SEARCH_CLIENT).not.toMatch(
       /localStorage|sessionStorage|pushState|replaceState|location\.search|sendBeacon|analytics/u,
     );
@@ -1128,11 +1193,23 @@ describe('AI Moment Index public search surface', () => {
 
   it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {
     const harness = executeClientPayload();
+    expect(harness.initializationOrder).toEqual([
+      'submit-listener-installed',
+      'input-name:q',
+      'fetch-started',
+    ]);
+    expect(harness.input.name).toBe('q');
     await harness.resolveIndex(
       serializePublicSearchIndex(fixture, searchIndex),
     );
 
     harness.submit('robots control');
+    expect(harness.form.lastSubmissionOrder.slice(0, 2)).toEqual([
+      'preventDefault',
+      'input-value-read',
+    ]);
+    expect(harness.form.lastSubmissionPrevented).toBe(true);
+    expect(harness.form.nativeSubmissionCount).toBe(0);
 
     const articles = descendants(harness.results, 'article');
     expect(articles.map((article) => article.dataset.momentId)).toEqual([

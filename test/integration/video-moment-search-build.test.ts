@@ -92,8 +92,16 @@ describe('atomic AI Moment Index build', () => {
         readFile(join(outputDirectory, 'robots.txt'), 'utf8'),
         readFile(join(outputDirectory, 'sitemap.xml'), 'utf8'),
       ]);
-    expect(html).toContain('name="q"');
+    expect(html).not.toContain('name="q"');
+    expect(html).toContain('method="get"');
+    expect(html).toContain(
+      'action="https://receipt-portfolio.example/video-moment-search/"',
+    );
+    expect(html).not.toContain('?q=');
+    expect(html).toContain('data-server-results');
+    expect(html).toContain('moment-robots-control');
     expect(html).toContain('Search moments');
+    expect(client).toContain("input.name = 'q'");
     expect(client).toContain('textContent');
     expect(styles).toContain(':focus-visible');
 

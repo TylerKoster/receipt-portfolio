@@ -453,10 +453,11 @@ export function renderSearchShell(
   <section id="moment-search-controls" class="search-panel" aria-labelledby="search-heading">
     <p class="eyebrow">Find an exact explanation</p>
     <h2 id="search-heading">${escapeHtml(searchHeading)}</h2>
-    <form class="search-controls" role="search" data-moment-search>
-      <div><label for="moment-query">What explanation do you remember?</label><input id="moment-query" name="q" type="search" autocomplete="off" data-moment-query></div>
+    <form class="search-controls" action="${escapeHtml(routeUrl(baseUrl))}" method="get" role="search" data-moment-search>
+      <div><label for="moment-query">What explanation do you remember?</label><input id="moment-query" type="search" autocomplete="off" data-moment-query></div>
       <button type="submit">Search moments</button>
     </form>
+    <noscript><p class="guidance">Interactive search requires JavaScript; the admitted initial moments remain available below without sending your query.</p></noscript>
     <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>
     <p class="error" data-search-error hidden>Search could not load. The initial controlled moments remain available below.</p>
     <div class="moment-list" data-client-results></div>

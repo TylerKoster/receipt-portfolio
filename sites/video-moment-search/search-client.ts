@@ -474,22 +474,6 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     status.textContent = 'Search could not load. The initial controlled moments remain available below.';
   };
 
-  fetch('search-index.json', { credentials: 'same-origin' })
-    .then((response) => {
-      if (!response.ok) throw new Error('index load failed');
-      return response.json();
-    })
-    .then((value) => {
-      if (!validIndex(value)) throw new Error('index validation failed');
-      index = value;
-      error.hidden = true;
-      status.textContent = 'Search is ready. Enter a phrase such as “robots control”.';
-    })
-    .catch(() => {
-      index = null;
-      showLoadError();
-    });
-
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     try {
@@ -513,4 +497,21 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       showSearchError();
     }
   });
+  input.name = 'q';
+
+  fetch('search-index.json', { credentials: 'same-origin' })
+    .then((response) => {
+      if (!response.ok) throw new Error('index load failed');
+      return response.json();
+    })
+    .then((value) => {
+      if (!validIndex(value)) throw new Error('index validation failed');
+      index = value;
+      error.hidden = true;
+      status.textContent = 'Search is ready. Enter a phrase such as “robots control”.';
+    })
+    .catch(() => {
+      index = null;
+      showLoadError();
+    });
 })();`;
