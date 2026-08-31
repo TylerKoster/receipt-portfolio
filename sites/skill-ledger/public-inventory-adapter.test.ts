@@ -593,6 +593,46 @@ describe('SkillLedger public inventory adapter', () => {
           ),
         },
       },
+      {
+        ...sourceBound,
+        source: {
+          ...sourceBound.source,
+          url: sourceBound.source.url.replace(
+            'https://raw.githubusercontent.com',
+            'HTTPS://RAW.GITHUBUSERCONTENT.COM',
+          ),
+        },
+      },
+      {
+        ...sourceBound,
+        inheritedLicense: {
+          ...sourceBound.inheritedLicense,
+          url: sourceBound.inheritedLicense.url.replace(
+            'https://raw.githubusercontent.com',
+            'HTTPS://RAW.GITHUBUSERCONTENT.COM',
+          ),
+        },
+      },
+      {
+        ...sourceBound,
+        source: {
+          ...sourceBound.source,
+          url: sourceBound.source.url.replace(
+            'https://raw.githubusercontent.com',
+            'https://raw.githubusercontent.com:443',
+          ),
+        },
+      },
+      {
+        ...sourceBound,
+        inheritedLicense: {
+          ...sourceBound.inheritedLicense,
+          url: sourceBound.inheritedLicense.url.replace(
+            'https://raw.githubusercontent.com',
+            'https://raw.githubusercontent.com:443',
+          ),
+        },
+      },
     ]) {
       const malformedRoot = document.createElement('section');
       initializePublicSkillLedgerInventory(

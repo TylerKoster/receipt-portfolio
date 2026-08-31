@@ -175,8 +175,8 @@
   },
   "limits": [
     "No real demand, adoption, safety, revenue, or willingness-to-pay conclusion is established.",
-    "P0 gap: controlled-only records; no admitted public source records.",
-    "P0 gap: the site-owned search/filter/compare adapter is not integrated into an emitted public page.",
+    "Released state: one admitted source-bound observation appears alongside controlled examples; this does not establish currentness, provenance, safety, demand, or revenue.",
+    "Released state: the site-owned search/filter/compare adapter is integrated into an emitted public page; this does not establish real users, demand, conversion, revenue, safety, currentness, or provenance.",
     "P0 gap: no real artifact provenance.",
     "P0 gap: no conversion/measurement path.",
     "Synthetic offer events do not capture identity and are not persisted."

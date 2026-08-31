@@ -204,17 +204,21 @@ function isSourceBoundPublicSkillRecord(record) {
   } catch {
     return false;
   }
+  const canonicalRawSourceUrl = `https://raw.githubusercontent.com/microsoft/skills/${record.source.commit}/${record.source.path}`;
+  const canonicalLicenseEvidenceUrl = `https://raw.githubusercontent.com/microsoft/skills/${record.source.commit}/LICENSE`;
   return (
     record.source.sourceId === 'microsoft-skill-creator' &&
     record.source.publisher === 'Microsoft' &&
     record.source.repository === 'https://github.com/microsoft/skills' &&
     /^[a-f0-9]{40}$/u.test(record.source.commit) &&
     record.source.path === '.github/skills/skill-creator/SKILL.md' &&
+    record.source.url === canonicalRawSourceUrl &&
     isExactImmutableRawGithubUrl(
       rawUrl,
       `/microsoft/skills/${record.source.commit}/${record.source.path}`,
     ) &&
     repositoryUrl.protocol === 'https:' &&
+    record.inheritedLicense.url === canonicalLicenseEvidenceUrl &&
     isExactImmutableRawGithubUrl(
       licenseUrl,
       `/microsoft/skills/${record.source.commit}/LICENSE`,

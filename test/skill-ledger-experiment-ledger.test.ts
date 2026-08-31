@@ -265,5 +265,17 @@ describe('SkillLedger synthetic usability ledger', () => {
     expect(ledger.limits).toContain(
       'No real demand, adoption, safety, revenue, or willingness-to-pay conclusion is established.',
     );
+    expect(ledger.limits).toContain(
+      'Released state: one admitted source-bound observation appears alongside controlled examples; this does not establish currentness, provenance, safety, demand, or revenue.',
+    );
+    expect(ledger.limits).toContain(
+      'Released state: the site-owned search/filter/compare adapter is integrated into an emitted public page; this does not establish real users, demand, conversion, revenue, safety, currentness, or provenance.',
+    );
+    expect(ledger.limits).not.toContain(
+      'P0 gap: controlled-only records; no admitted public source records.',
+    );
+    expect(ledger.limits).not.toContain(
+      'P0 gap: the site-owned search/filter/compare adapter is not integrated into an emitted public page.',
+    );
   });
 });
