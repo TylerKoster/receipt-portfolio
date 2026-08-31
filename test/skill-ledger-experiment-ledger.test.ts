@@ -63,15 +63,15 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'searchable-filterable-discovery',
+        area: 'current-original-guides',
         rank: 1,
-        experiment: 'public-source-bound-inventory-v1',
+        experiment: 'microsoft-skill-creator-source-contract-v1',
         status: 'active',
-        metric: 'controlled public adapter utility contract',
+        metric: 'designated source contract coverage',
         target:
-          'A controlled two-record adapter supports search, declared filters, count, empty, loading, error, reset, selection, and exactly-two comparison without network or persistence.',
+          'A prospective record admits only coordinator-designated Microsoft skill frontmatter and source/hash fields with no instruction body.',
         stopRule:
-          'Controlled adapter interaction does not establish real users, demand, conversion, revenue, provenance, currentness, safety, adoption, or public deployment.',
+          'Contract validation does not collect, publish, execute, verify currentness or provenance, or establish security, safety, adoption, suitability, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
       },
       {
         area: 'current-original-guides',
@@ -162,6 +162,12 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-internal',
         boundary:
           'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, suitability, or public UI readiness.',
+      },
+      {
+        experiment: 'public-source-bound-inventory-v1',
+        status: 'completed-public-controlled-adapter',
+        boundary:
+          'Controlled public adapter completion is not real source evidence and does not establish real users, demand, conversion, revenue, provenance, currentness, safety, adoption, suitability, recommendation, endorsement, or public deployment.',
       },
     ]);
     expect(ledger.rejectedCandidates).toEqual([
