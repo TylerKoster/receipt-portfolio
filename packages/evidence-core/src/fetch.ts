@@ -327,30 +327,26 @@ async function resolvedPublicAddress(
     );
   }
 
-  return [...addresses].sort((left, right) =>
-    left.address === right.address
-      ? left.family - right.family
-      : left.address.localeCompare(right.address),
+  return [...addresses].sort(
+    (left, right) =>
+      left.family - right.family || left.address.localeCompare(right.address),
   )[0]!;
 }
 
-function pinnedHttpsConnection(
-  endpoint: URL,
-  address: ResolvedAddress,
-  init: RequestInit,
-): Promise<Response> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    type PinnedLookupCallback = ((
-      error: Error | null,
-      address: string,
-      family: 4 | 6,
-    ) => void) &
-      ((error: Error | null, addresses: readonly ResolvedAddress[]) => void);
-    const pinnedLookup = ((
-      _hostname: string,
-      options: unknown,
-      callback: PinnedLookupCallback,
-    ) => {
+type PinnedLookupCallback = ((
+  error: Error | null,
+  address: string,
+  family: 4 | 6,
+) => void) &
+  ((error: Error | null, addresses: readonly ResolvedAddress[]) => void);
+
+export function createPinnedLookup(address: ResolvedAddress): LookupFunction {
+  return ((
+    _hostname: string,
+    options: unknown,
+    callback: PinnedLookupCallback,
+  ) => {
+    queueMicrotask(() => {
       if (
         typeof options === 'object' &&
         options !== null &&
@@ -361,7 +357,17 @@ function pinnedHttpsConnection(
       } else {
         callback(null, address.address, address.family);
       }
-    }) as LookupFunction;
+    });
+  }) as LookupFunction;
+}
+
+function pinnedHttpsConnection(
+  endpoint: URL,
+  address: ResolvedAddress,
+  init: RequestInit,
+): Promise<Response> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const pinnedLookup = createPinnedLookup(address);
     const request = httpsRequest(
       endpoint,
       {

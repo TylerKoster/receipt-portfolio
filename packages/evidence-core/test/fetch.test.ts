@@ -4,6 +4,7 @@ import { isAbsolute, join } from 'node:path';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createPinnedLookup,
   FetchBoundaryError,
   fetchAllowedSource as fetchAllowedSourceWithResolver,
   type FetchAllowedSourceOptions,
@@ -150,6 +151,85 @@ afterEach(async () => {
 });
 
 describe('bounded public-source fetch', () => {
+  it('prefers a validated IPv4 address from a dual-stack public result', async () => {
+    let selectedAddress:
+      { readonly address: string; readonly family: 4 | 6 } | undefined;
+
+    await fetchAllowedSource(baseManifest, {
+      resolver: async () => [
+        { address: '2606:4700:4700::1111', family: 6 },
+        { address: '8.8.8.8', family: 4 },
+      ],
+      connectionImplementation: async (_endpoint, address) => {
+        selectedAddress = address;
+        return responseOf('abc', { contentType: 'application/json' });
+      },
+    });
+
+    expect(selectedAddress).toEqual({ address: '8.8.8.8', family: 4 });
+  });
+
+  it('retains a validated IPv6-only result', async () => {
+    let selectedAddress:
+      { readonly address: string; readonly family: 4 | 6 } | undefined;
+
+    await fetchAllowedSource(baseManifest, {
+      resolver: async () => [{ address: '2606:4700:4700::1111', family: 6 }],
+      connectionImplementation: async (_endpoint, address) => {
+        selectedAddress = address;
+        return responseOf('abc', { contentType: 'application/json' });
+      },
+    });
+
+    expect(selectedAddress).toEqual({
+      address: '2606:4700:4700::1111',
+      family: 6,
+    });
+  });
+
+  it('rejects a dual-stack result when either address is forbidden', async () => {
+    await expect(
+      fetchAllowedSource(baseManifest, {
+        resolver: async () => [
+          { address: '8.8.8.8', family: 4 },
+          { address: 'fd00::1', family: 6 },
+        ],
+        connectionImplementation: async () => {
+          throw new Error('CONNECTION_SHOULD_NOT_BE_ATTEMPTED');
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'ENDPOINT_IP_FORBIDDEN' });
+  });
+
+  it('delivers a pinned DNS answer asynchronously', async () => {
+    const lookup = createPinnedLookup({ address: '8.8.8.8', family: 4 });
+    let synchronous = true;
+    const result = new Promise<{
+      readonly address: string;
+      readonly family: number;
+      readonly synchronous: boolean;
+    }>((resolveResult, rejectResult) => {
+      lookup('example.invalid', {}, (error, address, family) => {
+        if (error !== null) {
+          rejectResult(error);
+          return;
+        }
+        if (Array.isArray(address) || family === undefined) {
+          rejectResult(new Error('expected one pinned address'));
+          return;
+        }
+        resolveResult({ address, family, synchronous });
+      });
+    });
+    synchronous = false;
+
+    await expect(result).resolves.toEqual({
+      address: '8.8.8.8',
+      family: 4,
+      synchronous: false,
+    });
+  });
+
   it.each([
     [
       'non-HTTPS endpoint',
@@ -521,6 +601,47 @@ describe('bounded public-source fetch', () => {
 });
 
 describe('live dry-run report', () => {
+  it('writes a sanitized failure report when a dual-stack connection fails', async () => {
+    const projectDirectory = await mkdtemp(join(tmpdir(), 'receipt-dry-run-'));
+    temporaryDirectories.push(projectDirectory);
+    let selectedAddress:
+      { readonly address: string; readonly family: 4 | 6 } | undefined;
+    const result = await runDryRunLive({
+      projectDirectory,
+      manifests: [baseManifest],
+      fetchSource: (sourceManifest) =>
+        fetchAllowedSourceWithResolver(sourceManifest, {
+          resolver: async () => [
+            { address: '2606:4700:4700::1111', family: 6 },
+            { address: '8.8.8.8', family: 4 },
+          ],
+          connectionImplementation: async (_endpoint, address) => {
+            selectedAddress = address;
+            const error = new Error(
+              'connect ENETUNREACH 8.8.8.8 source-secret',
+            ) as Error & { code: string };
+            error.code = 'ENETUNREACH';
+            throw error;
+          },
+        }),
+    });
+    const reportBytes = await readFile(result.outputPath, 'utf8');
+    const report = JSON.parse(reportBytes) as {
+      readonly results: readonly Record<string, unknown>[];
+    };
+
+    expect(selectedAddress).toEqual({ address: '8.8.8.8', family: 4 });
+    expect(result.exitCode).toBe(1);
+    expect(report.results[0]).toMatchObject({
+      errorCode: 'FETCH_FAILED',
+      message: 'Source fetch failed',
+      status: 'FAILED',
+    });
+    expect(reportBytes).not.toContain('ENETUNREACH');
+    expect(reportBytes).not.toContain('8.8.8.8');
+    expect(reportBytes).not.toContain('source-secret');
+  });
+
   it.each([
     ['enabled success', true, false, 0, 'SUCCESS'],
     ['enabled fetch rejection', true, true, 1, 'FAILED'],

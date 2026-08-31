@@ -117,7 +117,7 @@ describe('resolved and pinned fetch boundary', () => {
     ).rejects.toMatchObject({ code: 'ENDPOINT_IP_FORBIDDEN' });
   });
 
-  it('passes one validated public address to the pinned connection and never uses the legacy fetch seam', async () => {
+  it('passes the validated IPv4 address to the pinned connection and never uses the legacy fetch seam', async () => {
     const connectionImplementation = vi.fn(
       async (endpoint: URL, address: { address: string; family: 4 | 6 }) => {
         void endpoint;
@@ -140,8 +140,8 @@ describe('resolved and pinned fetch boundary', () => {
     expect(result.status).toBe(200);
     expect(connectionImplementation).toHaveBeenCalledTimes(1);
     expect(connectionImplementation.mock.calls[0]?.[1]).toMatchObject({
-      address: '2606:2800:220:1:248:1893:25c8:1946',
-      family: 6,
+      address: '93.184.216.34',
+      family: 4,
     });
     expect(fetchImplementation).not.toHaveBeenCalled();
   });
