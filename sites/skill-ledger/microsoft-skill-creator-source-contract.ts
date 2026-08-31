@@ -56,16 +56,19 @@ export type MicrosoftSkillCreatorProspectiveSource = Readonly<{
 
 export type MicrosoftSkillCreatorSourceContractIssue =
   | 'unknown-root-fields'
+  | 'invalid-source-fields'
   | 'source-repository-mismatch'
   | 'source-commit-mismatch'
   | 'source-path-mismatch'
   | 'source-raw-url-mismatch'
   | 'source-publisher-mismatch'
+  | 'invalid-license-fields'
   | 'license-name-mismatch'
   | 'license-reference-mismatch'
   | 'license-bytes-mismatch'
   | 'license-sha256-mismatch'
   | 'invalid-observed-at'
+  | 'invalid-raw-fields'
   | 'raw-bytes-mismatch'
   | 'raw-sha256-mismatch'
   | 'invalid-normalized-sha256'
@@ -111,6 +114,17 @@ export type MicrosoftSkillCreatorPublicDisclosure = Readonly<{
   boundary: typeof MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY;
 }>;
 
+export type MicrosoftSkillCreatorPublicDisclosureNotReady = Readonly<{
+  kind: 'not-ready';
+  issues: readonly MicrosoftSkillCreatorSourceContractIssue[];
+  disclosure: null;
+  boundary: typeof MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY;
+}>;
+
+export type MicrosoftSkillCreatorPublicDisclosureResult =
+  | MicrosoftSkillCreatorPublicDisclosure
+  | MicrosoftSkillCreatorPublicDisclosureNotReady;
+
 type UnknownRecord = Readonly<Record<string, unknown>>;
 
 const ROOT_FIELDS = [
@@ -122,6 +136,18 @@ const ROOT_FIELDS = [
   'contentSha256',
   'declaredMetadata',
 ] as const;
+
+const SOURCE_FIELDS = [
+  'repository',
+  'commit',
+  'path',
+  'rawUrl',
+  'publisher',
+] as const;
+
+const LICENSE_FIELDS = ['name', 'referenceUrl', 'bytes', 'sha256'] as const;
+
+const RAW_FIELDS = ['bytes', 'sha256'] as const;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -190,6 +216,9 @@ export function assessMicrosoftSkillCreatorProspectiveSource(
   if (!hasExactFields(record, ROOT_FIELDS)) {
     issues.push('unknown-root-fields');
   }
+  if (!hasExactFields(source, SOURCE_FIELDS)) {
+    issues.push('invalid-source-fields');
+  }
   if (
     source.repository !== MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.repository
   ) {
@@ -208,6 +237,9 @@ export function assessMicrosoftSkillCreatorProspectiveSource(
     source.publisher !== MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.publisher
   ) {
     issues.push('source-publisher-mismatch');
+  }
+  if (!hasExactFields(license, LICENSE_FIELDS)) {
+    issues.push('invalid-license-fields');
   }
   if (
     license.name !==
@@ -235,6 +267,9 @@ export function assessMicrosoftSkillCreatorProspectiveSource(
   }
   if (!isStrictUtcTimestamp(stringAt(record, 'observedAt'))) {
     issues.push('invalid-observed-at');
+  }
+  if (!hasExactFields(raw, RAW_FIELDS)) {
+    issues.push('invalid-raw-fields');
   }
   if (raw.bytes !== MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.raw.bytes) {
     issues.push('raw-bytes-mismatch');
@@ -280,7 +315,18 @@ export function assessMicrosoftSkillCreatorProspectiveSource(
 
 export function discloseMicrosoftSkillCreatorProspectiveSource(
   prospectiveSource: unknown,
-): MicrosoftSkillCreatorPublicDisclosure {
+): MicrosoftSkillCreatorPublicDisclosureResult {
+  const assessment =
+    assessMicrosoftSkillCreatorProspectiveSource(prospectiveSource);
+  if (assessment.kind === 'not-ready') {
+    return {
+      kind: 'not-ready',
+      issues: assessment.issues,
+      disclosure: null,
+      boundary: MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY,
+    };
+  }
+
   const record = isRecord(prospectiveSource) ? prospectiveSource : {};
   const raw = recordAt(record, 'raw');
   const declaredMetadata = recordAt(record, 'declaredMetadata');

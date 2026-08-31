@@ -93,15 +93,17 @@ describe('Microsoft skill-creator designated source contract', () => {
           path: 'README.md',
           rawUrl: 'https://example.invalid/SKILL.md',
           publisher: 'Not designated',
+          extra: 'not allowed',
         },
         inheritedLicense: {
           name: 'Not designated',
           referenceUrl: 'https://example.invalid/LICENSE',
           bytes: 0,
           sha256: 'A'.repeat(64),
+          extra: 'not allowed',
         },
         observedAt: '2026-08-30T12:34:56Z',
-        raw: { bytes: 0, sha256: 'B'.repeat(64) },
+        raw: { bytes: 0, sha256: 'B'.repeat(64), extra: 'not allowed' },
         normalizedSha256: 'C'.repeat(64),
         contentSha256: 'not-a-hash',
         declaredMetadata: { extra: 'not allowed' },
@@ -111,16 +113,19 @@ describe('Microsoft skill-creator designated source contract', () => {
       kind: 'not-ready',
       issues: [
         'unknown-root-fields',
+        'invalid-source-fields',
         'source-repository-mismatch',
         'source-commit-mismatch',
         'source-path-mismatch',
         'source-raw-url-mismatch',
         'source-publisher-mismatch',
+        'invalid-license-fields',
         'license-name-mismatch',
         'license-reference-mismatch',
         'license-bytes-mismatch',
         'license-sha256-mismatch',
         'invalid-observed-at',
+        'invalid-raw-fields',
         'raw-bytes-mismatch',
         'raw-sha256-mismatch',
         'invalid-normalized-sha256',
@@ -169,18 +174,34 @@ describe('Microsoft skill-creator designated source contract', () => {
     });
   });
 
-  it('returns only the public disclosure allowlist, even for hostile cast input', () => {
-    const record = {
-      ...controlledProspectiveSource(),
-      instructionBody: 'secret instruction body',
-      scripts: ['never disclose'],
-      declaredMetadata: {
-        ...controlledProspectiveSource().declaredMetadata,
-        body: 'nested secret body',
-      },
-    } as unknown as MicrosoftSkillCreatorProspectiveSource;
+  it('rejects unknown fields in every nested contract record', () => {
+    const record = controlledProspectiveSource();
 
-    const disclosure = discloseMicrosoftSkillCreatorProspectiveSource(record);
+    expect(
+      assessMicrosoftSkillCreatorProspectiveSource({
+        ...record,
+        source: { ...record.source, body: 'not permitted' },
+        inheritedLicense: {
+          ...record.inheritedLicense,
+          instructions: 'not permitted',
+        },
+        raw: { ...record.raw, scripts: ['not permitted'] },
+      }),
+    ).toEqual({
+      kind: 'not-ready',
+      issues: [
+        'invalid-source-fields',
+        'invalid-license-fields',
+        'invalid-raw-fields',
+      ],
+      boundary: MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY,
+    });
+  });
+
+  it('returns only the public disclosure allowlist for an assessed-ready record', () => {
+    const disclosure = discloseMicrosoftSkillCreatorProspectiveSource(
+      controlledProspectiveSource(),
+    );
 
     expect(disclosure).toEqual({
       source: {
@@ -209,6 +230,27 @@ describe('Microsoft skill-creator designated source contract', () => {
         name: 'controlled prospective name',
         description: 'Controlled prospective description for contract testing.',
       },
+      boundary: MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY,
+    });
+  });
+
+  it('returns no disclosure for hostile invalid or unassessed input', () => {
+    const record = {
+      ...controlledProspectiveSource(),
+      instructionBody: 'secret instruction body',
+      scripts: ['never disclose'],
+      declaredMetadata: {
+        ...controlledProspectiveSource().declaredMetadata,
+        body: 'nested secret body',
+      },
+    } as unknown as MicrosoftSkillCreatorProspectiveSource;
+
+    const disclosure = discloseMicrosoftSkillCreatorProspectiveSource(record);
+
+    expect(disclosure).toEqual({
+      kind: 'not-ready',
+      issues: ['unknown-root-fields', 'invalid-declared-metadata-fields'],
+      disclosure: null,
       boundary: MICROSOFT_SKILL_CREATOR_SOURCE_BOUNDARY,
     });
     expect(JSON.stringify(disclosure)).not.toMatch(
