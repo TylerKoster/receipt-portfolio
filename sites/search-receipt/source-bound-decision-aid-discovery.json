@@ -1,0 +1,72 @@
+{
+  "id": "source-bound-decision-aid-discovery-v1",
+  "schemaVersion": 1,
+  "intendedAudience": "Visitors deciding whether to begin with a source-bound Google Search status guide or use a worksheet after recording their own-site evidence.",
+  "decision": "Choose the next source-bound resource without treating either resource as a report of current Google Search status, a diagnosis, or a causal explanation for a site change.",
+  "metadata": {
+    "title": "Should I start with the Google Search guide or the evidence worksheet?",
+    "description": "A source-bound decision aid for choosing between the Google Search status guide and the own-site evidence worksheet without stating current status or cause.",
+    "canonicalSlugProposal": "/discover/choose-google-search-guide-or-worksheet"
+  },
+  "sourceBindings": [
+    {
+      "sourceId": "google-search-status",
+      "endpoint": "https://status.search.google.com/incidents.json",
+      "purpose": "Direct visitors to inspect the official Google Search Status source at their own decision time.",
+      "citation": "Google Search Status"
+    }
+  ],
+  "routeBindings": [
+    {
+      "id": "guide",
+      "route": "/guides/is-google-search-down-or-my-site/",
+      "purpose": "Existing published guide for choosing what to inspect before a visitor has dated own-site evidence."
+    },
+    {
+      "id": "worksheet",
+      "route": "/worksheets/compare-google-search-status-with-site-evidence",
+      "purpose": "Existing worksheet route fact for comparing a decision-time observation with separately recorded own-site evidence."
+    }
+  ],
+  "decisionAids": [
+    {
+      "id": "guide-first",
+      "route": "/guides/is-google-search-down-or-my-site/",
+      "choiceCriteria": "Choose the guide first before you have dated own-site evidence and need to decide what to inspect.",
+      "result": "The guide separates direct official-status checking, controlled historical context, and your own-site evidence."
+    },
+    {
+      "id": "worksheet-after-own-site-evidence",
+      "route": "/worksheets/compare-google-search-status-with-site-evidence",
+      "choiceCriteria": "Choose the worksheet after you have dated own-site evidence to record separately from a decision-time official-status observation.",
+      "result": "The worksheet preserves an unknown conclusion unless independently reviewed evidence establishes a connection."
+    }
+  ],
+  "boundaries": {
+    "currentOfficialStatus": "Check Google Search Status directly at decision time; this discovery contract does not state a current status or incident.",
+    "noCausation": "This discovery contract does not diagnose a site change and does not establish cause from a status observation or either linked resource.",
+    "unknowns": [
+      "Whether a visitor's own-site change is connected to an official-status observation remains unknown without independently reviewed evidence.",
+      "This contract does not determine a current incident, ranking effect, traffic outcome, or remediation."
+    ],
+    "privacyAndMeasurement": "Neither decision aid collects, transmits, or retains visitor or site evidence; this contract does not measure users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+  },
+  "faqs": [
+    {
+      "question": "When should I choose the guide?",
+      "answer": "Choose the guide before you have dated own-site evidence and need to decide what to inspect first.",
+      "routeBindingIds": ["guide"]
+    },
+    {
+      "question": "When should I choose the worksheet?",
+      "answer": "Choose the worksheet after you have dated own-site evidence to keep it separate from a decision-time official-status observation.",
+      "routeBindingIds": ["worksheet"]
+    }
+  ],
+  "correctionAndCurrentnessPolicy": "Check the official source directly at decision time and make a correction to any discovery copy that misstates an admitted route, source, or boundary; do not turn historical route facts into current incident evidence.",
+  "publication": {
+    "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+    "adapter": "coordinator-owned shared static route adapter",
+    "coordinatorDependency": "A coordinator-owned public-route adapter is required before this canonical slug proposal or its decision aids can be published; this contract makes no public-route claim."
+  }
+}

@@ -200,6 +200,19 @@
         "provenance": "Coordinator-provided accepted release evidence."
       },
       "nextSafeAction": "Maintain admitted source bindings and worksheet boundaries; do not claim traffic, demand, conversion, revenue, or another commercial outcome."
+    },
+    {
+      "id": "source-bound-decision-aid-discovery-v1",
+      "rank": 12,
+      "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+      "hypothesis": "A narrowly scoped, source-bound decision aid may help a visitor choose between the published guide and worksheet without stating a current incident, diagnosis, causal explanation, traffic outcome, demand, conversion, willingness to pay, revenue, or another commercial outcome.",
+      "firstUserOutcome": "Choose the guide before dated own-site evidence exists or the worksheet after dated own-site evidence exists, while retaining an unknown conclusion about status or cause.",
+      "metric": "Deterministic admission of every required decision-aid, route binding, source/currentness/no-causation/privacy boundary, FAQ, and adapter dependency.",
+      "target": "100% deterministic admission before any public-route proposal.",
+      "stopRule": "Stop publication preparation if an admitted route, decision boundary, privacy boundary, or source binding cannot be admitted.",
+      "noDataBoundary": "Internal content/discoverability contract admission is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
+      "coordinatorDependency": "A coordinator-owned shared static route adapter is required before publication; this Search-owned contract does not create or claim a public route.",
+      "nextSafeAction": "Keep the two admitted choices and their boundaries current in the contract; do not claim a published route or an outcome until coordinator-provided evidence exists."
     }
   ]
 }

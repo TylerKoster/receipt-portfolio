@@ -187,6 +187,16 @@ function assertWorksheetReleaseEvidenceMatchesLedger(
 }
 
 describe('Search Receipt product experiment ledger', () => {
+  it('records the ranked decision-aid discovery contract as adapter-pending rather than an outcome', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[11]).toMatchObject({
+      id: 'source-bound-decision-aid-discovery-v1',
+      rank: 12,
+      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+    });
+  });
+
   it('preserves synthetic usability evidence and records the shipped retrieval surface without claiming measurement', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
@@ -310,7 +320,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -334,7 +344,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
@@ -358,7 +368,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(ledger.experiments[8]).toMatchObject({
       id: 'shareable-filter-view-v1',
       rank: 9,
