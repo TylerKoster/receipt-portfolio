@@ -6,7 +6,11 @@ import {
   searchMoments,
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
-import { validateExperimentLedger } from './measurement.js';
+import {
+  canonicalVideoCorpusSemanticSha256,
+  validateExperimentLedger,
+  validateResearcherRelevanceBenchmarkCorpus,
+} from './measurement.js';
 
 type BenchmarkCase = {
   readonly query: string;
@@ -28,6 +32,7 @@ type ResearcherRelevanceBenchmark = {
     readonly benchmarkStrings: string;
     readonly transcriptDerivedCases: string;
     readonly prohibitedClaims: readonly string[];
+    readonly evaluatedCorpusSemanticSha256: string;
   };
   readonly corpusId: string;
   readonly target: {
@@ -51,6 +56,14 @@ type ResearcherRelevanceBenchmark = {
     };
     readonly maximumTimestampLandingErrorSeconds: number;
   };
+};
+
+type Mutable<T> = {
+  -readonly [Key in keyof T]: T[Key] extends readonly (infer Item)[]
+    ? Mutable<Item>[]
+    : T[Key] extends object
+      ? Mutable<T[Key]>
+      : T[Key];
 };
 
 const fixture = JSON.parse(
@@ -123,6 +136,8 @@ describe('controlled researcher-relevance benchmark', () => {
         'conversion',
         'revenue',
       ],
+      evaluatedCorpusSemanticSha256:
+        'd727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557',
     });
     expect(benchmark.target).toEqual({
       minimumTopThreePercent: 80,
@@ -131,8 +146,54 @@ describe('controlled researcher-relevance benchmark', () => {
     });
   });
 
+  it('stops before evaluation when a valid corpus changes without changing retrieval outcomes', () => {
+    const benchmark = loadBenchmark();
+    const driftedCorpus = structuredClone(fixture) as Mutable<VideoCorpus>;
+    driftedCorpus.videos[0]!.creatorName = 'University of the Drifted';
+
+    expect(
+      validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
+        .diagnostics,
+    ).toEqual([]);
+    expect(buildSearchIndex(driftedCorpus).entries).toHaveLength(1);
+    expect(
+      searchMoments(buildSearchIndex(driftedCorpus), 'robots control', 3),
+    ).toMatchObject([
+      {
+        momentId: 'moment-robots-control',
+        startSeconds: 132,
+      },
+    ]);
+    expect(
+      validateResearcherRelevanceBenchmarkCorpus(benchmark, driftedCorpus)
+        .diagnostics,
+    ).toContain('benchmark corpus semantic digest does not match the artifact');
+  });
+
+  it('uses a key-order-stable semantic digest for the released corpus', () => {
+    const reorderedCorpus = {
+      moments: fixture.moments,
+      cues: fixture.cues,
+      rights: fixture.rights,
+      videos: fixture.videos,
+      label: fixture.label,
+      corpusId: fixture.corpusId,
+    };
+
+    expect(canonicalVideoCorpusSemanticSha256(fixture)).toBe(
+      'd727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557',
+    );
+    expect(canonicalVideoCorpusSemanticSha256(reorderedCorpus)).toBe(
+      canonicalVideoCorpusSemanticSha256(fixture),
+    );
+  });
+
   it('retrieves the five released positive cases at the stored moment and timestamp', () => {
     const benchmark = loadBenchmark();
+    expect(
+      validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
+        .diagnostics,
+    ).toEqual([]);
     const index = buildSearchIndex(fixture);
     const positiveCases = benchmark.cases.filter(
       (benchmarkCase) => benchmarkCase.expectedMomentId !== null,

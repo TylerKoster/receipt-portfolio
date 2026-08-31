@@ -1,3 +1,8 @@
+import {
+  sha256Utf8,
+  validateVideoCorpus,
+} from '../../packages/video-moment-core/src/index.js';
+
 export const measurementEventTypes = [
   'search',
   'zero_result',
@@ -183,6 +188,82 @@ function isMeasurementEvent(value: unknown): value is MeasurementEvent {
     const sanitized = allowedValue(field as AllowedField, fieldValue);
     return sanitized !== undefined && sanitized === fieldValue;
   });
+}
+
+function canonicalizeSemanticValue(value: unknown): string {
+  if (
+    value === null ||
+    typeof value === 'boolean' ||
+    typeof value === 'string'
+  ) {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error('canonical semantic values must be finite');
+    }
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalizeSemanticValue).join(',')}]`;
+  }
+  const record = objectRecord(value);
+  if (record === undefined) {
+    throw new Error('canonical semantic values must be JSON values');
+  }
+  return `{${Object.keys(record)
+    .sort()
+    .map(
+      (key) =>
+        `${JSON.stringify(key)}:${canonicalizeSemanticValue(record[key])}`,
+    )
+    .join(',')}}`;
+}
+
+/**
+ * Produces a stable semantic digest only for a production-valid video corpus.
+ * Object-key order and source-file formatting do not affect the digest.
+ */
+export function canonicalVideoCorpusSemanticSha256(
+  value: unknown,
+): string | undefined {
+  if (!validateVideoCorpus(value).ok) return undefined;
+  return sha256Utf8(canonicalizeSemanticValue(value));
+}
+
+export interface ResearcherRelevanceBenchmarkCorpusValidation {
+  readonly diagnostics: readonly string[];
+}
+
+/**
+ * Stops controlled retrieval evaluation when its admitted corpus no longer
+ * matches the immutable semantic binding recorded in the benchmark artifact.
+ */
+export function validateResearcherRelevanceBenchmarkCorpus(
+  benchmarkValue: unknown,
+  corpusValue: unknown,
+): ResearcherRelevanceBenchmarkCorpusValidation {
+  const diagnostics: string[] = [];
+  const benchmark = objectRecord(benchmarkValue);
+  const limitations = objectRecord(benchmark?.limitations);
+  const corpus = objectRecord(corpusValue);
+  const digest = canonicalVideoCorpusSemanticSha256(corpusValue);
+
+  if (digest === undefined) {
+    diagnostics.push(
+      'benchmark corpus must satisfy the released corpus contract',
+    );
+    return { diagnostics };
+  }
+  if (benchmark?.corpusId !== corpus?.corpusId) {
+    diagnostics.push('benchmark corpus ID does not match the artifact');
+  }
+  if (limitations?.evaluatedCorpusSemanticSha256 !== digest) {
+    diagnostics.push(
+      'benchmark corpus semantic digest does not match the artifact',
+    );
+  }
+  return { diagnostics };
 }
 
 const requiredMetrics = [

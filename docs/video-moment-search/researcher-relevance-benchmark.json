@@ -5,6 +5,7 @@
   "limitations": {
     "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
     "transcriptDerivedCases": "prohibited",
+    "evaluatedCorpusSemanticSha256": "d727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557",
     "prohibitedClaims": [
       "user",
       "usability",
