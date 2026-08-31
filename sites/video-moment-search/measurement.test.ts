@@ -82,13 +82,21 @@ const canonicalPersonas = [
   },
   {
     id: 'ld-lead',
-    testability: 'not-yet-testable',
-    testableCapabilities: [],
+    testability: 'preview-testable-heuristic',
+    testableCapabilities: [
+      'controlled-fixture-search',
+      'stored-historical-evidence-inspection',
+      'exact-source-context-routing',
+      'timestamp-list-copy-share',
+    ],
     unsupportedCapabilities: [
       'approved-library-search',
-      'adjacent-context',
-      'timestamp-list-save-or-share',
-      'permissions-verification',
+      'current-permission-verification',
+      'collaboration-or-retention',
+      'measured-task-completion',
+      'measured-time-to-value',
+      'usability-evidence',
+      'demand-evidence',
     ],
   },
 ] as const;
@@ -390,10 +398,7 @@ describe('privacy-preserving measurement contract', () => {
     );
   });
 
-  it.each([
-    ['creator', 1],
-    ['ld-lead', 2],
-  ] as const)(
+  it.each([['creator', 1]] as const)(
     'rejects preview-testable for the %s persona',
     (personaId, index) => {
       const invalid = structuredClone(ledger);
@@ -404,6 +409,15 @@ describe('privacy-preserving measurement contract', () => {
       );
     },
   );
+
+  it('rejects not-yet-testable for the narrowed L&D persona', () => {
+    const invalid = structuredClone(ledger);
+    invalid.personas[2].testability = 'not-yet-testable';
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'personas[2] must match the ld-lead persona contract',
+    );
+  });
 
   it.each([
     ['description', 'Creator onboarding produced measured demand'],

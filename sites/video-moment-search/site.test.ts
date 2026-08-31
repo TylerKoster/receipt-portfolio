@@ -126,10 +126,16 @@ type SubmitListener = (event: { preventDefault(): void }) => void;
 class FakeHTMLElement {
   readonly children: FakeHTMLElement[] = [];
   readonly dataset: Record<string, string> = {};
+  private readonly clickListeners = new Map<string, (() => void)[]>();
+  private elementValue = '';
   className = '';
+  disabled = false;
   hidden = false;
   href = '';
+  readOnly = false;
   textContent = '';
+  type = '';
+  focusCount = 0;
   failNextReplace = false;
 
   constructor(readonly tagName = 'div') {}
@@ -144,6 +150,30 @@ class FakeHTMLElement {
       throw new Error('controlled DOM write failure');
     }
     this.children.splice(0, this.children.length, ...children);
+  }
+
+  addEventListener(type: string, listener: () => void): void {
+    this.clickListeners.set(type, [
+      ...(this.clickListeners.get(type) ?? []),
+      listener,
+    ]);
+  }
+
+  click(): void {
+    if (!this.disabled)
+      this.clickListeners.get('click')?.forEach((listener) => listener());
+  }
+
+  focus(): void {
+    this.focusCount += 1;
+  }
+
+  get value(): string {
+    return this.elementValue;
+  }
+
+  set value(value: string) {
+    this.elementValue = value;
   }
 }
 
@@ -217,14 +247,20 @@ class FakeHTMLInputElement extends FakeHTMLElement {
 }
 
 interface ClientHarness {
+  readonly clear: FakeHTMLElement;
+  readonly copy: FakeHTMLElement;
   readonly error: FakeHTMLElement;
   readonly form: FakeHTMLFormElement;
+  readonly handoffList: FakeHTMLElement;
+  readonly handoffStatus: FakeHTMLElement;
+  readonly handoffText: FakeHTMLElement;
   readonly initializationOrder: readonly string[];
   readonly input: FakeHTMLInputElement;
   readonly results: FakeHTMLElement;
   readonly serverResults: FakeHTMLElement;
   readonly status: FakeHTMLElement;
   failNextRender(): void;
+  failCopy(): void;
   rejectFetch(): Promise<void>;
   resolveNonOkFetch(): Promise<void>;
   resolveIndex(value: unknown): Promise<void>;
@@ -241,6 +277,16 @@ function descendants(
   ];
 }
 
+function byText(
+  element: FakeHTMLElement,
+  tagName: string,
+  text: string,
+): FakeHTMLElement | undefined {
+  return descendants(element, tagName).find(
+    (candidate) => candidate.textContent === text,
+  );
+}
+
 async function flushClientPromises(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
@@ -255,6 +301,14 @@ function executeClientPayload(): ClientHarness {
   const results = new FakeHTMLElement('div');
   const error = new FakeHTMLElement('p');
   error.hidden = true;
+  const handoffList = new FakeHTMLElement('ol');
+  const handoffText = new FakeHTMLElement('textarea');
+  const handoffStatus = new FakeHTMLElement('p');
+  const copy = new FakeHTMLElement('button');
+  const clear = new FakeHTMLElement('button');
+  const handoff = new FakeHTMLElement('section');
+  handoff.dataset.momentPageBase =
+    'https://receipt-portfolio.example/video-moment-search/moments/';
   const serverResults = new FakeHTMLElement('section');
   serverResults.textContent = 'server-rendered initial result';
   let resolveFetch!: (response: {
@@ -276,7 +330,14 @@ function executeClientPayload(): ClientHarness {
     ['[data-client-results]', results],
     ['[data-search-error]', error],
     ['[data-server-results]', serverResults],
+    ['[data-moment-page-base]', handoff],
+    ['[data-selected-moments]', handoffList],
+    ['[data-handoff-text]', handoffText],
+    ['[data-handoff-status]', handoffStatus],
+    ['[data-copy-handoff]', copy],
+    ['[data-clear-handoff]', clear],
   ]);
+  let copyFails = false;
   const document = {
     createElement: (tagName: string) => new FakeHTMLElement(tagName),
     querySelector: (selector: string) => selectors.get(selector) ?? null,
@@ -291,12 +352,26 @@ function executeClientPayload(): ClientHarness {
     HTMLElement: FakeHTMLElement,
     HTMLFormElement: FakeHTMLFormElement,
     HTMLInputElement: FakeHTMLInputElement,
+    isSecureContext: true,
+    navigator: {
+      clipboard: {
+        writeText: () =>
+          copyFails
+            ? Promise.reject(new Error('controlled clipboard failure'))
+            : Promise.resolve(),
+      },
+    },
     URL,
   });
 
   return {
+    clear,
+    copy,
     error,
     form,
+    handoffList,
+    handoffStatus,
+    handoffText,
     initializationOrder,
     input,
     results,
@@ -304,6 +379,9 @@ function executeClientPayload(): ClientHarness {
     status,
     failNextRender: () => {
       results.failNextReplace = true;
+    },
+    failCopy: () => {
+      copyFails = true;
     },
     rejectFetch: async () => {
       rejectFetch(new Error('controlled fetch rejection'));
@@ -1223,6 +1301,124 @@ describe('AI Moment Index public search surface', () => {
       ],
     );
     expect(harness.status.textContent).toBe('Showing 1 moment.');
+  });
+
+  it('keeps one reviewed fixed-flow moment in a page-memory-only timestamp and rights handoff', async () => {
+    const harness = executeClientPayload();
+    expect(harness.handoffList.children).toEqual([]);
+    expect(harness.handoffText.readOnly).toBe(true);
+    expect(harness.copy.disabled).toBe(true);
+    expect(harness.clear.disabled).toBe(true);
+
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+    );
+    harness.submit('robots control');
+    const result = descendants(harness.results, 'article')[0]!;
+    expect(result.dataset.momentId).toBe('moment-robots-control');
+    const add = byText(result, 'button', 'Add to temporary handoff');
+    expect(add?.disabled).toBe(false);
+    add?.click();
+
+    expect(harness.handoffList.children).toHaveLength(1);
+    expect(harness.handoffList.children[0]?.dataset.momentId).toBe(
+      'moment-robots-control',
+    );
+    expect(harness.copy.disabled).toBe(false);
+    expect(harness.clear.disabled).toBe(false);
+    expect(harness.handoffText.value).toContain(
+      'Source title: How can we keep robots under control?',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Creator: University of the Netherlands',
+    );
+    expect(harness.handoffText.value).toContain('Stored interval: 2:12–2:13');
+    expect(harness.handoffText.value).toContain(
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(harness.handoffText.value).toContain(
+      'https://receipt-portfolio.example/video-moment-search/moments/moment-robots-control/',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Evidence ID: commons-how-can-we-keep-robots-under-control-v1',
+    );
+    expect(harness.handoffText.value).toContain(
+      'License: CC BY-SA 4.0 International',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Immutable rights revision: https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Historical review date: 2022-01-18',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Included: timestamp link, original editorial annotation',
+    );
+    expect(harness.handoffText.value).toContain(
+      'Excluded: hosting, embedding, media distribution, transcript distribution, endorsement claim, inferred permission',
+    );
+    expect(harness.handoffText.value).toContain('Correction state: active');
+    expect(harness.handoffText.value).not.toContain('robots control');
+
+    harness.submit('robots control');
+    expect(
+      byText(
+        descendants(harness.results, 'article')[0]!,
+        'button',
+        'Add to temporary handoff',
+      ),
+    ).toBeUndefined();
+    expect(harness.handoffList.children).toHaveLength(1);
+    harness.failCopy();
+    harness.copy.click();
+    await flushClientPromises();
+    expect(harness.handoffText.value).toContain('Evidence ID:');
+    expect(harness.handoffStatus.textContent).toContain('manual copying');
+
+    harness.clear.click();
+    expect(harness.handoffList.children).toEqual([]);
+    expect(harness.handoffText.value).toBe('');
+    expect(harness.clear.disabled).toBe(true);
+    expect(harness.handoffStatus.textContent).toContain('cleared');
+    expect(harness.handoffStatus.focusCount).toBeGreaterThan(0);
+    expect(executeClientPayload().handoffList.children).toEqual([]);
+  });
+
+  it('does not expose a handoff add control for unreviewed or malformed public-index entries', async () => {
+    const unreviewedCorpus = twoSourceFixture();
+    const unreviewed = executeClientPayload();
+    await unreviewed.resolveIndex(
+      serializePublicSearchIndex(
+        unreviewedCorpus,
+        buildSearchIndex(unreviewedCorpus),
+      ),
+    );
+    unreviewed.submit('independent source');
+    expect(
+      byText(
+        descendants(unreviewed.results, 'article')[0]!,
+        'button',
+        'Add to temporary handoff',
+      ),
+    ).toBeUndefined();
+    expect(unreviewed.handoffList.children).toEqual([]);
+
+    const malformed = executeClientPayload();
+    const valid = serializePublicSearchIndex(
+      fixture,
+      searchIndex,
+      sourceRightsEvidence,
+    );
+    await malformed.resolveIndex({
+      ...valid,
+      entries: valid.entries.map((entry) => ({
+        ...entry,
+        reviewEvidence: { ...entry.reviewEvidence, reviewedOn: 'not-a-date' },
+      })),
+    });
+    malformed.submit('robots control');
+    expect(malformed.results.children).toEqual([]);
+    expect(malformed.handoffList.children).toEqual([]);
   });
 
   it('keeps shipped payload ranking equal to phrase-bonus helper ranking', async () => {

@@ -22,7 +22,13 @@ The released preview is a heuristic regression gate only. It does not establish 
 
 - **Applied-AI researcher:** the preview-testable heuristic route above; no usability or task-completion claim.
 - **Creator:** bounded source and rights review, preview inspect/correct/remove, then publication only after passing evidence. No production submission system is part of this slice.
-- **L&D lead:** approved-library search plus adjacent context, saved/shared timestamped lists, and permissions verification are proposed flows. They are not yet testable and must not be presented as delivered capability or user evidence.
+- **L&D lead:** `preview-testable-heuristic` only for controlled-fixture search, stored historical evidence inspection, exact-source context routing, and copying a temporary timestamp list from the open page. Approved enterprise-library search, current permission verification, collaboration or retention, measured task completion, measured time-to-value, usability, and demand remain unsupported.
+
+## Controlled L&D handoff-flow gate
+
+Run the fixed synthetic flow: search `robots control`, confirm the validated result, add its one reviewed moment, inspect the exact source-time and stored historical rights fields in the temporary plain-text handoff, copy it or manually copy the visibly retained text if copy fails, then clear the list and reload to confirm it is empty. The metric is **deterministic synthetic L&D handoff-flow integrity**. The target is one fixed flow with one selected moment, exact serialized timestamp and evidence fields, successful or visibly recoverable copy, clear/reload empty, invalid entries admitted `0`, timestamp landing error `0`, and retained or transmitted measurement data `0`.
+
+Stop if a selected item lacks its exact validated timestamp, substantive stored rights evidence, immutable rights revision, or included/excluded product boundary; if raw query text enters the artifact; if the route gains persistence, telemetry, credentials, another network destination, or new rights evidence; or if any wording implies an approved enterprise library, current permission verification, task completion, time-to-value, usability, demand, creator/referral outcomes, conversion, or revenue. The selection and handoff text are page memory only: no storage, account, cookie, URL/history state, beacon, analytics, download, or external sharing endpoint. This fixed synthetic gate is not user research or evidence of any user outcome.
 
 ## Measurement review
 

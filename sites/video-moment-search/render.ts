@@ -464,6 +464,16 @@ export function renderSearchShell(
     <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>
     <p class="error" data-search-error hidden>Search could not load. The initial controlled moments remain available below.</p>
     <div class="moment-list" data-client-results></div>
+    <section class="handoff-panel" aria-labelledby="handoff-heading" data-moment-page-base="${escapeHtml(routeUrl(baseUrl, 'moments/'))}">
+      <p class="eyebrow">Current page only</p>
+      <h3 id="handoff-heading">Temporary timestamp and rights handoff</h3>
+      <p>Selected reviewed moments stay only in this open page. Copy the plain text below or clear it before leaving.</p>
+      <ol data-selected-moments></ol>
+      <label for="moment-handoff-text">Plain text handoff</label>
+      <textarea id="moment-handoff-text" data-handoff-text readonly rows="12" aria-describedby="handoff-status"></textarea>
+      <div class="handoff-actions"><button type="button" data-copy-handoff disabled>Copy handoff text</button><button type="button" data-clear-handoff disabled>Clear handoff</button></div>
+      <p id="handoff-status" class="search-status" role="status" aria-live="polite" tabindex="-1" data-handoff-status>No reviewed moments are selected.</p>
+    </section>
   </section>
   <section aria-labelledby="initial-heading" data-server-results>
     <p class="eyebrow">Available without JavaScript</p>

@@ -263,11 +263,25 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   const status = document.querySelector('[data-search-status]');
   const results = document.querySelector('[data-client-results]');
   const error = document.querySelector('[data-search-error]');
+  const handoff = document.querySelector('[data-moment-page-base]');
+  const selectedList = document.querySelector('[data-selected-moments]');
+  const handoffText = document.querySelector('[data-handoff-text]');
+  const handoffStatus = document.querySelector('[data-handoff-status]');
+  const copy = document.querySelector('[data-copy-handoff]');
+  const clear = document.querySelector('[data-clear-handoff]');
   if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement) ||
       !(status instanceof HTMLElement) || !(results instanceof HTMLElement) ||
-      !(error instanceof HTMLElement)) return;
+      !(error instanceof HTMLElement) || !(handoff instanceof HTMLElement) ||
+      !(selectedList instanceof HTMLElement) || !(handoffText instanceof HTMLElement) ||
+      !(handoffStatus instanceof HTMLElement) || !(copy instanceof HTMLElement) ||
+      !(clear instanceof HTMLElement)) return;
 
   let index = null;
+  let shown = [];
+  const selected = new Map();
+  handoffText.readOnly = true;
+  copy.disabled = true;
+  clear.disabled = true;
   const normalize = (value) => value.normalize('NFKC').toLocaleLowerCase('en-US')
     .replace(/[\p{Pd}_]/gu, ' ').replace(/\s+/gu, ' ').trim();
   const tokens = (value) => normalize(value).match(/[\p{L}\p{N}]+/gu) || [];
@@ -427,6 +441,52 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   };
   const format = (seconds) => Math.floor(seconds / 60) + ':' +
     String(seconds % 60).padStart(2, '0');
+  const momentPageUrl = (entry) => handoff.dataset.momentPageBase +
+    encodeURIComponent(entry.momentId) + '/';
+  const handoffTextFor = (entry) => {
+    const review = entry.reviewEvidence;
+    if (!review) return '';
+    return [
+      'Source title: ' + entry.videoTitle,
+      'Creator: ' + entry.creatorName,
+      'Stored interval: ' + format(entry.startSeconds) + '–' + format(entry.endSeconds),
+      'Exact source-time URL: ' + entry.timestampUrl,
+      'Evidence-bound moment page: ' + momentPageUrl(entry),
+      'Evidence ID: ' + review.evidenceId,
+      'License: ' + review.licenseIdentifier,
+      'Immutable rights revision: ' + review.immutableRightsRevisionUrl,
+      'Historical review date: ' + review.reviewedOn,
+      'Included: ' + review.productBoundary.included.join(', '),
+      'Excluded: ' + review.productBoundary.excluded.join(', '),
+      'Correction state: ' + entry.correctionState,
+    ].join('\n');
+  };
+  const renderHandoff = () => {
+    const entries = Array.from(selected.values());
+    selectedList.replaceChildren(...entries.map((entry) => {
+      const item = document.createElement('li');
+      item.dataset.momentId = entry.momentId;
+      item.textContent = entry.videoTitle + ' · ' + format(entry.startSeconds) +
+        ' · ' + entry.reviewEvidence.licenseIdentifier + ' · ' + entry.correctionState;
+      return item;
+    }));
+    handoffText.value = entries.map(handoffTextFor).join('\n\n');
+    copy.disabled = entries.length === 0;
+    clear.disabled = entries.length === 0;
+  };
+  const renderShown = () => results.replaceChildren(...shown.map(card));
+  const changeSelection = (entry) => {
+    if (!entry.reviewEvidence) return;
+    if (selected.has(entry.momentId)) {
+      selected.delete(entry.momentId);
+      handoffStatus.textContent = 'Removed the selected moment from this temporary handoff.';
+    } else {
+      selected.set(entry.momentId, entry);
+      handoffStatus.textContent = 'Added one reviewed moment to this temporary handoff.';
+    }
+    renderHandoff();
+    renderShown();
+  };
   const card = (entry) => {
     const article = document.createElement('article');
     article.className = 'moment-card';
@@ -463,6 +523,16 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     related.href = 'moments/' + encodeURIComponent(entry.momentId) + '/';
     related.textContent = 'Open the evidence-bound moment page';
     article.append(heading, metadata, related);
+    if (entry.reviewEvidence) {
+      const select = document.createElement('button');
+      const alreadySelected = selected.has(entry.momentId);
+      select.type = 'button';
+      select.textContent = alreadySelected
+        ? 'Remove from temporary handoff'
+        : 'Add to temporary handoff';
+      select.addEventListener('click', () => changeSelection(entry));
+      article.append(select);
+    }
     return article;
   };
   const showLoadError = () => {
@@ -474,6 +544,27 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     status.textContent = 'Search could not load. The initial controlled moments remain available below.';
   };
 
+  copy.addEventListener('click', () => {
+    if (handoffText.value.length === 0) return;
+    if (!globalThis.isSecureContext || !navigator.clipboard ||
+        typeof navigator.clipboard.writeText !== 'function') {
+      handoffStatus.textContent = 'Copy is unavailable; the plain text remains visible for manual copying.';
+      return;
+    }
+    navigator.clipboard.writeText(handoffText.value).then(() => {
+      handoffStatus.textContent = 'Handoff text copied for this temporary use.';
+    }).catch(() => {
+      handoffStatus.textContent = 'Copy did not complete; the plain text remains visible for manual copying.';
+    });
+  });
+  clear.addEventListener('click', () => {
+    selected.clear();
+    renderHandoff();
+    renderShown();
+    handoffStatus.textContent = 'Temporary handoff cleared.';
+    handoffStatus.focus();
+  });
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     try {
@@ -483,12 +574,14 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       }
       const query = input.value.trim();
       if (query.length === 0) {
-        results.replaceChildren();
+        shown = [];
+        renderShown();
         status.textContent = 'Enter a phrase such as “robots control”.';
         return;
       }
       const found = find(query);
-      results.replaceChildren(...found.map(card));
+      shown = found;
+      renderShown();
       error.hidden = true;
       status.textContent = found.length === 0
         ? 'No moments match this phrase. Try fewer or different words.'

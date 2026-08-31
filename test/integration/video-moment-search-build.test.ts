@@ -99,10 +99,18 @@ describe('atomic AI Moment Index build', () => {
     );
     expect(html).not.toContain('?q=');
     expect(html).toContain('data-server-results');
+    expect(html).toContain('data-selected-moments');
+    expect(html).toContain('data-handoff-text');
+    expect(html).toContain('data-copy-handoff');
+    expect(html).toContain('data-clear-handoff');
+    expect(html).toContain('Temporary timestamp and rights handoff');
     expect(html).toContain('moment-robots-control');
     expect(html).toContain('Search moments');
     expect(client).toContain("input.name = 'q'");
     expect(client).toContain('textContent');
+    expect(client).toContain('navigator.clipboard.writeText');
+    expect(client).not.toContain('localStorage');
+    expect(client).not.toContain('sessionStorage');
     expect(styles).toContain(':focus-visible');
 
     const results = searchPublicIndex(JSON.parse(indexJson), 'robots control');

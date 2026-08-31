@@ -62,13 +62,21 @@
     },
     {
       "id": "ld-lead",
-      "testability": "not-yet-testable",
-      "testableCapabilities": [],
+      "testability": "preview-testable-heuristic",
+      "testableCapabilities": [
+        "controlled-fixture-search",
+        "stored-historical-evidence-inspection",
+        "exact-source-context-routing",
+        "timestamp-list-copy-share"
+      ],
       "unsupportedCapabilities": [
         "approved-library-search",
-        "adjacent-context",
-        "timestamp-list-save-or-share",
-        "permissions-verification"
+        "current-permission-verification",
+        "collaboration-or-retention",
+        "measured-task-completion",
+        "measured-time-to-value",
+        "usability-evidence",
+        "demand-evidence"
       ]
     }
   ],
