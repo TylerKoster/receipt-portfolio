@@ -18,6 +18,12 @@ interface SyntheticUsabilityLedger {
     status: string;
     boundary: string;
   }>;
+  rejectedCandidates: Array<{
+    experiment: string;
+    status: string;
+    candidate: string;
+    reason: string;
+  }>;
   baseline: {
     fullCompletion: number;
     partialCompletion: number;
@@ -57,10 +63,21 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'current-original-guides',
+        area: 'searchable-filterable-discovery',
         rank: 1,
+        experiment: 'public-source-bound-inventory-v1',
+        status: 'active',
+        metric: 'controlled public adapter utility contract',
+        target:
+          'A controlled two-record adapter supports search, declared filters, count, empty, loading, error, reset, selection, and exactly-two comparison without network or persistence.',
+        stopRule:
+          'Controlled adapter interaction does not establish real users, demand, conversion, revenue, provenance, currentness, safety, adoption, or public deployment.',
+      },
+      {
+        area: 'current-original-guides',
+        rank: 2,
         experiment: 'controlled-guide-draft-admission-contract',
-        status: 'in-progress',
+        status: 'completed-internal',
         metric: 'controlled guide draft admission coverage',
         target:
           'Each controlled guide draft requires nonempty guide/source bindings and a quality-gated source receipt.',
@@ -69,7 +86,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'source-bound-comparison',
-        rank: 2,
+        rank: 3,
         experiment: 'controlled-comparison-field-differences',
         status: 'completed-internal',
         metric: 'controlled comparison field-difference coverage',
@@ -77,17 +94,6 @@ describe('SkillLedger synthetic usability ledger', () => {
           'Exactly two quality-gated controlled records produce deterministic source, hash, declared-metadata, and static-signal-presence differences.',
         stopRule:
           'Field differences do not establish real provenance, safety, adoption, demand, suitability, or public UI readiness.',
-      },
-      {
-        area: 'searchable-filterable-discovery',
-        rank: 3,
-        experiment: 'source-bound-record-quality-gate',
-        status: 'completed-internal',
-        metric: 'controlled invalid-record rejection coverage',
-        target:
-          'Every controlled record with a missing source binding, invalid observed time, or malformed hash is excluded and disclosed deterministically.',
-        stopRule:
-          'Field validation does not establish real provenance, safety, adoption, demand, or public UI readiness.',
       },
       {
         area: 'discoverability',
@@ -150,6 +156,20 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-internal',
         boundary:
           'Field differences do not establish real provenance, safety, adoption, demand, suitability, or public UI readiness.',
+      },
+      {
+        experiment: 'controlled-guide-draft-admission-contract',
+        status: 'completed-internal',
+        boundary:
+          'Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, suitability, or public UI readiness.',
+      },
+    ]);
+    expect(ledger.rejectedCandidates).toEqual([
+      {
+        experiment: 'controlled-guide-draft-admission-measurement',
+        status: 'killed-superseded',
+        candidate: '6830f757a9dee1b81861e2653e4389a2fe50149f',
+        reason: 'It had no delivered public/user/monetization utility.',
       },
     ]);
   });
