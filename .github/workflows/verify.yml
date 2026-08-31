@@ -38,8 +38,10 @@ jobs:
         run: npm test -- --run
       - name: Run integration suite
         run: npm run test:integration
-      - name: Collect controlled and pinned-source evidence
+      - name: Collect controlled and pinned-source evidence including AI Moment Index
         run: npm run evidence -- collect-fixtures
+      - name: Run AI Moment Index focused fixture and build contract
+        run: npm test -- --run test/integration/video-moment-search-build.test.ts
       - name: Verify exact nonempty evidence inventory
         run: npm run evidence -- verify --all
       - name: Run evidence mutation gate

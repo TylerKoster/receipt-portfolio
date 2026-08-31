@@ -30,8 +30,10 @@ jobs:
         run: npm run check
       - name: Run full test suite
         run: npm test -- --run
-      - name: Collect controlled and pinned-source evidence
+      - name: Collect controlled and pinned-source evidence including AI Moment Index
         run: npm run evidence -- collect-fixtures
+      - name: Run AI Moment Index focused fixture and build contract
+        run: npm test -- --run test/integration/video-moment-search-build.test.ts
       - name: Verify exact nonempty evidence inventory
         run: npm run evidence -- verify --all
       - name: Run evidence mutation gate
@@ -67,3 +69,29 @@ jobs:
       - name: Deploy GitHub Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
+
+  public-health:
+    needs: deploy
+    permissions: {}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify AI Moment Index public routes and timestamp documents
+        shell: bash
+        run: |
+          home_document="$(mktemp)"
+          video_document="$(mktemp)"
+          moment_document="$(mktemp)"
+          trap 'rm -f "$home_document" "$video_document" "$moment_document"' EXIT
+          curl --fail --show-error --silent --location \
+            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/' \
+            > "$home_document"
+          curl --fail --show-error --silent --location \
+            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/' \
+            > "$video_document"
+          curl --fail --show-error --silent --location \
+            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/' \
+            > "$moment_document"
+          source_timestamp='https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132'
+          grep --fixed-strings -- "$source_timestamp" "$video_document"
+          grep --fixed-strings -- "$source_timestamp" "$moment_document"
