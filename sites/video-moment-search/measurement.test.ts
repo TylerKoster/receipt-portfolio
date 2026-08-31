@@ -30,6 +30,69 @@ const ledger = JSON.parse(
   ),
 );
 
+const canonicalHistoricalArtifact = {
+  relationship: 'supplements',
+  replacementPolicy: 'does-not-replace',
+  path: 'sites/video-moment-search/product-experiment-ledger.json',
+  role: 'released-single-experiment-historical-artifact',
+} as const;
+
+const canonicalNoDataState = {
+  measurementEvidence: 'not-measured',
+  missingDataInterpretation: 'unknown-or-blocked',
+  zeroDemandInference: 'prohibited',
+  prohibitedOutcomeClaims: [
+    'measured-users',
+    'creator-onboarding',
+    'creator-referrals',
+    'usability',
+    'demand',
+    'revenue',
+    'task-completion',
+    'ld-workflow',
+    'paid-pilot-evidence',
+  ],
+} as const;
+
+const canonicalPersonas = [
+  {
+    id: 'researcher',
+    testability: 'preview-testable-heuristic',
+    testableCapabilities: [
+      'concept-search',
+      'ranked-results',
+      'exact-moment-routing',
+    ],
+    unsupportedCapabilities: [
+      'measured-task-completion',
+      'measured-time-to-value',
+      'usability-evidence',
+      'demand-evidence',
+    ],
+  },
+  {
+    id: 'creator',
+    testability: 'not-yet-testable',
+    testableCapabilities: [],
+    unsupportedCapabilities: [
+      'rights-cleared-library-submission',
+      'moment-correction-or-removal',
+      'creator-referral-evidence',
+    ],
+  },
+  {
+    id: 'ld-lead',
+    testability: 'not-yet-testable',
+    testableCapabilities: [],
+    unsupportedCapabilities: [
+      'approved-library-search',
+      'adjacent-context',
+      'timestamp-list-save-or-share',
+      'permissions-verification',
+    ],
+  },
+] as const;
+
 describe('privacy-preserving measurement contract', () => {
   it('constructs a strict allowlisted search payload without query text or personal data', () => {
     const event = createMeasurementEvent('search', {
@@ -73,12 +136,39 @@ describe('privacy-preserving measurement contract', () => {
         rawQuery: 'robots control',
       });
 
+      expect(event).toBeDefined();
+      if (event === undefined) throw new Error('expected a valid event');
       expect(event.eventType).toBe(eventType);
       expect(event.pageId).toBe('search-home');
       expect(event.occurredAt).toBe('2026-08-31T12:00:00.000Z');
       expect(JSON.stringify(event)).not.toContain('robots control');
     },
   );
+
+  it('generates a canonical current timestamp only when occurredAt is omitted', () => {
+    const before = Date.now();
+    const event = createMeasurementEvent('search', { resultCount: 1 });
+    const after = Date.now();
+
+    expect(event).toBeDefined();
+    expect(new Date(event!.occurredAt).toISOString()).toBe(event!.occurredAt);
+    expect(Date.parse(event!.occurredAt)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(event!.occurredAt)).toBeLessThanOrEqual(after);
+  });
+
+  it.each([
+    ['explicit undefined', undefined],
+    ['an invalid string', 'not-a-timestamp'],
+    ['a number', 1_777_777_777_777],
+    ['a noncanonical ISO form', '2026-08-31T12:00:00Z'],
+  ])('rejects %s when occurredAt is explicitly present', (_, occurredAt) => {
+    expect(
+      createMeasurementEvent('search', {
+        resultCount: 1,
+        occurredAt,
+      }),
+    ).toBeUndefined();
+  });
 
   it('explicitly discards events while no approved measurement endpoint exists', () => {
     const delivery = deliverMeasurementEvent(
@@ -205,6 +295,159 @@ describe('privacy-preserving measurement contract', () => {
     expect(validateExperimentLedger(ledger).diagnostics).toEqual([]);
   });
 
+  it('uses exact structured source authority, no-data, and persona contracts', () => {
+    expect(ledger.historicalArtifact).toEqual(canonicalHistoricalArtifact);
+    expect(ledger.noDataState).toEqual(canonicalNoDataState);
+    expect(ledger).not.toHaveProperty(
+      'relationshipToReleasedHistoricalArtifact',
+    );
+    expect(ledger).not.toHaveProperty('noDataBoundary');
+    expect(ledger.personas).toEqual(canonicalPersonas);
+  });
+
+  it.each([
+    ['relationship', 'replaces'],
+    ['replacementPolicy', 'may-replace'],
+    ['path', 'docs/video-moment-search/experiment-ledger.json'],
+    ['role', 'current-source-of-truth'],
+  ] as const)(
+    'rejects false historical artifact authority in %s',
+    (field, value) => {
+      const invalid = structuredClone(ledger);
+      invalid.historicalArtifact = {
+        ...structuredClone(canonicalHistoricalArtifact),
+        [field]: value,
+      };
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        'historicalArtifact must match the released artifact contract',
+      );
+    },
+  );
+
+  it('rejects a missing structured no-data state', () => {
+    const invalid = structuredClone(ledger);
+    delete invalid.noDataState;
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'noDataState must match the no-data claim boundary',
+    );
+  });
+
+  it.each([
+    ['measurementEvidence', 'measured'],
+    ['missingDataInterpretation', 'zero-demand'],
+    ['zeroDemandInference', 'allowed'],
+  ] as const)('rejects a false no-data state in %s', (field, value) => {
+    const invalid = structuredClone(ledger);
+    invalid.noDataState = {
+      ...structuredClone(canonicalNoDataState),
+      [field]: value,
+    };
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'noDataState must match the no-data claim boundary',
+    );
+  });
+
+  it('rejects removal of a prohibited outcome claim', () => {
+    const invalid = structuredClone(ledger);
+    invalid.noDataState = {
+      ...structuredClone(canonicalNoDataState),
+      prohibitedOutcomeClaims:
+        canonicalNoDataState.prohibitedOutcomeClaims.filter(
+          (claim) => claim !== 'demand',
+        ),
+    };
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'noDataState must match the no-data claim boundary',
+    );
+  });
+
+  it('rejects an extra top-level outcome claim', () => {
+    const invalid = structuredClone(ledger);
+    invalid.outcomeClaim = 'Measured creator demand';
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'ledger has unsupported top-level key(s): outcomeClaim',
+    );
+  });
+
+  it('binds testability to persona identity rather than accepting a state swap', () => {
+    const invalid = structuredClone(ledger);
+    [invalid.personas[0].testability, invalid.personas[1].testability] = [
+      invalid.personas[1].testability,
+      invalid.personas[0].testability,
+    ];
+
+    const diagnostics = validateExperimentLedger(invalid).diagnostics;
+    expect(diagnostics).toContain(
+      'personas[0] must match the researcher persona contract',
+    );
+    expect(diagnostics).toContain(
+      'personas[1] must match the creator persona contract',
+    );
+  });
+
+  it.each([
+    ['creator', 1],
+    ['ld-lead', 2],
+  ] as const)(
+    'rejects preview-testable for the %s persona',
+    (personaId, index) => {
+      const invalid = structuredClone(ledger);
+      invalid.personas[index].testability = 'preview-testable-heuristic';
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        `personas[${index}] must match the ${personaId} persona contract`,
+      );
+    },
+  );
+
+  it.each([
+    ['description', 'Creator onboarding produced measured demand'],
+    ['outcomeClaim', 'Creator onboarding succeeded'],
+  ] as const)(
+    'rejects persona outcome prose in an extra %s field',
+    (field, value) => {
+      const invalid = structuredClone(ledger);
+      invalid.personas[1][field] = value;
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        `personas[1] has unsupported persona key(s): ${field}`,
+      );
+    },
+  );
+
+  it('rejects an extra persona key', () => {
+    const invalid = structuredClone(ledger);
+    invalid.personas[0].operatorNote = 'Treat this as measured';
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'personas[0] has unsupported persona key(s): operatorNote',
+    );
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['changed', ['creator-referral-evidence']],
+  ] as const)(
+    'rejects %s creator unsupported capabilities',
+    (_, unsupportedCapabilities) => {
+      const invalid = structuredClone(ledger);
+      if (unsupportedCapabilities === undefined) {
+        delete invalid.personas[1].unsupportedCapabilities;
+      } else {
+        invalid.personas[1].unsupportedCapabilities = unsupportedCapabilities;
+      }
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        'personas[1] must match the creator persona contract',
+      );
+    },
+  );
+
   it('rejects active experiments that lose their measurable stop rule or evidence classification', () => {
     const invalid = structuredClone(ledger);
     invalid.experiments[0].stopRule = '';
@@ -233,7 +476,9 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[0].rank');
     expect(diagnostics).toContain('experiments[2].target');
     expect(diagnostics).toContain('requiredMetrics');
-    expect(diagnostics).toContain('personas[1].testability');
+    expect(diagnostics).toContain(
+      'personas[1] must match the creator persona contract',
+    );
   });
 
   it('rejects a reordered or substituted experiment even when its rank remains numeric', () => {
@@ -269,6 +514,56 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[2].metric');
     expect(diagnostics).toContain('experiments[2].measures');
     expect(diagnostics).toContain('experiments[2].target');
+  });
+
+  it.each(['complete', 'measured'])(
+    'rejects an experiment lifecycle status of %s',
+    (status) => {
+      const invalid = structuredClone(ledger);
+      invalid.experiments[0].status = status;
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        'experiments[0].status must equal proposed',
+      );
+    },
+  );
+
+  it('binds evidence classification to experiment rank', () => {
+    const invalid = structuredClone(ledger);
+    [
+      invalid.experiments[1].evidenceClassification,
+      invalid.experiments[2].evidenceClassification,
+    ] = [
+      invalid.experiments[2].evidenceClassification,
+      invalid.experiments[1].evidenceClassification,
+    ];
+
+    const diagnostics = validateExperimentLedger(invalid).diagnostics;
+    expect(diagnostics).toContain(
+      'experiments[1].evidenceClassification must match the ranked evidence state',
+    );
+    expect(diagnostics).toContain(
+      'experiments[2].evidenceClassification must match the ranked evidence state',
+    );
+  });
+
+  it('rejects arbitrary nonblank evidence paths', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[0].evidencePaths = ['README.md'];
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[0].evidencePaths must match the approved evidence roles',
+    );
+  });
+
+  it('rejects a fabricated measured-outcome baseline', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[0].baseline =
+      'Measured creator demand and successful onboarding.';
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[0].baseline must match the approved evidence baseline',
+    );
   });
 
   it('rejects a conflicting legacy continuation gate as a second target source', () => {

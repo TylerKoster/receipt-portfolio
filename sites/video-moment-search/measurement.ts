@@ -70,9 +70,8 @@ function safePositiveCount(value: unknown): number | undefined {
     : undefined;
 }
 
-function safeTimestamp(value: unknown): string {
-  if (isIsoTimestamp(value)) return value;
-  return new Date().toISOString();
+function safeTimestamp(value: unknown): string | undefined {
+  return isIsoTimestamp(value) ? value : undefined;
 }
 
 function isIsoTimestamp(value: unknown): value is string {
@@ -107,7 +106,7 @@ function allowedValue(
 export function createMeasurementEvent(
   eventType: MeasurementEventType,
   payload?: Record<string, unknown>,
-): MeasurementEvent;
+): MeasurementEvent | undefined;
 
 export function createMeasurementEvent(
   eventType: unknown,
@@ -127,10 +126,14 @@ function createMeasurementEventFromUnknown(
 ): MeasurementEvent | undefined {
   if (!isMeasurementEventType(eventType)) return undefined;
   const fields = objectRecord(payload) ?? {};
+  const occurredAt = Object.prototype.hasOwnProperty.call(fields, 'occurredAt')
+    ? safeTimestamp(fields.occurredAt)
+    : new Date().toISOString();
+  if (occurredAt === undefined) return undefined;
   const event: Record<string, string | number> = {
     schemaVersion: 1,
     eventType,
-    occurredAt: safeTimestamp(fields.occurredAt),
+    occurredAt,
   };
   for (const field of [...commonFields, ...fieldsByEventType[eventType]]) {
     if (field === 'occurredAt') continue;
@@ -194,14 +197,21 @@ const requiredMetrics = [
 ] as const;
 
 const requiredPersonaIds = ['researcher', 'creator', 'ld-lead'] as const;
-const allowedEvidenceClassifications = new Set([
-  'heuristic-preview-gate',
-  'not-yet-testable',
-  'no-data',
+const allowedLedgerKeys = new Set([
+  'schemaVersion',
+  'siteId',
+  'historicalArtifact',
+  'measurementStatus',
+  'noDataState',
+  'requiredMetrics',
+  'personas',
+  'experiments',
 ]);
-const allowedTestability = new Set([
-  'preview-testable-heuristic',
-  'not-yet-testable',
+const allowedPersonaKeys = new Set([
+  'id',
+  'testability',
+  'testableCapabilities',
+  'unsupportedCapabilities',
 ]);
 const allowedExperimentKeys = new Set([
   'rank',
@@ -217,28 +227,136 @@ const allowedExperimentKeys = new Set([
   'evidencePaths',
 ]);
 
+const expectedHistoricalArtifact = {
+  relationship: 'supplements',
+  replacementPolicy: 'does-not-replace',
+  path: 'sites/video-moment-search/product-experiment-ledger.json',
+  role: 'released-single-experiment-historical-artifact',
+} as const;
+
+const expectedNoDataState = {
+  measurementEvidence: 'not-measured',
+  missingDataInterpretation: 'unknown-or-blocked',
+  zeroDemandInference: 'prohibited',
+  prohibitedOutcomeClaims: [
+    'measured-users',
+    'creator-onboarding',
+    'creator-referrals',
+    'usability',
+    'demand',
+    'revenue',
+    'task-completion',
+    'ld-workflow',
+    'paid-pilot-evidence',
+  ],
+} as const;
+
+const expectedPersonas = [
+  {
+    id: 'researcher',
+    testability: 'preview-testable-heuristic',
+    testableCapabilities: [
+      'concept-search',
+      'ranked-results',
+      'exact-moment-routing',
+    ],
+    unsupportedCapabilities: [
+      'measured-task-completion',
+      'measured-time-to-value',
+      'usability-evidence',
+      'demand-evidence',
+    ],
+  },
+  {
+    id: 'creator',
+    testability: 'not-yet-testable',
+    testableCapabilities: [],
+    unsupportedCapabilities: [
+      'rights-cleared-library-submission',
+      'moment-correction-or-removal',
+      'creator-referral-evidence',
+    ],
+  },
+  {
+    id: 'ld-lead',
+    testability: 'not-yet-testable',
+    testableCapabilities: [],
+    unsupportedCapabilities: [
+      'approved-library-search',
+      'adjacent-context',
+      'timestamp-list-save-or-share',
+      'permissions-verification',
+    ],
+  },
+] as const;
+
 const expectedExperiments = [
   {
     rank: 1,
     id: 'creator-authorization',
+    hypothesis: 'bounded-rights-review-admission',
     metric: 'creator referral clicks',
     measures: ['creator referral clicks', 'correction rate'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'authority-review',
+    },
     target: {
       classification: 'approved-spec-gate',
       authorizedCreators: 3,
       coveredVideos: 100,
     },
+    stopRule: {
+      action: 'stop',
+      when: 'authority-or-rights-evidence-is-ambiguous',
+    },
+    status: 'proposed',
+    evidenceClassification: 'not-yet-testable',
+    evidencePaths: [
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+      {
+        role: 'released-historical-artifact',
+        path: 'sites/video-moment-search/product-experiment-ledger.json',
+      },
+    ],
   },
   {
     rank: 2,
     id: 'corpus-growth',
+    hypothesis: 'authorized-corpus-growth-with-review-controls',
     metric: 'correction rate',
     measures: ['correction rate'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'authorized-evidence',
+    },
     target: { classification: 'approved-spec-gate', verifiedMoments: 500 },
+    stopRule: {
+      action: 'stop',
+      when: 'rights-routing-or-correction-evidence-is-missing',
+    },
+    status: 'proposed',
+    evidenceClassification: 'not-yet-testable',
+    evidencePaths: [
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+      {
+        role: 'authorized-corpus-fixture',
+        path: 'fixtures/video-moment-search/authorized-ai-video-v1.json',
+      },
+    ],
   },
   {
     rank: 3,
     id: 'researcher-relevance',
+    hypothesis: 'heuristic-search-to-exact-moment-routing',
     metric: 'top-three relevance',
     measures: [
       'top-three relevance',
@@ -247,60 +365,175 @@ const expectedExperiments = [
       'task completion',
       'time-to-value',
     ],
+    baseline: {
+      evidenceState: 'heuristic-only',
+      interpretation: 'not-measured',
+      blocker: 'measured-user-evidence',
+    },
     target: { classification: 'approved-spec-gate', minimumPercent: 80 },
+    stopRule: {
+      action: 'stop',
+      when: 'target-is-not-met-or-routing-integrity-fails',
+      targetReference: 'target',
+      additionalGate: 'zero-results-require-review',
+    },
+    status: 'proposed',
+    evidenceClassification: 'heuristic-preview-gate',
+    evidencePaths: [
+      {
+        role: 'exact-routing-regression',
+        path: 'sites/video-moment-search/site.test.ts',
+      },
+      {
+        role: 'released-historical-artifact',
+        path: 'sites/video-moment-search/product-experiment-ledger.json',
+      },
+    ],
   },
   {
     rank: 4,
     id: 'exact-moment-routing',
+    hypothesis: 'approved-measurement-exact-moment-usefulness',
     metric: 'exact-moment click rate',
     measures: ['exact-moment click rate', 'timestamp landing error'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'approved-measurement',
+    },
     target: {
       classification: 'approved-spec-gate',
       minimumPercent: 30,
       denominator: 'successful-searches',
     },
+    stopRule: {
+      action: 'stop',
+      when: 'target-is-not-met-or-timestamp-routing-fails',
+      targetReference: 'target',
+      inferenceBoundary: 'clicks-do-not-prove-task-completion',
+    },
+    status: 'proposed',
+    evidenceClassification: 'no-data',
+    evidencePaths: [
+      {
+        role: 'measurement-contract',
+        path: 'sites/video-moment-search/measurement.ts',
+      },
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+    ],
   },
   {
     rank: 5,
     id: 'non-branded-discovery',
+    hypothesis: 'bounded-non-branded-impression-observation',
     metric: 'non-branded impressions',
     measures: ['non-branded impressions'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'approved-measurement',
+    },
     target: {
       classification: 'provisional-operator-hypothesis',
       observationTarget: 100,
       days: 90,
     },
+    stopRule: {
+      action: 'stop',
+      when: 'target-is-not-observed-or-attribution-integrity-fails',
+      targetReference: 'target',
+      belowTargetConclusion: 'unknown',
+    },
+    status: 'proposed',
+    evidenceClassification: 'no-data',
+    evidencePaths: [
+      {
+        role: 'measurement-contract',
+        path: 'sites/video-moment-search/measurement.ts',
+      },
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+    ],
   },
   {
     rank: 6,
     id: 'offer-interest',
+    hypothesis: 'bounded-offer-click-observation',
     metric: 'offer clicks',
     measures: ['offer clicks'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'approved-measurement',
+    },
     target: {
       classification: 'provisional-operator-hypothesis',
       observationTarget: 10,
       days: 90,
     },
+    stopRule: {
+      action: 'stop',
+      when: 'target-is-not-observed-or-private-attribution-is-required',
+      targetReference: 'target',
+      belowTargetConclusion: 'no-demand-conclusion',
+    },
+    status: 'proposed',
+    evidenceClassification: 'no-data',
+    evidencePaths: [
+      {
+        role: 'measurement-contract',
+        path: 'sites/video-moment-search/measurement.ts',
+      },
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+    ],
   },
   {
     rank: 7,
     id: 'paid-pilot-evidence',
+    hypothesis: 'rights-safe-paid-pilot-signal',
     metric: 'paid pilot evidence',
     measures: ['paid pilot evidence'],
+    baseline: {
+      evidenceState: 'no-data',
+      interpretation: 'unknown-or-blocked',
+      blocker: 'paid-pilot-evidence',
+    },
     target: {
       classification: 'approved-spec-gate',
       minimumCommitments: 1,
       days: 90,
     },
+    stopRule: {
+      action: 'stop',
+      when: 'target-is-not-met-or-permissions-pricing-or-provenance-is-unresolved',
+      targetReference: 'target',
+      belowTargetConclusion: 'no-established-revenue',
+    },
+    status: 'proposed',
+    evidenceClassification: 'no-data',
+    evidencePaths: [
+      {
+        role: 'operator-procedure',
+        path: 'docs/video-moment-search/operator-runbook.md',
+      },
+      {
+        role: 'ranked-operator-ledger',
+        path: 'docs/video-moment-search/experiment-ledger.json',
+      },
+    ],
   },
 ] as const;
 
 export interface ExperimentLedgerValidation {
   readonly diagnostics: readonly string[];
-}
-
-function nonBlank(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function objectRecord(value: unknown): Record<string, unknown> | undefined {
@@ -315,6 +548,31 @@ function sameStrings(actual: unknown, expected: readonly string[]): boolean {
     actual.length === expected.length &&
     actual.every((value, index) => value === expected[index])
   );
+}
+
+function sameExactStructure(actual: unknown, expected: unknown): boolean {
+  if (Array.isArray(expected)) {
+    return (
+      Array.isArray(actual) &&
+      actual.length === expected.length &&
+      actual.every((value, index) => sameExactStructure(value, expected[index]))
+    );
+  }
+  const expectedRecord = objectRecord(expected);
+  if (expectedRecord !== undefined) {
+    const actualRecord = objectRecord(actual);
+    if (actualRecord === undefined) return false;
+    const expectedKeys = Object.keys(expectedRecord);
+    return (
+      Object.keys(actualRecord).length === expectedKeys.length &&
+      expectedKeys.every(
+        (key) =>
+          Object.prototype.hasOwnProperty.call(actualRecord, key) &&
+          sameExactStructure(actualRecord[key], expectedRecord[key]),
+      )
+    );
+  }
+  return actual === expected;
 }
 
 function sameGate(
@@ -338,25 +596,36 @@ export function validateExperimentLedger(
   const ledger = objectRecord(value);
   if (ledger === undefined)
     return { diagnostics: ['ledger must be an object'] };
+  const unsupportedLedgerKeys = Object.keys(ledger)
+    .filter((key) => !allowedLedgerKeys.has(key))
+    .sort();
+  if (unsupportedLedgerKeys.length > 0) {
+    diagnostics.push(
+      `ledger has unsupported top-level key(s): ${unsupportedLedgerKeys.join(', ')}`,
+    );
+  }
   if (ledger.schemaVersion !== 1)
     diagnostics.push('schemaVersion must equal 1');
   if (ledger.siteId !== 'video-moment-search')
     diagnostics.push('siteId must identify video-moment-search');
-  if (!nonBlank(ledger.relationshipToReleasedHistoricalArtifact)) {
-    diagnostics.push('relationshipToReleasedHistoricalArtifact is required');
+  if (
+    !sameExactStructure(ledger.historicalArtifact, expectedHistoricalArtifact)
+  ) {
+    diagnostics.push(
+      'historicalArtifact must match the released artifact contract',
+    );
   }
   if (ledger.measurementStatus !== 'not-configured') {
     diagnostics.push(
       'measurementStatus must be not-configured without an approved endpoint',
     );
   }
+  if (!sameExactStructure(ledger.noDataState, expectedNoDataState)) {
+    diagnostics.push('noDataState must match the no-data claim boundary');
+  }
 
   const metrics = ledger.requiredMetrics;
-  if (
-    !Array.isArray(metrics) ||
-    metrics.length !== requiredMetrics.length ||
-    !requiredMetrics.every((metric) => metrics.includes(metric))
-  ) {
+  if (!sameStrings(metrics, requiredMetrics)) {
     diagnostics.push(
       'requiredMetrics must include every approved measurement metric',
     );
@@ -377,16 +646,25 @@ export function validateExperimentLedger(
     }
     personas.forEach((persona, index) => {
       const record = objectRecord(persona);
-      if (
-        record === undefined ||
-        !allowedTestability.has(String(record.testability))
-      ) {
+      if (record === undefined) {
+        diagnostics.push(`personas[${index}] must be an object`);
+        return;
+      }
+      const unsupportedKeys = Object.keys(record)
+        .filter((key) => !allowedPersonaKeys.has(key))
+        .sort();
+      if (unsupportedKeys.length > 0) {
         diagnostics.push(
-          `personas[${index}].testability must be a bounded heuristic or not-yet-testable state`,
+          `personas[${index}] has unsupported persona key(s): ${unsupportedKeys.join(', ')}`,
         );
       }
-      if (record === undefined || !nonBlank(record.description)) {
-        diagnostics.push(`personas[${index}].description is required`);
+      const expected = expectedPersonas.find(
+        (candidate) => candidate.id === record.id,
+      );
+      if (expected !== undefined && !sameExactStructure(record, expected)) {
+        diagnostics.push(
+          `personas[${index}] must match the ${expected.id} persona contract`,
+        );
       }
     });
   }
@@ -432,31 +710,30 @@ export function validateExperimentLedger(
     if (!sameGate(record.target, expected.target)) {
       diagnostics.push(`${prefix}.target must match the approved gate`);
     }
-    for (const field of [
-      'id',
-      'hypothesis',
-      'metric',
-      'baseline',
-      'stopRule',
-      'status',
-    ] as const) {
-      if (!nonBlank(record[field]))
-        diagnostics.push(`${prefix}.${field} is required`);
-    }
-    if (
-      !Array.isArray(record.evidencePaths) ||
-      record.evidencePaths.length === 0 ||
-      !record.evidencePaths.every(nonBlank)
-    ) {
+    if (record.hypothesis !== expected.hypothesis) {
       diagnostics.push(
-        `${prefix}.evidencePaths must name supporting local evidence`,
+        `${prefix}.hypothesis must match the approved operator hypothesis`,
       );
     }
-    if (
-      !allowedEvidenceClassifications.has(String(record.evidenceClassification))
-    ) {
+    if (!sameExactStructure(record.baseline, expected.baseline)) {
       diagnostics.push(
-        `${prefix}.evidenceClassification must state its bounded evidence status`,
+        `${prefix}.baseline must match the approved evidence baseline`,
+      );
+    }
+    if (!sameExactStructure(record.stopRule, expected.stopRule)) {
+      diagnostics.push(`${prefix}.stopRule must match the approved stop rule`);
+    }
+    if (record.status !== expected.status) {
+      diagnostics.push(`${prefix}.status must equal proposed`);
+    }
+    if (record.evidenceClassification !== expected.evidenceClassification) {
+      diagnostics.push(
+        `${prefix}.evidenceClassification must match the ranked evidence state`,
+      );
+    }
+    if (!sameExactStructure(record.evidencePaths, expected.evidencePaths)) {
+      diagnostics.push(
+        `${prefix}.evidencePaths must match the approved evidence roles`,
       );
     }
   });

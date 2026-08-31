@@ -1,9 +1,29 @@
 {
   "schemaVersion": 1,
   "siteId": "video-moment-search",
-  "relationshipToReleasedHistoricalArtifact": "This ranked 90-day operator source supplements the released one-experiment historical public artifact at sites/video-moment-search/product-experiment-ledger.json; it does not replace or alter that artifact.",
+  "historicalArtifact": {
+    "relationship": "supplements",
+    "replacementPolicy": "does-not-replace",
+    "path": "sites/video-moment-search/product-experiment-ledger.json",
+    "role": "released-single-experiment-historical-artifact"
+  },
   "measurementStatus": "not-configured",
-  "noDataBoundary": "No measured users, creator onboarding, referrals, usability, demand, revenue, task-completion, or paid-pilot evidence exists. Missing data is unknown or blocked, never zero demand.",
+  "noDataState": {
+    "measurementEvidence": "not-measured",
+    "missingDataInterpretation": "unknown-or-blocked",
+    "zeroDemandInference": "prohibited",
+    "prohibitedOutcomeClaims": [
+      "measured-users",
+      "creator-onboarding",
+      "creator-referrals",
+      "usability",
+      "demand",
+      "revenue",
+      "task-completion",
+      "ld-workflow",
+      "paid-pilot-evidence"
+    ]
+  },
   "requiredMetrics": [
     "top-three relevance",
     "timestamp landing error",
@@ -18,63 +38,110 @@
     {
       "id": "researcher",
       "testability": "preview-testable-heuristic",
-      "description": "An applied-AI researcher enters a concept, receives a ranked list, and reaches the correct exact moment within 60 seconds. This is a heuristic preview gate, not usability or demand evidence."
+      "testableCapabilities": [
+        "concept-search",
+        "ranked-results",
+        "exact-moment-routing"
+      ],
+      "unsupportedCapabilities": [
+        "measured-task-completion",
+        "measured-time-to-value",
+        "usability-evidence",
+        "demand-evidence"
+      ]
     },
     {
       "id": "creator",
       "testability": "not-yet-testable",
-      "description": "A creator submits a rights-cleared library, inspects, corrects, or removes moments, and sees attributable referral evidence. No production creator submission or approved measurement exists."
+      "testableCapabilities": [],
+      "unsupportedCapabilities": [
+        "rights-cleared-library-submission",
+        "moment-correction-or-removal",
+        "creator-referral-evidence"
+      ]
     },
     {
       "id": "ld-lead",
       "testability": "not-yet-testable",
-      "description": "An L&D lead searches an approved library, inspects adjacent context, saves or shares a timestamped list, and verifies permissions. Those adjacent-context, save/share, and permissions flows are not yet testable."
+      "testableCapabilities": [],
+      "unsupportedCapabilities": [
+        "approved-library-search",
+        "adjacent-context",
+        "timestamp-list-save-or-share",
+        "permissions-verification"
+      ]
     }
   ],
   "experiments": [
     {
       "rank": 1,
       "id": "creator-authorization",
-      "hypothesis": "A bounded rights-review flow can admit authorized creator libraries without weakening source authority.",
+      "hypothesis": "bounded-rights-review-admission",
       "metric": "creator referral clicks",
       "measures": ["creator referral clicks", "correction rate"],
-      "baseline": "No data; creator authorization is unknown and blocked pending approved review.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "authority-review"
+      },
       "target": {
         "classification": "approved-spec-gate",
         "authorizedCreators": 3,
         "coveredVideos": 100
       },
-      "stopRule": "Stop authorization if source identity or authority, covered URLs/content, rights, commercial/excerpt/expiry/revocation terms, or caption provenance is ambiguous; quarantine the record.",
+      "stopRule": {
+        "action": "stop",
+        "when": "authority-or-rights-evidence-is-ambiguous"
+      },
       "status": "proposed",
       "evidenceClassification": "not-yet-testable",
       "evidencePaths": [
-        "docs/video-moment-search/operator-runbook.md",
-        "sites/video-moment-search/product-experiment-ledger.json"
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        },
+        {
+          "role": "released-historical-artifact",
+          "path": "sites/video-moment-search/product-experiment-ledger.json"
+        }
       ]
     },
     {
       "rank": 2,
       "id": "corpus-growth",
-      "hypothesis": "Authorized additions can grow the corpus while correction and provenance controls remain reviewable.",
+      "hypothesis": "authorized-corpus-growth-with-review-controls",
       "metric": "correction rate",
       "measures": ["correction rate"],
-      "baseline": "No data; verified corpus growth is unknown and blocked pending authorized evidence.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "authorized-evidence"
+      },
       "target": {
         "classification": "approved-spec-gate",
         "verifiedMoments": 500
       },
-      "stopRule": "Stop admission when a moment lacks rights evidence, exact timestamp routing, or a correction/removal review path.",
+      "stopRule": {
+        "action": "stop",
+        "when": "rights-routing-or-correction-evidence-is-missing"
+      },
       "status": "proposed",
       "evidenceClassification": "not-yet-testable",
       "evidencePaths": [
-        "docs/video-moment-search/operator-runbook.md",
-        "fixtures/video-moment-search/authorized-ai-video-v1.json"
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        },
+        {
+          "role": "authorized-corpus-fixture",
+          "path": "fixtures/video-moment-search/authorized-ai-video-v1.json"
+        }
       ]
     },
     {
       "rank": 3,
       "id": "researcher-relevance",
-      "hypothesis": "The search preview can route a researcher to the correct exact moment with a bounded heuristic gate.",
+      "hypothesis": "heuristic-search-to-exact-moment-routing",
       "metric": "top-three relevance",
       "measures": [
         "top-three relevance",
@@ -83,97 +150,172 @@
         "task completion",
         "time-to-value"
       ],
-      "baseline": "No measured users; the released fixed flow is only a heuristic regression.",
+      "baseline": {
+        "evidenceState": "heuristic-only",
+        "interpretation": "not-measured",
+        "blocker": "measured-user-evidence"
+      },
       "target": {
         "classification": "approved-spec-gate",
         "minimumPercent": 80
       },
-      "stopRule": "Stop the preview gate if fewer than 80% of reviewed heuristic cases place the expected moment in the top three, any timestamp landing error occurs, or a zero-result case lacks an explicit review record.",
+      "stopRule": {
+        "action": "stop",
+        "when": "target-is-not-met-or-routing-integrity-fails",
+        "targetReference": "target",
+        "additionalGate": "zero-results-require-review"
+      },
       "status": "proposed",
       "evidenceClassification": "heuristic-preview-gate",
       "evidencePaths": [
-        "sites/video-moment-search/site.test.ts",
-        "sites/video-moment-search/product-experiment-ledger.json"
+        {
+          "role": "exact-routing-regression",
+          "path": "sites/video-moment-search/site.test.ts"
+        },
+        {
+          "role": "released-historical-artifact",
+          "path": "sites/video-moment-search/product-experiment-ledger.json"
+        }
       ]
     },
     {
       "rank": 4,
       "id": "exact-moment-routing",
-      "hypothesis": "Successful searches can make an exact-moment link useful enough to warrant a bounded measured test once measurement is approved.",
+      "hypothesis": "approved-measurement-exact-moment-usefulness",
       "metric": "exact-moment click rate",
       "measures": ["exact-moment click rate", "timestamp landing error"],
-      "baseline": "No data; no approved measurement endpoint exists.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "approved-measurement"
+      },
       "target": {
         "classification": "approved-spec-gate",
         "minimumPercent": 30,
         "denominator": "successful-searches"
       },
-      "stopRule": "Stop after approved measurement if the rate remains below 30% among successful searches or any timestamp landing error is observed; do not infer task completion from clicks.",
+      "stopRule": {
+        "action": "stop",
+        "when": "target-is-not-met-or-timestamp-routing-fails",
+        "targetReference": "target",
+        "inferenceBoundary": "clicks-do-not-prove-task-completion"
+      },
       "status": "proposed",
       "evidenceClassification": "no-data",
       "evidencePaths": [
-        "sites/video-moment-search/measurement.ts",
-        "docs/video-moment-search/operator-runbook.md"
+        {
+          "role": "measurement-contract",
+          "path": "sites/video-moment-search/measurement.ts"
+        },
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        }
       ]
     },
     {
       "rank": 5,
       "id": "non-branded-discovery",
-      "hypothesis": "A bounded observation window can characterize non-branded impressions without claiming demand.",
+      "hypothesis": "bounded-non-branded-impression-observation",
       "metric": "non-branded impressions",
       "measures": ["non-branded impressions"],
-      "baseline": "No data; non-branded discovery is unknown and blocked without approved measurement.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "approved-measurement"
+      },
       "target": {
         "classification": "provisional-operator-hypothesis",
         "observationTarget": 100,
         "days": 90
       },
-      "stopRule": "Stop the observation if attribution is unavailable, source or query data would be retained, or 100 impressions are not observed by day 90; report unknown rather than zero demand.",
+      "stopRule": {
+        "action": "stop",
+        "when": "target-is-not-observed-or-attribution-integrity-fails",
+        "targetReference": "target",
+        "belowTargetConclusion": "unknown"
+      },
       "status": "proposed",
       "evidenceClassification": "no-data",
       "evidencePaths": [
-        "sites/video-moment-search/measurement.ts",
-        "docs/video-moment-search/operator-runbook.md"
+        {
+          "role": "measurement-contract",
+          "path": "sites/video-moment-search/measurement.ts"
+        },
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        }
       ]
     },
     {
       "rank": 6,
       "id": "offer-interest",
-      "hypothesis": "A narrowly described pilot offer can be observed without representing offer clicks as revenue or demand proof.",
+      "hypothesis": "bounded-offer-click-observation",
       "metric": "offer clicks",
       "measures": ["offer clicks"],
-      "baseline": "No data; offer interest is unknown and blocked without approved measurement.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "approved-measurement"
+      },
       "target": {
         "classification": "provisional-operator-hypothesis",
         "observationTarget": 10,
         "days": 90
       },
-      "stopRule": "Stop the observation if measurement is not approved, attribution would require personal or cross-site identifiers, or fewer than 10 offer clicks are observed by day 90; report no conclusion about demand.",
+      "stopRule": {
+        "action": "stop",
+        "when": "target-is-not-observed-or-private-attribution-is-required",
+        "targetReference": "target",
+        "belowTargetConclusion": "no-demand-conclusion"
+      },
       "status": "proposed",
       "evidenceClassification": "no-data",
       "evidencePaths": [
-        "sites/video-moment-search/measurement.ts",
-        "docs/video-moment-search/operator-runbook.md"
+        {
+          "role": "measurement-contract",
+          "path": "sites/video-moment-search/measurement.ts"
+        },
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        }
       ]
     },
     {
       "rank": 7,
       "id": "paid-pilot-evidence",
-      "hypothesis": "A rights-safe operator workflow may earn one bounded paid-pilot signal without treating it as established revenue.",
+      "hypothesis": "rights-safe-paid-pilot-signal",
       "metric": "paid pilot evidence",
       "measures": ["paid pilot evidence"],
-      "baseline": "No data; paid-pilot evidence is unknown and blocked.",
+      "baseline": {
+        "evidenceState": "no-data",
+        "interpretation": "unknown-or-blocked",
+        "blocker": "paid-pilot-evidence"
+      },
       "target": {
         "classification": "approved-spec-gate",
         "minimumCommitments": 1,
         "days": 90
       },
-      "stopRule": "Stop the pilot path at day 90 without one paid pilot or credible signed paid commitment, or immediately if permissions, pricing authority, or evidence provenance is unresolved.",
+      "stopRule": {
+        "action": "stop",
+        "when": "target-is-not-met-or-permissions-pricing-or-provenance-is-unresolved",
+        "targetReference": "target",
+        "belowTargetConclusion": "no-established-revenue"
+      },
       "status": "proposed",
       "evidenceClassification": "no-data",
       "evidencePaths": [
-        "docs/video-moment-search/operator-runbook.md",
-        "docs/video-moment-search/experiment-ledger.json"
+        {
+          "role": "operator-procedure",
+          "path": "docs/video-moment-search/operator-runbook.md"
+        },
+        {
+          "role": "ranked-operator-ledger",
+          "path": "docs/video-moment-search/experiment-ledger.json"
+        }
       ]
     }
   ]
