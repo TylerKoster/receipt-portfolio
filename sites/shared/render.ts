@@ -292,13 +292,14 @@ export function renderStaticPage(
     <p class="proposition">${escapeHtml(site.proposition)}</p>
     <nav aria-label="Primary navigation">
       <a href="${escapeHtml(sitePath(site, '/', publicBaseUrl))}">Receipts</a>
+      ${site.siteId === 'search-receipt' ? `<a href="${escapeHtml(sitePath(site, '/worksheets/compare-google-search-status-with-site-evidence/', publicBaseUrl))}">Worksheet</a>` : ''}
       ${site.siteId === 'skill-ledger' ? `<a href="${escapeHtml(sitePath(site, '/inventory/', publicBaseUrl))}">Inventory</a>` : ''}
       <a href="${escapeHtml(sitePath(site, '/methodology/', publicBaseUrl))}">Methodology</a>
       <a href="${escapeHtml(sitePath(site, '/sources/', publicBaseUrl))}">Sources</a>
     </nav>
   </div></header>
   <main id="main-content" class="shell">${options.body}</main>
-  <footer><div class="shell">${options.scriptPath === undefined ? 'Deterministic static evidence · No accounts, analytics, external assets, or executable source content.' : 'Deterministic static evidence · First-party filtering only; no accounts, analytics, external assets, or query transmission.'}</div></footer>
+  <footer><div class="shell">${options.scriptPath === undefined ? 'Deterministic static evidence · No accounts, analytics, external assets, or executable source content.' : 'Deterministic static evidence · First-party interaction only; no accounts, analytics, external assets, or query transmission.'}</div></footer>
 </body>
 </html>
 `;

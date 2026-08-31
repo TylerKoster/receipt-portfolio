@@ -154,9 +154,8 @@ export function validateSourceBoundInvestigationWorksheet(
   }
 
   if (
-    !/^\/worksheets\/[a-z0-9-]+$/u.test(
-      candidate.metadata?.canonicalSlugProposal ?? '',
-    )
+    candidate.metadata?.canonicalSlugProposal !==
+    '/worksheets/compare-google-search-status-with-site-evidence'
   ) {
     diagnostics.push('CANONICAL_SLUG_INVALID');
   }
@@ -262,8 +261,7 @@ export function validateSourceBoundInvestigationWorksheet(
   }
 
   if (
-    candidate.publication?.status !==
-      'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER' ||
+    candidate.publication?.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
     candidate.publication?.adapter !==
       'coordinator-owned shared static route adapter' ||
     !nonEmptyString(candidate.publication?.coordinatorDependency)

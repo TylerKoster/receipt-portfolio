@@ -415,22 +415,23 @@ describe('Search Receipt product experiment ledger', () => {
     ).toThrow();
   });
 
-  it('records the adapter-pending investigation worksheet without claiming an outcome', () => {
+  it('records the release-pending investigation worksheet without claiming an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.experiments[10]).toMatchObject({
       id: 'source-bound-investigation-worksheet-v1',
       rank: 11,
-      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
       metric:
         'Deterministic admission of every required worksheet-contract element and admitted source binding.',
-      target: '100% deterministic admission before any public-route proposal.',
+      target:
+        '100% deterministic admission, public route emission, and privacy-bounded worksheet behavior before release.',
       stopRule:
-        'Stop publication preparation if a required boundary or source binding cannot be admitted.',
+        'Stop release if a required boundary or source binding cannot be admitted, the route is unreachable, or worksheet input is transmitted or retained.',
       noDataBoundary:
         'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'A coordinator-owned shared static route adapter is required before this non-public worksheet contract can be publicly reachable.',
+        'The coordinator-owned shared static route adapter is integrated; production release and public behavior verification remain required.',
     });
   });
 });

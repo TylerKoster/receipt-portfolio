@@ -49,7 +49,7 @@ describe('Search Receipt source-bound investigation worksheet', () => {
           '/worksheets/compare-google-search-status-with-site-evidence',
       },
       publication: {
-        status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+        status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
         adapter: 'coordinator-owned shared static route adapter',
       },
     });
@@ -106,6 +106,19 @@ describe('Search Receipt source-bound investigation worksheet', () => {
       diagnostics: expect.arrayContaining([
         'CURRENTNESS_OR_NO_CAUSATION_BOUNDARY_MISSING',
       ]),
+    });
+
+    const changedRoute = structuredClone(worksheet);
+    changedRoute.metadata.canonicalSlugProposal = '/worksheets/other-route';
+
+    expect(
+      validateSourceBoundInvestigationWorksheet(
+        changedRoute,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining(['CANONICAL_SLUG_INVALID']),
     });
   });
 });

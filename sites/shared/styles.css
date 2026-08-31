@@ -332,6 +332,57 @@ summary {
   gap: 1rem;
 }
 
+.worksheet-form {
+  display: grid;
+  gap: 1.25rem;
+  margin-block: 2rem;
+}
+
+.worksheet-form fieldset {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.worksheet-form legend,
+.worksheet-form label {
+  font-weight: 750;
+}
+
+.worksheet-form input,
+.worksheet-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.worksheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.worksheet-actions button {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  background: var(--accent);
+  color: var(--surface);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 footer {
   padding-block: 2rem;
   border-block-start: 1px solid var(--line);

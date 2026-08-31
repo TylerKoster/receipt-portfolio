@@ -28,8 +28,10 @@ const REQUIRED_SITE_FILES: Readonly<
   'search-receipt': [
     ...RECEIPT_SITE_FILES,
     'guides/is-google-search-down-or-my-site/index.html',
+    'investigation-worksheet.js',
     'search-interface.css',
     'search-interface.js',
+    'worksheets/compare-google-search-status-with-site-evidence/index.html',
   ],
   'skill-ledger': [
     ...RECEIPT_SITE_FILES,

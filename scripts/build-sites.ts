@@ -35,7 +35,12 @@ import {
   renderSearchReceiptEvergreenGuide,
   type SourceBoundEvergreenGuide,
 } from '../sites/search-receipt/render-evergreen-guide.js';
+import {
+  renderSearchReceiptInvestigationWorksheet,
+  type SourceBoundInvestigationWorksheet,
+} from '../sites/search-receipt/render-investigation-worksheet.js';
 import { validateSourceBoundEvergreenGuide } from '../sites/search-receipt/source-bound-evergreen-guide.js';
+import { validateSourceBoundInvestigationWorksheet } from '../sites/search-receipt/source-bound-investigation-worksheet.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
   DEFAULT_PUBLIC_BASE_URL,
@@ -342,42 +347,57 @@ async function writeSiteTree(
   publicBaseUrl: string,
   includeVideoMomentSearch: boolean,
 ): Promise<void> {
-  const [searchGuide, searchStatusManifest, searchCentralManifest] =
-    await Promise.all([
-      readFile(
-        join(
-          projectRoot(),
-          'sites',
-          'search-receipt',
-          'source-bound-evergreen-guide.json',
-        ),
-        'utf8',
-      ).then((content) => JSON.parse(content) as SourceBoundEvergreenGuide),
-      readFile(
-        join(
-          projectRoot(),
-          'manifests',
-          'search-receipt',
-          'google-search-status.json',
-        ),
-        'utf8',
-      ).then(
-        (content) =>
-          JSON.parse(content) as { sourceId: string; endpoint: string },
+  const [
+    searchGuide,
+    searchWorksheet,
+    searchStatusManifest,
+    searchCentralManifest,
+  ] = await Promise.all([
+    readFile(
+      join(
+        projectRoot(),
+        'sites',
+        'search-receipt',
+        'source-bound-evergreen-guide.json',
       ),
-      readFile(
-        join(
-          projectRoot(),
-          'manifests',
-          'search-receipt',
-          'google-search-central-blog.json',
-        ),
-        'utf8',
-      ).then(
-        (content) =>
-          JSON.parse(content) as { sourceId: string; endpoint: string },
+      'utf8',
+    ).then((content) => JSON.parse(content) as SourceBoundEvergreenGuide),
+    readFile(
+      join(
+        projectRoot(),
+        'sites',
+        'search-receipt',
+        'source-bound-investigation-worksheet.json',
       ),
-    ]);
+      'utf8',
+    ).then(
+      (content) => JSON.parse(content) as SourceBoundInvestigationWorksheet,
+    ),
+    readFile(
+      join(
+        projectRoot(),
+        'manifests',
+        'search-receipt',
+        'google-search-status.json',
+      ),
+      'utf8',
+    ).then(
+      (content) =>
+        JSON.parse(content) as { sourceId: string; endpoint: string },
+    ),
+    readFile(
+      join(
+        projectRoot(),
+        'manifests',
+        'search-receipt',
+        'google-search-central-blog.json',
+      ),
+      'utf8',
+    ).then(
+      (content) =>
+        JSON.parse(content) as { sourceId: string; endpoint: string },
+    ),
+  ]);
   const guideValidation = validateSourceBoundEvergreenGuide(searchGuide, {
     [searchStatusManifest.sourceId]: searchStatusManifest,
     [searchCentralManifest.sourceId]: searchCentralManifest,
@@ -387,7 +407,20 @@ async function writeSiteTree(
       `Search Receipt evergreen guide is not admitted: ${guideValidation.diagnostics.join(', ')}`,
     );
   }
+  const worksheetValidation = validateSourceBoundInvestigationWorksheet(
+    searchWorksheet,
+    {
+      [searchStatusManifest.sourceId]: searchStatusManifest,
+      [searchCentralManifest.sourceId]: searchCentralManifest,
+    },
+  );
+  if (!worksheetValidation.ok) {
+    throw new Error(
+      `Search Receipt investigation worksheet is not admitted: ${worksheetValidation.diagnostics.join(', ')}`,
+    );
+  }
   const guidePath = `${searchGuide.metadata.canonicalSlugProposal}/`;
+  const worksheetPath = `${searchWorksheet.metadata.canonicalSlugProposal}/`;
 
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
@@ -431,6 +464,15 @@ async function writeSiteTree(
         ),
         { recursive: true },
       );
+      await mkdir(
+        join(
+          directory,
+          ...searchWorksheet.metadata.canonicalSlugProposal
+            .split('/')
+            .filter((segment) => segment !== ''),
+        ),
+        { recursive: true },
+      );
       await Promise.all([
         copyFile(
           join(projectRoot(), 'sites', 'search-receipt', 'search-interface.js'),
@@ -445,6 +487,15 @@ async function writeSiteTree(
           ),
           join(directory, 'search-interface.css'),
         ),
+        copyFile(
+          join(
+            projectRoot(),
+            'sites',
+            'search-receipt',
+            'investigation-worksheet.js',
+          ),
+          join(directory, 'investigation-worksheet.js'),
+        ),
         writeFile(
           join(
             directory,
@@ -454,6 +505,20 @@ async function writeSiteTree(
             'index.html',
           ),
           renderSearchReceiptEvergreenGuide(site, searchGuide, publicBaseUrl),
+        ),
+        writeFile(
+          join(
+            directory,
+            ...searchWorksheet.metadata.canonicalSlugProposal
+              .split('/')
+              .filter((segment) => segment !== ''),
+            'index.html',
+          ),
+          renderSearchReceiptInvestigationWorksheet(
+            site,
+            searchWorksheet,
+            publicBaseUrl,
+          ),
         ),
       ]);
     }
@@ -488,6 +553,12 @@ async function writeSiteTree(
                 title: searchGuide.metadata.title,
                 description: searchGuide.metadata.description,
               },
+              featuredUtility: {
+                path: worksheetPath,
+                title: searchWorksheet.metadata.title,
+                description: searchWorksheet.metadata.description,
+                label: 'Open the private worksheet',
+              },
             }
           : site.siteId === 'skill-ledger'
             ? {
@@ -517,7 +588,7 @@ async function writeSiteTree(
         visible,
         publicBaseUrl,
         site.siteId === 'search-receipt'
-          ? [guidePath]
+          ? [guidePath, worksheetPath]
           : site.siteId === 'skill-ledger'
             ? ['/inventory/']
             : [],

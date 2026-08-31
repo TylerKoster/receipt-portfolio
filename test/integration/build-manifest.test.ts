@@ -17,6 +17,7 @@ const EXPECTED_PATHS = [
   'portfolio.css',
   'search-receipt/guides/is-google-search-down-or-my-site/index.html',
   'search-receipt/index.html',
+  'search-receipt/investigation-worksheet.js',
   'search-receipt/methodology/index.html',
   `search-receipt/receipts/${'a'.repeat(64)}/index.html`,
   'search-receipt/robots.txt',
@@ -26,6 +27,7 @@ const EXPECTED_PATHS = [
   'search-receipt/sources/index.html',
   'search-receipt/styles.css',
   'search-receipt/topics/example-topic/index.html',
+  'search-receipt/worksheets/compare-google-search-status-with-site-evidence/index.html',
   'skill-ledger/index.html',
   'skill-ledger/inventory/index.html',
   'skill-ledger/methodology/index.html',
@@ -56,7 +58,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '73720e19fee609ab436ed20182022f031fd418db1505f3f17181a072c52d9fb7';
+  '4c32549be8b04d552adf1c7514a51a18a14f881e2baf58ea3588e0cd0f0a7ee1';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

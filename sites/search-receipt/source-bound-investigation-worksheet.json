@@ -81,8 +81,8 @@
   ],
   "correctionAndCurrentnessPolicy": "Recheck the official source directly at decision time and make a correction to any worksheet transcription against that source; controlled historical context remains separate and is never promoted to current incident evidence.",
   "publication": {
-    "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+    "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
     "adapter": "coordinator-owned shared static route adapter",
-    "coordinatorDependency": "A coordinator-owned shared static route adapter must publish this content contract before it is publicly reachable."
+    "coordinatorDependency": "The coordinator-owned shared static route adapter is integrated; production release and public behavior verification remain required."
   }
 }

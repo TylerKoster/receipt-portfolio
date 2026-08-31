@@ -377,6 +377,58 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('publishes the admitted Search Receipt investigation worksheet as an enterable route', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const [home, worksheet, emittedClient, sourceClient, sitemap] =
+      await Promise.all([
+        readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8'),
+        readFile(
+          join(
+            outputDirectory,
+            'search-receipt',
+            'worksheets',
+            'compare-google-search-status-with-site-evidence',
+            'index.html',
+          ),
+          'utf8',
+        ),
+        readFile(
+          join(outputDirectory, 'search-receipt', 'investigation-worksheet.js'),
+          'utf8',
+        ),
+        readFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'investigation-worksheet.js',
+          ),
+          'utf8',
+        ),
+        readFile(
+          join(outputDirectory, 'search-receipt', 'sitemap.xml'),
+          'utf8',
+        ),
+      ]);
+
+    expect(emittedClient).toBe(sourceClient);
+    expect(home).toContain(
+      'href="/search-receipt/worksheets/compare-google-search-status-with-site-evidence/"',
+    );
+    expect(worksheet).toContain('data-investigation-worksheet');
+    expect(worksheet).toContain('data-worksheet-field');
+    expect(worksheet).toContain(
+      '<script type="module" src="/search-receipt/investigation-worksheet.js"></script>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/search-receipt/worksheets/compare-google-search-status-with-site-evidence/</loc>',
+    );
+  });
+
   it('publishes the controlled SkillLedger inventory as a first-party interactive route', async () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -1055,6 +1107,34 @@ describe('static receipt site build', () => {
             projectRoot,
             'sites',
             'search-receipt',
+            'investigation-worksheet.js',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'search-receipt',
+            'investigation-worksheet.js',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'investigation-worksheet.js',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'search-receipt',
+            'investigation-worksheet.js',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
             'source-bound-evergreen-guide.json',
           ),
           join(
@@ -1076,6 +1156,34 @@ describe('static receipt site build', () => {
             'sites',
             'search-receipt',
             'source-bound-evergreen-guide.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-worksheet.json',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-worksheet.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-worksheet.json',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-worksheet.json',
           ),
         ),
       ]);

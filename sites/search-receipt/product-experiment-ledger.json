@@ -186,15 +186,15 @@
     {
       "id": "source-bound-investigation-worksheet-v1",
       "rank": 11,
-      "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+      "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
       "hypothesis": "A narrowly scoped source-bound worksheet may help a site owner separate a decision-time official-status observation, controlled historical context, and dated own-site evidence while retaining an unknown conclusion absent independently reviewed connection evidence.",
       "firstUserOutcome": "Record a decision-time official-status observation and separately record controlled historical context and dated own-site evidence without treating the comparison as a current incident report or causal explanation.",
       "metric": "Deterministic admission of every required worksheet-contract element and admitted source binding.",
-      "target": "100% deterministic admission before any public-route proposal.",
-      "stopRule": "Stop publication preparation if a required boundary or source binding cannot be admitted.",
+      "target": "100% deterministic admission, public route emission, and privacy-bounded worksheet behavior before release.",
+      "stopRule": "Stop release if a required boundary or source binding cannot be admitted, the route is unreachable, or worksheet input is transmitted or retained.",
       "noDataBoundary": "Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.",
-      "coordinatorDependency": "A coordinator-owned shared static route adapter is required before this non-public worksheet contract can be publicly reachable.",
-      "nextSafeAction": "Keep the worksheet contract source-bound and adapter-pending; do not collect, transmit, retain, or measure visitor or site evidence and do not claim traffic, demand, conversion, revenue, or another commercial outcome."
+      "coordinatorDependency": "The coordinator-owned shared static route adapter is integrated; production release and public behavior verification remain required.",
+      "nextSafeAction": "Release and verify the public worksheet without collecting, transmitting, retaining, or measuring visitor or site evidence; do not claim traffic, demand, conversion, revenue, or another commercial outcome."
     }
   ]
 }
