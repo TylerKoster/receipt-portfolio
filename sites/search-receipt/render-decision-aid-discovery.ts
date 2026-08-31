@@ -53,8 +53,19 @@ export interface SourceBoundDecisionAidDiscovery {
     readonly adapter: string;
     readonly coordinatorDependency: string;
     readonly route?: string;
+    readonly coordinatorReleaseEvidence?: {
+      readonly releaseHead?: string;
+      readonly tag?: string;
+      readonly provenance?: string;
+    };
   };
 }
+
+const acceptedCoordinatorReleaseEvidence = Object.freeze({
+  releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
+  tag: 'v0.1.45',
+  provenance: 'Coordinator-provided accepted release evidence.',
+});
 
 function canonicalDiscoveryUrl(
   site: SiteDefinition,
@@ -89,12 +100,33 @@ export function renderSearchReceiptDecisionAidDiscovery(
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
   if (
-    discovery.publication.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
     discovery.publication.adapter !==
       'coordinator-owned shared static route adapter' ||
     discovery.publication.route !==
       '/discover/choose-google-search-guide-or-worksheet/'
   ) {
+    throw new Error('Decision aid requires an admitted integrated route');
+  }
+  const releaseEvidence = discovery.publication.coordinatorReleaseEvidence;
+  if (discovery.publication.status === 'ROUTE_INTEGRATED_PENDING_RELEASE') {
+    if (releaseEvidence !== undefined) {
+      throw new Error(
+        'Pending decision aid must not claim coordinator release evidence',
+      );
+    }
+  } else if (discovery.publication.status === 'ROUTE_RELEASE_VERIFIED') {
+    if (
+      releaseEvidence?.releaseHead !==
+        acceptedCoordinatorReleaseEvidence.releaseHead ||
+      releaseEvidence?.tag !== acceptedCoordinatorReleaseEvidence.tag ||
+      releaseEvidence?.provenance !==
+        acceptedCoordinatorReleaseEvidence.provenance
+    ) {
+      throw new Error(
+        'Decision aid requires exact coordinator release evidence',
+      );
+    }
+  } else {
     throw new Error('Decision aid requires an admitted integrated route');
   }
   const canonical = canonicalDiscoveryUrl(site, discovery, publicBaseUrl);

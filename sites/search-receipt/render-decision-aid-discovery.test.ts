@@ -9,6 +9,11 @@ const discovery = JSON.parse(
     'utf8',
   ),
 );
+const coordinatorReleaseEvidence = {
+  releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
+  tag: 'v0.1.45',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 
 describe('Search Receipt decision-aid discovery route', () => {
   it('renders an indexable source-bound choice between only the admitted resources', () => {
@@ -64,13 +69,76 @@ describe('Search Receipt decision-aid discovery route', () => {
     const pendingAdapter = structuredClone(discovery);
     pendingAdapter.publication.status =
       'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER';
-    delete pendingAdapter.publication.route;
 
     expect(() =>
       renderSearchReceiptDecisionAidDiscovery(
         searchReceiptSite,
         pendingAdapter,
       ),
+    ).toThrow(/integrated route/i);
+  });
+
+  it('renders release-verified state with exact coordinator evidence without changing public output', () => {
+    const releaseVerified = structuredClone(discovery);
+    releaseVerified.publication.status = 'ROUTE_RELEASE_VERIFIED';
+    releaseVerified.publication.coordinatorReleaseEvidence =
+      coordinatorReleaseEvidence;
+
+    expect(
+      renderSearchReceiptDecisionAidDiscovery(
+        searchReceiptSite,
+        releaseVerified,
+      ),
+    ).toBe(
+      renderSearchReceiptDecisionAidDiscovery(searchReceiptSite, discovery),
+    );
+  });
+
+  it.each([
+    ['missing', undefined],
+    [
+      'stale head',
+      { ...coordinatorReleaseEvidence, releaseHead: 'stale-release-head' },
+    ],
+    ['wrong tag', { ...coordinatorReleaseEvidence, tag: 'v0.1.44' }],
+    [
+      'wrong provenance',
+      { ...coordinatorReleaseEvidence, provenance: 'Unverified claim.' },
+    ],
+  ])(
+    'refuses release-verified state with %s release evidence',
+    (_name, evidence) => {
+      const releaseVerified = structuredClone(discovery);
+      releaseVerified.publication.status = 'ROUTE_RELEASE_VERIFIED';
+      releaseVerified.publication.coordinatorReleaseEvidence = evidence;
+
+      expect(() =>
+        renderSearchReceiptDecisionAidDiscovery(
+          searchReceiptSite,
+          releaseVerified,
+        ),
+      ).toThrow(/release evidence/i);
+    },
+  );
+
+  it.each([
+    ['ROUTE_INTEGRATED_PENDING_RELEASE', undefined],
+    ['ROUTE_RELEASE_VERIFIED', coordinatorReleaseEvidence],
+  ])('refuses %s with a mismatched adapter or route', (status, evidence) => {
+    const wrongRoute = structuredClone(discovery);
+    wrongRoute.publication.status = status;
+    wrongRoute.publication.coordinatorReleaseEvidence = evidence;
+    wrongRoute.publication.route = '/discover/not-admitted/';
+    const wrongAdapter = structuredClone(wrongRoute);
+    wrongAdapter.publication.route =
+      '/discover/choose-google-search-guide-or-worksheet/';
+    wrongAdapter.publication.adapter = 'unowned adapter';
+
+    expect(() =>
+      renderSearchReceiptDecisionAidDiscovery(searchReceiptSite, wrongRoute),
+    ).toThrow(/integrated route/i);
+    expect(() =>
+      renderSearchReceiptDecisionAidDiscovery(searchReceiptSite, wrongAdapter),
     ).toThrow(/integrated route/i);
   });
 });
