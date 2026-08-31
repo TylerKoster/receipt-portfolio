@@ -182,6 +182,9 @@ describe('atomic AI Moment Index build', () => {
     expect(video).toContain(
       'rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/"',
     );
+    expect(home).toContain(
+      '<link rel="icon" href="/receipt-portfolio/favicon.ico">',
+    );
     expect(video).not.toContain('"@type":"VideoObject"');
     expect(video).not.toContain('"@type":"Clip"');
     expect(video).not.toContain('"contentUrl"');

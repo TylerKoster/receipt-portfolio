@@ -355,6 +355,7 @@ function page(
   },
 ): string {
   const canonical = routeUrl(baseUrl, suffix);
+  const favicon = `${new URL(normalizePublicBaseUrl(baseUrl)).pathname}favicon.ico`;
   const styles = routePath(baseUrl, 'styles.css');
   const client = routePath(baseUrl, 'search-client.js');
   const script = includeClient
@@ -384,6 +385,7 @@ function page(
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'; script-src 'self'; connect-src 'self'">
   <meta name="description" content="${escapeHtml(metadata.description)}">${socialMetadata}
   <link rel="canonical" href="${escapeHtml(canonical)}">
+  <link rel="icon" href="${escapeHtml(favicon)}">
   <title>${escapeHtml(title)}</title>
   <link rel="stylesheet" href="${escapeHtml(styles)}">${script}${structuredData}
 </head>

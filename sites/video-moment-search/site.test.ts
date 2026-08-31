@@ -340,6 +340,7 @@ describe('AI Moment Index public search surface', () => {
       'Interactive search requires JavaScript; the admitted initial moments remain available below without sending your query.',
     );
     expect(html).toContain('Search moments');
+    expect(html).toContain('<link rel="icon" href="/favicon.ico">');
     expect(html).toContain('#t=132');
     expect(html.indexOf('<strong>For:</strong>')).toBeLessThan(
       html.indexOf('data-moment-query'),
