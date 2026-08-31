@@ -271,6 +271,52 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[2].target');
   });
 
+  it('rejects a conflicting legacy continuation gate as a second target source', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[0].continuationGate = {
+      classification: 'approved-spec-gate',
+      authorizedCreators: 30,
+      coveredVideos: 1_000,
+    };
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[0] has unsupported experiment key(s): continuationGate',
+    );
+  });
+
+  it('rejects an unknown experiment-level key', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[1].operatorNote = 'Treat the target as optional';
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[1] has unsupported experiment key(s): operatorNote',
+    );
+  });
+
+  it('rejects an experiment with no target', () => {
+    const invalid = structuredClone(ledger);
+    delete invalid.experiments[2].target;
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[2].target must match the approved gate',
+    );
+  });
+
+  it.each([
+    [0, 'provisional-operator-hypothesis'],
+    [4, 'approved-spec-gate'],
+  ] as const)(
+    'rejects the wrong approved/provisional target classification at experiment index %d',
+    (index, classification) => {
+      const invalid = structuredClone(ledger);
+      invalid.experiments[index].target.classification = classification;
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        `experiments[${index}].target must match the approved gate`,
+      );
+    },
+  );
+
   it.each([
     [
       'decimal expansion',

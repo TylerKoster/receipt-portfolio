@@ -203,6 +203,19 @@ const allowedTestability = new Set([
   'preview-testable-heuristic',
   'not-yet-testable',
 ]);
+const allowedExperimentKeys = new Set([
+  'rank',
+  'id',
+  'hypothesis',
+  'metric',
+  'measures',
+  'baseline',
+  'target',
+  'stopRule',
+  'status',
+  'evidenceClassification',
+  'evidencePaths',
+]);
 
 const expectedExperiments = [
   {
@@ -392,6 +405,14 @@ export function validateExperimentLedger(
     if (record === undefined) {
       diagnostics.push(`${prefix} must be an object`);
       return;
+    }
+    const unsupportedKeys = Object.keys(record)
+      .filter((key) => !allowedExperimentKeys.has(key))
+      .sort();
+    if (unsupportedKeys.length > 0) {
+      diagnostics.push(
+        `${prefix} has unsupported experiment key(s): ${unsupportedKeys.join(', ')}`,
+      );
     }
     if (record.rank !== expected.rank)
       diagnostics.push(`${prefix}.rank must preserve the ranked order`);
