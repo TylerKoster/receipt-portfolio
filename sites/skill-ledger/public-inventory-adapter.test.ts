@@ -256,12 +256,24 @@ describe('SkillLedger public inventory adapter', () => {
       statusMessage: 'Showing 1 of 4 records.',
       filters: { evidenceClass: 'source-bound-observation' },
       sourceBoundComparisonReadinessMessage:
-        'Showing 1 source-bound observation. Two admitted source-bound observations are needed for source-bound comparison.',
+        'Showing 1 distinct source-bound observation. Two distinct admitted source-bound observations are needed for source-bound comparison.',
     });
     expect(
       createPublicSkillLedgerInventoryState([sourceBound, sourceBound], {
         filters: { evidenceClass: 'source-bound-observation' },
       }).sourceBoundComparisonReadinessMessage,
+    ).toBe(
+      'Showing 1 distinct source-bound observation. Two distinct admitted source-bound observations are needed for source-bound comparison.',
+    );
+    const distinctSourceBound: PublicSkillLedgerRecord = {
+      ...sourceBound,
+      receiptId: '4'.repeat(64),
+    };
+    expect(
+      createPublicSkillLedgerInventoryState(
+        [sourceBound, distinctSourceBound],
+        { filters: { evidenceClass: 'source-bound-observation' } },
+      ).sourceBoundComparisonReadinessMessage,
     ).toBe('');
     expect(
       createPublicSkillLedgerInventoryState(mixedRecords, {
@@ -531,7 +543,7 @@ describe('SkillLedger public inventory adapter', () => {
     );
     expect(readiness?.hidden).toBe(false);
     expect(readiness?.textContent).toBe(
-      'Showing 1 source-bound observation. Two admitted source-bound observations are needed for source-bound comparison.',
+      'Showing 1 distinct source-bound observation. Two distinct admitted source-bound observations are needed for source-bound comparison.',
     );
 
     query.value = 'missing';
@@ -539,7 +551,7 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(false);
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
     expect(readiness?.textContent).toBe(
-      'Showing 0 source-bound observations. Two admitted source-bound observations are needed for source-bound comparison.',
+      'Showing 0 distinct source-bound observations. Two distinct admitted source-bound observations are needed for source-bound comparison.',
     );
 
     root.querySelector('[data-skill-ledger-reset]')?.dispatch('click');

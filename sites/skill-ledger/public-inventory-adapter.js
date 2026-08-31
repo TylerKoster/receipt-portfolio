@@ -351,15 +351,17 @@ export function createPublicSkillLedgerComparison(records, receiptIds) {
 }
 
 function sourceBoundComparisonReadinessMessage(phase, filters, visibleRecords) {
+  const distinctObservationCount = new Set(
+    visibleRecords.map((record) => record.receiptId),
+  ).size;
   if (
     phase !== 'ready' ||
     filters.evidenceClass !== 'source-bound-observation' ||
-    visibleRecords.length >= 2
+    distinctObservationCount >= 2
   ) {
     return '';
   }
-  const count = visibleRecords.length;
-  return `Showing ${count} source-bound ${count === 1 ? 'observation' : 'observations'}. Two admitted source-bound observations are needed for source-bound comparison.`;
+  return `Showing ${distinctObservationCount} distinct source-bound ${distinctObservationCount === 1 ? 'observation' : 'observations'}. Two distinct admitted source-bound observations are needed for source-bound comparison.`;
 }
 
 export function createPublicSkillLedgerInventoryState(records, options = {}) {
