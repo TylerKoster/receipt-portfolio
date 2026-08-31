@@ -25,6 +25,7 @@
 ### Task 1: Bootstrap the deterministic TypeScript workspace
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `eslint.config.mjs`
@@ -35,6 +36,7 @@
 - Create: `packages/evidence-core/test/workspace.test.ts`
 
 **Interfaces:**
+
 - Produces the `@receipt/evidence-core` workspace package and common `npm run check`, `npm test`, and `npm run build` commands.
 
 - [ ] **Step 1: Write the failing workspace test**
@@ -103,6 +105,7 @@ git commit -m "build: bootstrap deterministic evidence workspace"
 ### Task 2: Implement source manifests and hostile-input validation
 
 **Files:**
+
 - Create: `packages/evidence-core/src/manifest.ts`
 - Create: `packages/evidence-core/test/manifest.test.ts`
 - Create: `manifests/search-receipt/google-search-status.json`
@@ -110,6 +113,7 @@ git commit -m "build: bootstrap deterministic evidence workspace"
 - Create: `manifests/skill-ledger/example-skill-archive.json`
 
 **Interfaces:**
+
 - Consumes: `EVIDENCE_SCHEMA_VERSION` from Task 1.
 - Produces: `SourceManifestSchema`, `validateManifest(input: unknown): SourceManifest`, and `manifestSha256(manifest: SourceManifest): string`.
 
@@ -117,11 +121,15 @@ git commit -m "build: bootstrap deterministic evidence workspace"
 
 ```ts
 it('rejects a manifest whose endpoint is not allowlisted HTTPS', () => {
-  expect(() => validateManifest({ endpoint: 'http://127.0.0.1/a' })).toThrow(/https/i);
+  expect(() => validateManifest({ endpoint: 'http://127.0.0.1/a' })).toThrow(
+    /https/i,
+  );
 });
 
 it('creates a stable digest regardless of object key order', () => {
-  expect(manifestSha256(validManifest)).toBe(manifestSha256({ ...validManifest }));
+  expect(manifestSha256(validManifest)).toBe(
+    manifestSha256({ ...validManifest }),
+  );
 });
 ```
 
@@ -134,20 +142,33 @@ Expected: FAIL because no schema or validator exists.
 - [ ] **Step 3: Implement the strict schema and canonical digest**
 
 ```ts
-export const SourceManifestSchema = z.object({
-  siteId: z.enum(['search-receipt', 'workflow-test-lab', 'skill-ledger']),
-  sourceId: z.string().regex(/^[a-z0-9-]+$/),
-  kind: z.enum(['rss', 'json', 'fixture', 'archive-fixture']),
-  endpoint: z.string().url().refine((value) => new URL(value).protocol === 'https:'),
-  allowedHosts: z.array(z.string().min(1)).min(1),
-  maxBytes: z.number().int().positive().max(5_000_000),
-  timeoutMs: z.number().int().min(100).max(30_000),
-  normalizerId: z.enum(['status-json-v1', 'workflow-fixture-v1', 'archive-fixture-v1']),
-  diffStrategyId: z.enum(['event-list-v1', 'fixture-record-v1', 'inventory-v1']),
-  publicationMode: z.enum(['auto-facts-only', 'hold-only']),
-  licenseNote: z.string().min(1),
-  enabled: z.boolean(),
-}).strict();
+export const SourceManifestSchema = z
+  .object({
+    siteId: z.enum(['search-receipt', 'workflow-test-lab', 'skill-ledger']),
+    sourceId: z.string().regex(/^[a-z0-9-]+$/),
+    kind: z.enum(['rss', 'json', 'fixture', 'archive-fixture']),
+    endpoint: z
+      .string()
+      .url()
+      .refine((value) => new URL(value).protocol === 'https:'),
+    allowedHosts: z.array(z.string().min(1)).min(1),
+    maxBytes: z.number().int().positive().max(5_000_000),
+    timeoutMs: z.number().int().min(100).max(30_000),
+    normalizerId: z.enum([
+      'status-json-v1',
+      'workflow-fixture-v1',
+      'archive-fixture-v1',
+    ]),
+    diffStrategyId: z.enum([
+      'event-list-v1',
+      'fixture-record-v1',
+      'inventory-v1',
+    ]),
+    publicationMode: z.enum(['auto-facts-only', 'hold-only']),
+    licenseNote: z.string().min(1),
+    enabled: z.boolean(),
+  })
+  .strict();
 ```
 
 - [ ] **Step 4: Run the focused tests and add a malformed-manifest case**
@@ -166,6 +187,7 @@ git commit -m "feat: validate audited source manifests"
 ### Task 3: Build append-only snapshots, deterministic receipts, and policy gates
 
 **Files:**
+
 - Create: `packages/evidence-core/src/canonical-json.ts`
 - Create: `packages/evidence-core/src/receipt.ts`
 - Create: `packages/evidence-core/src/policy.ts`
@@ -173,6 +195,7 @@ git commit -m "feat: validate audited source manifests"
 - Create: `packages/evidence-core/test/policy.test.ts`
 
 **Interfaces:**
+
 - Consumes: `SourceManifest`, `manifestSha256` from Task 2.
 - Produces: `sha256(bytes: Uint8Array): string`, `createReceipt(input: ReceiptInput): Receipt`, `verifyReceipt(receipt: Receipt): void`, and `evaluatePublication(candidate: Candidate): GateDecision`.
 
@@ -184,11 +207,15 @@ it('changes the raw digest when one input byte changes', () => {
 });
 
 it('rejects a receipt whose file key is not its payload digest', () => {
-  expect(() => verifyReceipt({ ...receipt, id: '0'.repeat(64) })).toThrow(/digest/i);
+  expect(() => verifyReceipt({ ...receipt, id: '0'.repeat(64) })).toThrow(
+    /digest/i,
+  );
 });
 
 it('holds an ambiguous source change instead of publishing it', () => {
-  expect(evaluatePublication(ambiguousCandidate).decision).toBe('REVIEW_REQUIRED');
+  expect(evaluatePublication(ambiguousCandidate).decision).toBe(
+    'REVIEW_REQUIRED',
+  );
 });
 ```
 
@@ -204,11 +231,18 @@ Expected: FAIL because receipt and gate code do not exist.
 export type GateDecision = 'PASS' | 'REVIEW_REQUIRED' | 'REJECTED';
 
 export function evaluatePublication(candidate: Candidate): GateResult {
-  if (!candidate.manifestValid || !candidate.rawSha256 || !candidate.normalizedSha256) {
+  if (
+    !candidate.manifestValid ||
+    !candidate.rawSha256 ||
+    !candidate.normalizedSha256
+  ) {
     return { decision: 'REJECTED', reasonCodes: ['INCOMPLETE_EVIDENCE'] };
   }
   if (candidate.ambiguous || candidate.diffRatio > 0.6) {
-    return { decision: 'REVIEW_REQUIRED', reasonCodes: ['AMBIGUOUS_OR_LARGE_CHANGE'] };
+    return {
+      decision: 'REVIEW_REQUIRED',
+      reasonCodes: ['AMBIGUOUS_OR_LARGE_CHANGE'],
+    };
   }
   return { decision: 'PASS', reasonCodes: ['SOURCE_FACTS_ONLY'] };
 }
@@ -230,6 +264,7 @@ git commit -m "feat: add append-only receipt integrity gates"
 ### Task 4: Build the fixture-backed evidence pipeline and verification CLI
 
 **Files:**
+
 - Create: `fixtures/search-receipt/status-v1.json`
 - Create: `fixtures/search-receipt/status-v2.json`
 - Create: `fixtures/workflow-test-lab/structured-extraction-v1.json`
@@ -239,6 +274,7 @@ git commit -m "feat: add append-only receipt integrity gates"
 - Create: `evidence/.gitkeep`
 
 **Interfaces:**
+
 - Consumes: Task 2 manifests and Task 3 `createReceipt`, `evaluatePublication`, and `verifyReceipt`.
 - Produces: `npm run evidence -- collect-fixtures`, `npm run evidence -- verify --all`, and deterministic `evidence/receipts/*.json` files.
 
@@ -246,7 +282,11 @@ git commit -m "feat: add append-only receipt integrity gates"
 
 ```ts
 it('creates a verifiable, source-bound receipt from a changed status fixture', async () => {
-  const result = await collectFixturePair('search-receipt', 'status-v1.json', 'status-v2.json');
+  const result = await collectFixturePair(
+    'search-receipt',
+    'status-v1.json',
+    'status-v2.json',
+  );
   expect(result.receipt.policy.decision).toBe('PASS');
   expect(() => verifyReceipt(result.receipt)).not.toThrow();
   expect(result.receipt.previousReceipt).toBeDefined();
@@ -264,7 +304,10 @@ Expected: FAIL because the pipeline/CLI does not exist.
 ```ts
 await fs.mkdir(receiptDirectory, { recursive: true });
 const target = join(receiptDirectory, `${receipt.id}.json`);
-await fs.writeFile(target, canonicalJson(receipt), { encoding: 'utf8', flag: 'wx' });
+await fs.writeFile(target, canonicalJson(receipt), {
+  encoding: 'utf8',
+  flag: 'wx',
+});
 ```
 
 When `writeFile(..., 'wx')` returns `EEXIST`, read the existing file and require byte equality; otherwise throw `RECEIPT_COLLISION`.
@@ -285,6 +328,7 @@ git commit -m "feat: generate and verify fixture evidence receipts"
 ### Task 5: Generate three safe, accessible static sites from accepted receipts
 
 **Files:**
+
 - Create: `scripts/build-sites.ts`
 - Create: `sites/shared/render.ts`
 - Create: `sites/shared/styles.css`
@@ -294,6 +338,7 @@ git commit -m "feat: generate and verify fixture evidence receipts"
 - Create: `test/integration/site-build.test.ts`
 
 **Interfaces:**
+
 - Consumes: accepted receipt JSON from Task 4.
 - Produces: `dist/sites/search-receipt/index.html`, `dist/sites/workflow-test-lab/index.html`, and `dist/sites/skill-ledger/index.html`.
 
@@ -301,12 +346,19 @@ git commit -m "feat: generate and verify fixture evidence receipts"
 
 ```ts
 it('renders one named static home page per portfolio site', async () => {
-  await buildSites({ evidenceDirectory: testEvidenceDirectory, outputDirectory });
-  await expect(readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8')).resolves.toContain('Search Receipt');
+  await buildSites({
+    evidenceDirectory: testEvidenceDirectory,
+    outputDirectory,
+  });
+  await expect(
+    readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8'),
+  ).resolves.toContain('Search Receipt');
 });
 
 it('escapes hostile source text rather than rendering markup', () => {
-  expect(escapeHtml('<script>alert(1)</script>')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+  expect(escapeHtml('<script>alert(1)</script>')).toBe(
+    '&lt;script&gt;alert(1)&lt;/script&gt;',
+  );
 });
 ```
 
@@ -321,7 +373,10 @@ Expected: FAIL because renderer and output do not exist.
 Every generated document includes this head policy and plain escaped text only:
 
 ```html
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; style-src 'self'; script-src 'none'"
+/>
 ```
 
 Each receipt section must render source link, evidence class, observed time, hashes, decision, facts, interpretation, and unknowns. A `REVIEW_REQUIRED` or `REJECTED` candidate is omitted from public pages.
@@ -342,6 +397,7 @@ git commit -m "feat: render three evidence-bound static sites"
 ### Task 6: Add contained live-source dry-run support and scheduled CI gates
 
 **Files:**
+
 - Create: `packages/evidence-core/src/fetch.ts`
 - Create: `packages/evidence-core/test/fetch.test.ts`
 - Create: `.github/workflows/verify.yml`
@@ -349,6 +405,7 @@ git commit -m "feat: render three evidence-bound static sites"
 - Create: `docs/operations/automation-and-rollback.md`
 
 **Interfaces:**
+
 - Consumes: `SourceManifest` allowlists and Task 3 gate functions.
 - Produces: `fetchAllowedSource(manifest: SourceManifest): Promise<RawFetch>` and workflow evidence that scheduled collection cannot commit/publish directly.
 
@@ -356,11 +413,15 @@ git commit -m "feat: render three evidence-bound static sites"
 
 ```ts
 it('rejects a redirect from an allowed hostname to a loopback address', async () => {
-  await expect(fetchAllowedSource(manifest, redirectTo('http://127.0.0.1/x'))).rejects.toThrow(/redirect/i);
+  await expect(
+    fetchAllowedSource(manifest, redirectTo('http://127.0.0.1/x')),
+  ).rejects.toThrow(/redirect/i);
 });
 
 it('rejects an oversized response before normalization', async () => {
-  await expect(fetchAllowedSource(manifest, responseOf(manifest.maxBytes + 1))).rejects.toThrow(/maxBytes/i);
+  await expect(
+    fetchAllowedSource(manifest, responseOf(manifest.maxBytes + 1)),
+  ).rejects.toThrow(/maxBytes/i);
 });
 ```
 
@@ -394,11 +455,13 @@ git commit -m "ci: add unprivileged collection and rollback controls"
 ### Task 7: Complete independent review, release validation, and automation handoff
 
 **Files:**
+
 - Create: `docs/reviews/mvp-review-checklist.md`
 - Modify: `README.md`
 - Modify: `docs/operations/automation-and-rollback.md`
 
 **Interfaces:**
+
 - Consumes: complete project from Tasks 1–6.
 - Produces: an evidence-backed review record, verified build commands, versioned release tag, and weekly-maintenance automation specification.
 
