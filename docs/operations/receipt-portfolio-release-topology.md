@@ -1,5 +1,10 @@
 # Receipt portfolio release topology
 
+This document is the current authority for the four-product permanent-lane
+count and ownership. It narrowly supersedes the older three-product inventory
+in `automation-and-rollback.md`; that document's collection and rollback
+mechanics remain applicable unless this topology states otherwise.
+
 The release coordinator is the sole writer for the primary checkout, `main`,
 release tags, pushes, GitHub Pages deployment, and cross-product integration.
 Product operators work concurrently only in their permanent lanes and submit

@@ -16,6 +16,20 @@ and synthetic personas are regression inputs, not demand or usability evidence.
 Measurement remains discard-only and not configured; it neither transmits nor
 retains events and is not evidence.
 
+## Heartbeat and bounded recovery
+
+The AI Moment Index operator runs an hourly recovery and experiment-progress
+poll. It is subordinate to the event-driven immutable-candidate-receipt handoff:
+a completed candidate wakes the serial release coordinator rather than waiting
+for the next hourly poll. The heartbeat may inspect its own lane's source,
+fixture, experiment, validation, and failure state, but cannot trigger, modify,
+or take authority over another lane.
+
+A blocker creates a bounded failure packet for only the blocked operation. It
+does not halt unrelated safe work: the operator continues the next safe,
+rights-bounded experiment or recovery check while preserving the blocked
+operation and its evidence for coordinator review.
+
 ## Candidate receipt and coordinator acknowledgement
 
 Every candidate receipt records these immutable fields:
