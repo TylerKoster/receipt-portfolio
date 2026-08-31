@@ -81,8 +81,13 @@
   ],
   "correctionAndCurrentnessPolicy": "Recheck the official source directly at decision time and make a correction to any worksheet transcription against that source; controlled historical context remains separate and is never promoted to current incident evidence.",
   "publication": {
-    "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+    "status": "ROUTE_RELEASE_VERIFIED",
     "adapter": "coordinator-owned shared static route adapter",
-    "coordinatorDependency": "The coordinator-owned shared static route adapter is integrated; production release and public behavior verification remain required."
+    "coordinatorDependency": "The coordinator-owned shared static route adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.",
+    "coordinatorReleaseEvidence": {
+      "releaseHead": "3f36ae7bc83ff4e16c1f7d3c2a0bfa75a80158da",
+      "tag": "v0.1.39",
+      "provenance": "Coordinator-provided accepted release evidence."
+    }
   }
 }

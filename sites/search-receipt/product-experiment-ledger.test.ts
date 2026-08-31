@@ -6,12 +6,21 @@ const guidePath = new URL(
   './source-bound-evergreen-guide.json',
   import.meta.url,
 );
+const worksheetPath = new URL(
+  './source-bound-investigation-worksheet.json',
+  import.meta.url,
+);
 
 const observationBlocker =
   'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
 const coordinatorReleaseEvidence = {
   releaseHead: 'dbed8d57d42a4b6b0801d386462699d0335f9e43',
   tag: 'v0.1.35',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
+const worksheetCoordinatorReleaseEvidence = {
+  releaseHead: '3f36ae7bc83ff4e16c1f7d3c2a0bfa75a80158da',
+  tag: 'v0.1.39',
   provenance: 'Coordinator-provided accepted release evidence.',
 };
 
@@ -156,6 +165,25 @@ function assertEvergreenGuideReleaseEvidenceMatchesLedger(
     rank: 10,
   });
   expect(rankTen?.coordinatorReleaseEvidence).toEqual(guideReleaseEvidence);
+}
+
+function assertWorksheetReleaseEvidenceMatchesLedger(
+  worksheet: Record<string, unknown>,
+  ledger: Record<string, unknown>,
+) {
+  const publication = worksheet.publication as Record<string, unknown>;
+  const worksheetReleaseEvidence = publication.coordinatorReleaseEvidence;
+  const experiments = ledger.experiments as Array<Record<string, unknown>>;
+  const rankEleven = experiments.find((experiment) => experiment.rank === 11);
+
+  expect(worksheetReleaseEvidence).toEqual(worksheetCoordinatorReleaseEvidence);
+  expect(rankEleven).toMatchObject({
+    id: 'source-bound-investigation-worksheet-v1',
+    rank: 11,
+  });
+  expect(rankEleven?.coordinatorReleaseEvidence).toEqual(
+    worksheetReleaseEvidence,
+  );
 }
 
 describe('Search Receipt product experiment ledger', () => {
@@ -415,23 +443,51 @@ describe('Search Receipt product experiment ledger', () => {
     ).toThrow();
   });
 
-  it('records the release-pending investigation worksheet without claiming an outcome', () => {
+  it('records the verified worksheet release without claiming an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.experiments[10]).toMatchObject({
       id: 'source-bound-investigation-worksheet-v1',
       rank: 11,
-      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      status: 'ROUTE_RELEASE_VERIFIED',
       metric:
         'Deterministic admission of every required worksheet-contract element and admitted source binding.',
       target:
-        '100% deterministic admission, public route emission, and privacy-bounded worksheet behavior before release.',
+        '100% deterministic admission and privacy-bounded worksheet behavior before release; coordinator-provided release evidence records the accepted public verification.',
       stopRule:
-        'Stop release if a required boundary or source binding cannot be admitted, the route is unreachable, or worksheet input is transmitted or retained.',
+        'Stop source-bound maintenance if a required boundary or source binding cannot be admitted, the route is unreachable, or worksheet input is transmitted or retained.',
       noDataBoundary:
         'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'The coordinator-owned shared static route adapter is integrated; production release and public behavior verification remain required.',
+        'The coordinator-owned shared static route adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.',
+      coordinatorReleaseEvidence: worksheetCoordinatorReleaseEvidence,
+      nextSafeAction:
+        'Maintain admitted source bindings and worksheet boundaries; do not claim traffic, demand, conversion, revenue, or another commercial outcome.',
     });
+  });
+
+  it('keeps the worksheet and rank-eleven ledger release evidence in one accepted contract', () => {
+    const worksheet = JSON.parse(readFileSync(worksheetPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    assertWorksheetReleaseEvidenceMatchesLedger(worksheet, ledger);
+  });
+
+  it('rejects a rank-eleven ledger release-evidence mutation', () => {
+    const worksheet = JSON.parse(readFileSync(worksheetPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankEleven = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 11,
+    );
+
+    rankEleven.coordinatorReleaseEvidence = {
+      ...worksheetCoordinatorReleaseEvidence,
+      releaseHead: 'stale-release-head',
+    };
+
+    expect(() =>
+      assertWorksheetReleaseEvidenceMatchesLedger(worksheet, mutatedLedger),
+    ).toThrow();
   });
 });

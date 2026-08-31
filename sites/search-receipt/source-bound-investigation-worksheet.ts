@@ -55,12 +55,23 @@ interface SourceBoundInvestigationWorksheetCandidate {
     readonly status?: string;
     readonly adapter?: string;
     readonly coordinatorDependency?: string;
+    readonly coordinatorReleaseEvidence?: {
+      readonly releaseHead?: string;
+      readonly tag?: string;
+      readonly provenance?: string;
+    };
   };
 }
 
 const approvedSourceBindings: Readonly<Record<string, string>> = Object.freeze({
   'google-search-status': 'https://status.search.google.com/incidents.json',
   'google-search-central-blog': 'https://feeds.feedburner.com/blogspot/amDG',
+});
+
+const acceptedCoordinatorReleaseEvidence = Object.freeze({
+  releaseHead: '3f36ae7bc83ff4e16c1f7d3c2a0bfa75a80158da',
+  tag: 'v0.1.39',
+  provenance: 'Coordinator-provided accepted release evidence.',
 });
 
 function nonEmptyString(value: unknown): value is string {
@@ -261,12 +272,23 @@ export function validateSourceBoundInvestigationWorksheet(
   }
 
   if (
-    candidate.publication?.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
     candidate.publication?.adapter !==
       'coordinator-owned shared static route adapter' ||
     !nonEmptyString(candidate.publication?.coordinatorDependency)
   ) {
     diagnostics.push('ROUTE_ADAPTER_DEPENDENCY_MISSING');
+  }
+
+  const releaseEvidence = candidate.publication?.coordinatorReleaseEvidence;
+  if (
+    candidate.publication?.status !== 'ROUTE_RELEASE_VERIFIED' ||
+    releaseEvidence?.releaseHead !==
+      acceptedCoordinatorReleaseEvidence.releaseHead ||
+    releaseEvidence?.tag !== acceptedCoordinatorReleaseEvidence.tag ||
+    releaseEvidence?.provenance !==
+      acceptedCoordinatorReleaseEvidence.provenance
+  ) {
+    diagnostics.push('COORDINATOR_RELEASE_EVIDENCE_INVALID');
   }
 
   return { ok: diagnostics.length === 0, diagnostics };

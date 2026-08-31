@@ -13,6 +13,11 @@ const searchCentralManifestPath = new URL(
   '../../manifests/search-receipt/google-search-central-blog.json',
   import.meta.url,
 );
+const coordinatorReleaseEvidence = {
+  releaseHead: '3f36ae7bc83ff4e16c1f7d3c2a0bfa75a80158da',
+  tag: 'v0.1.39',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 
 function admittedManifests() {
   const status = JSON.parse(readFileSync(statusManifestPath, 'utf8'));
@@ -49,8 +54,9 @@ describe('Search Receipt source-bound investigation worksheet', () => {
           '/worksheets/compare-google-search-status-with-site-evidence',
       },
       publication: {
-        status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+        status: 'ROUTE_RELEASE_VERIFIED',
         adapter: 'coordinator-owned shared static route adapter',
+        coordinatorReleaseEvidence,
       },
     });
     expect(worksheet.worksheet).toHaveLength(4);
@@ -119,6 +125,25 @@ describe('Search Receipt source-bound investigation worksheet', () => {
     ).toMatchObject({
       ok: false,
       diagnostics: expect.arrayContaining(['CANONICAL_SLUG_INVALID']),
+    });
+
+    const staleReleaseEvidence = structuredClone(worksheet);
+    staleReleaseEvidence.publication.status = 'ROUTE_RELEASE_VERIFIED';
+    staleReleaseEvidence.publication.coordinatorReleaseEvidence = {
+      ...coordinatorReleaseEvidence,
+      releaseHead: 'stale-release-head',
+    };
+
+    expect(
+      validateSourceBoundInvestigationWorksheet(
+        staleReleaseEvidence,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining([
+        'COORDINATOR_RELEASE_EVIDENCE_INVALID',
+      ]),
     });
   });
 });
