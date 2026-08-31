@@ -141,8 +141,9 @@ describe('atomic AI Moment Index build', () => {
     });
 
     const routeDirectory = join(outputDirectory, 'video-moment-search');
-    const [video, moment, creator, sitemap, sitemapIndex, feed] =
+    const [home, video, moment, creator, sitemap, sitemapIndex, feed] =
       await Promise.all([
+        readFile(join(routeDirectory, 'index.html'), 'utf8'),
         readFile(
           join(routeDirectory, 'videos', 'robots-under-control', 'index.html'),
           'utf8',
@@ -182,18 +183,27 @@ describe('atomic AI Moment Index build', () => {
     expect(creator).toContain(
       'rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/video-moment-search/creators/university-of-the-netherlands/"',
     );
-    expect(sitemap).toContain(
-      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/</loc>',
-    );
-    expect(sitemap).toContain(
-      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/</loc>',
-    );
-    expect(sitemap).toContain(
-      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/</loc>',
-    );
-    expect(sitemap).toContain(
-      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/creators/university-of-the-netherlands/</loc>',
-    );
+    for (const [location, page] of [
+      [
+        'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/',
+        home,
+      ],
+      [
+        'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/',
+        video,
+      ],
+      [
+        'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/',
+        moment,
+      ],
+      [
+        'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/creators/university-of-the-netherlands/',
+        creator,
+      ],
+    ] as const) {
+      expect(sitemap).toContain(`<loc>${location}</loc>`);
+      expect(page).toContain('<meta name="robots" content="index,follow">');
+    }
     expect(sitemap).not.toContain('?q=');
     expect(sitemapIndex).not.toContain('video-sitemap.xml');
     expect(feed).toContain(

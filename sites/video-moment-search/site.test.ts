@@ -302,9 +302,12 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('keeps arbitrary query state out of indexable URLs and persistent state', () => {
-    expect(renderSearchShell(fixture, searchIndex, baseUrl)).toContain(
-      'name="robots" content="noindex,nofollow"',
+    const html = renderSearchShell(fixture, searchIndex, baseUrl);
+    expect(html).toContain('name="robots" content="index,follow"');
+    expect(html).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/">',
     );
+    expect(html).not.toContain('?q=');
     expect(VIDEO_MOMENT_SEARCH_CLIENT).not.toMatch(
       /localStorage|sessionStorage|pushState|replaceState|location\.search|sendBeacon|analytics/u,
     );
@@ -873,9 +876,9 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
-  it('indexes only the canonical moment while aggregate pages remain noindex and fully oriented', () => {
+  it('indexes every nonempty admitted canonical page while keeping query state out of discovery', () => {
     const search = renderVideoMomentHome(fixture, searchIndex, baseUrl);
-    expect(search).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(search).toContain('<meta name="robots" content="index,follow">');
     expect(search).toContain(
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/">',
     );
@@ -890,7 +893,7 @@ describe('AI Moment Index public search surface', () => {
       baseUrl,
     );
     expect(video).toContain('How can we keep robots under control?');
-    expect(video).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(video).toContain('<meta name="robots" content="index,follow">');
     expect(video).toContain(
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/videos/robots-under-control/">',
     );
@@ -914,9 +917,7 @@ describe('AI Moment Index public search surface', () => {
       baseUrl,
     );
     expect(creator).toContain('University of the Netherlands');
-    expect(creator).toContain(
-      '<meta name="robots" content="noindex,nofollow">',
-    );
+    expect(creator).toContain('<meta name="robots" content="index,follow">');
 
     for (const directPage of [video, moment, creator]) {
       expect(directPage).toContain('<strong>For:</strong>');
@@ -940,6 +941,44 @@ describe('AI Moment Index public search surface', () => {
     ).toBeNull();
     expect(renderGuidePage(fixture, searchIndex, baseUrl)).toBeNull();
     expect(videoMomentSearchSite.siteId).toBe('video-moment-search');
+  });
+
+  it('keeps empty home and unavailable video or creator variants out of the index', () => {
+    const emptyCorpus: VideoCorpus = {
+      corpusId: 'synthetic-empty-site-corpus',
+      label: 'SYNTHETIC LOCAL-ONLY EMPTY CORPUS',
+      videos: [],
+      rights: [],
+      cues: [],
+      moments: [],
+    };
+    const emptyHome = renderVideoMomentHome(
+      emptyCorpus,
+      buildSearchIndex(emptyCorpus),
+      baseUrl,
+    );
+    const unavailableVideo = renderVideoPage(
+      fixture,
+      searchIndex,
+      'video-unavailable',
+      baseUrl,
+    );
+    const unavailableCreator = renderCreatorPage(
+      fixture,
+      searchIndex,
+      'creator-unavailable',
+      baseUrl,
+    );
+
+    for (const unavailablePage of [
+      emptyHome,
+      unavailableVideo,
+      unavailableCreator,
+    ]) {
+      expect(unavailablePage).toContain(
+        '<meta name="robots" content="noindex,nofollow">',
+      );
+    }
   });
 
   it('renders eligible topic and guide pages with escaped original synthesis and contextual links', () => {

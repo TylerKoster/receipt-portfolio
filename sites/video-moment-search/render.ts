@@ -466,7 +466,11 @@ export function renderSearchShell(
     <h2 id="initial-heading">${escapeHtml(initialHeading)}</h2>
     ${renderEntries(initial, baseUrl)}
   </section>`;
-  return page(videoMomentSearchSite.title, body, baseUrl, '', true);
+  return page(videoMomentSearchSite.title, body, baseUrl, '', true, {
+    indexable: initial.length > 0,
+    description: videoMomentSearchSite.description,
+    openGraphType: 'website',
+  });
 }
 
 export function renderVideoMomentHome(
@@ -588,7 +592,6 @@ export function renderVideoPage(
     undefined,
     undefined,
     discovery,
-    false,
   );
 }
 
@@ -693,7 +696,6 @@ export function renderCreatorPage(
     undefined,
     undefined,
     discovery,
-    false,
   );
 }
 
