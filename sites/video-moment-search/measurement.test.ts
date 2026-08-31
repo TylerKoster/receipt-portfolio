@@ -216,10 +216,13 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[1].evidenceClassification');
   });
 
-  it('rejects an invalid rank, nonnumeric target, missing required metric, and an unsupported persona assertion', () => {
+  it('rejects an invalid rank, invalid target shape, missing required metric, and an unsupported persona assertion', () => {
     const invalid = structuredClone(ledger);
     invalid.experiments[0].rank = 2;
-    invalid.experiments[2].target = 'improve relevance later';
+    invalid.experiments[2].target = {
+      classification: 'approved-spec-gate',
+      minimumPercent: '80',
+    };
     invalid.requiredMetrics = invalid.requiredMetrics.filter(
       (metric: string) => metric !== 'time-to-value',
     );
@@ -250,29 +253,139 @@ describe('privacy-preserving measurement contract', () => {
     ).toContain('experiments[3].id');
   });
 
-  it('binds each ranked experiment to its primary metric, required measures, and approved continuation gate', () => {
+  it('binds each ranked experiment to its primary metric, required measures, and exact target gate', () => {
     const invalid = structuredClone(ledger);
     invalid.experiments[2].metric = 'exact-moment click rate';
     invalid.experiments[2].measures = invalid.experiments[2].measures.filter(
       (metric: string) => metric !== 'time-to-value',
     );
-    invalid.experiments[2].continuationGate.minimumPercent = 1;
-    invalid.experiments[2].target = '1';
+    invalid.experiments[2].target = {
+      classification: 'approved-spec-gate',
+      minimumPercent: 1,
+    };
 
     const diagnostics =
       validateExperimentLedger(invalid).diagnostics.join('\n');
     expect(diagnostics).toContain('experiments[2].metric');
     expect(diagnostics).toContain('experiments[2].measures');
-    expect(diagnostics).toContain('experiments[2].continuationGate');
     expect(diagnostics).toContain('experiments[2].target');
   });
 
-  it('rejects a numeric target that contains but does not equal the approved gate', () => {
+  it.each([
+    [
+      'decimal expansion',
+      2,
+      { classification: 'approved-spec-gate', minimumPercent: 80.5 },
+    ],
+    [
+      'comma-equivalent click-rate expansion',
+      3,
+      {
+        classification: 'approved-spec-gate',
+        minimumPercent: 30000,
+        denominator: 'successful-searches',
+      },
+    ],
+    [
+      'comma-equivalent impression expansion',
+      4,
+      {
+        classification: 'provisional-operator-hypothesis',
+        observationTarget: 100000,
+        days: 90,
+      },
+    ],
+    [
+      'word expansion',
+      6,
+      {
+        classification: 'approved-spec-gate',
+        minimumCommitments: 'One hundred',
+        days: 90,
+      },
+    ],
+    [
+      'prefix expansion',
+      0,
+      {
+        classification: 'approved-spec-gate',
+        authorizedCreators: 13,
+        coveredVideos: 100,
+      },
+    ],
+    [
+      'suffix representation',
+      2,
+      {
+        classification: 'approved-spec-gate',
+        minimumPercent: 80,
+        suffix: '%',
+      },
+    ],
+    [
+      'negative alternate representation',
+      1,
+      { classification: 'approved-spec-gate', verifiedMoments: -500 },
+    ],
+  ] as const)('rejects a target with %s', (_, index, target) => {
     const invalid = structuredClone(ledger);
-    invalid.experiments[2].target = '>=800% top-three relevance.';
+    invalid.experiments[index].target = target;
 
     expect(validateExperimentLedger(invalid).diagnostics.join('\n')).toContain(
-      'experiments[2].target',
+      `experiments[${index}].target`,
     );
   });
+
+  it.each([
+    [
+      0,
+      {
+        classification: 'approved-spec-gate',
+        authorizedCreators: 3,
+        coveredVideos: 100,
+      },
+    ],
+    [1, { classification: 'approved-spec-gate', verifiedMoments: 500 }],
+    [2, { classification: 'approved-spec-gate', minimumPercent: 80 }],
+    [
+      3,
+      {
+        classification: 'approved-spec-gate',
+        minimumPercent: 30,
+        denominator: 'successful-searches',
+      },
+    ],
+    [
+      4,
+      {
+        classification: 'provisional-operator-hypothesis',
+        observationTarget: 100,
+        days: 90,
+      },
+    ],
+    [
+      5,
+      {
+        classification: 'provisional-operator-hypothesis',
+        observationTarget: 10,
+        days: 90,
+      },
+    ],
+    [
+      6,
+      {
+        classification: 'approved-spec-gate',
+        minimumCommitments: 1,
+        days: 90,
+      },
+    ],
+  ] as const)(
+    'accepts the exact structured target for rank %d',
+    (index, target) => {
+      const candidate = structuredClone(ledger);
+      candidate.experiments[index].target = target;
+
+      expect(validateExperimentLedger(candidate).diagnostics).toEqual([]);
+    },
+  );
 });

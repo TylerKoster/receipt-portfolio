@@ -39,8 +39,11 @@
       "metric": "creator referral clicks",
       "measures": ["creator referral clicks", "correction rate"],
       "baseline": "No data; creator authorization is unknown and blocked pending approved review.",
-      "target": "3 authorized creators and 100 covered videos.",
-      "continuationGate": { "authorizedCreators": 3, "coveredVideos": 100 },
+      "target": {
+        "classification": "approved-spec-gate",
+        "authorizedCreators": 3,
+        "coveredVideos": 100
+      },
       "stopRule": "Stop authorization if source identity or authority, covered URLs/content, rights, commercial/excerpt/expiry/revocation terms, or caption provenance is ambiguous; quarantine the record.",
       "status": "proposed",
       "evidenceClassification": "not-yet-testable",
@@ -56,8 +59,10 @@
       "metric": "correction rate",
       "measures": ["correction rate"],
       "baseline": "No data; verified corpus growth is unknown and blocked pending authorized evidence.",
-      "target": "500 verified moments.",
-      "continuationGate": { "verifiedMoments": 500 },
+      "target": {
+        "classification": "approved-spec-gate",
+        "verifiedMoments": 500
+      },
       "stopRule": "Stop admission when a moment lacks rights evidence, exact timestamp routing, or a correction/removal review path.",
       "status": "proposed",
       "evidenceClassification": "not-yet-testable",
@@ -79,8 +84,10 @@
         "time-to-value"
       ],
       "baseline": "No measured users; the released fixed flow is only a heuristic regression.",
-      "target": ">=80% top-three relevance.",
-      "continuationGate": { "minimumPercent": 80 },
+      "target": {
+        "classification": "approved-spec-gate",
+        "minimumPercent": 80
+      },
       "stopRule": "Stop the preview gate if fewer than 80% of reviewed heuristic cases place the expected moment in the top three, any timestamp landing error occurs, or a zero-result case lacks an explicit review record.",
       "status": "proposed",
       "evidenceClassification": "heuristic-preview-gate",
@@ -96,8 +103,8 @@
       "metric": "exact-moment click rate",
       "measures": ["exact-moment click rate", "timestamp landing error"],
       "baseline": "No data; no approved measurement endpoint exists.",
-      "target": ">=30% exact-moment click rate among successful searches.",
-      "continuationGate": {
+      "target": {
+        "classification": "approved-spec-gate",
         "minimumPercent": 30,
         "denominator": "successful-searches"
       },
@@ -116,11 +123,10 @@
       "metric": "non-branded impressions",
       "measures": ["non-branded impressions"],
       "baseline": "No data; non-branded discovery is unknown and blocked without approved measurement.",
-      "target": "Provisional bounded observation target: 100 non-branded impressions in 90 days after approved measurement.",
-      "continuationGate": {
+      "target": {
+        "classification": "provisional-operator-hypothesis",
         "observationTarget": 100,
-        "days": 90,
-        "provisional": true
+        "days": 90
       },
       "stopRule": "Stop the observation if attribution is unavailable, source or query data would be retained, or 100 impressions are not observed by day 90; report unknown rather than zero demand.",
       "status": "proposed",
@@ -137,11 +143,10 @@
       "metric": "offer clicks",
       "measures": ["offer clicks"],
       "baseline": "No data; offer interest is unknown and blocked without approved measurement.",
-      "target": "Provisional bounded observation target: 10 offer clicks in 90 days after approved measurement.",
-      "continuationGate": {
+      "target": {
+        "classification": "provisional-operator-hypothesis",
         "observationTarget": 10,
-        "days": 90,
-        "provisional": true
+        "days": 90
       },
       "stopRule": "Stop the observation if measurement is not approved, attribution would require personal or cross-site identifiers, or fewer than 10 offer clicks are observed by day 90; report no conclusion about demand.",
       "status": "proposed",
@@ -158,8 +163,11 @@
       "metric": "paid pilot evidence",
       "measures": ["paid pilot evidence"],
       "baseline": "No data; paid-pilot evidence is unknown and blocked.",
-      "target": "One paid pilot or credible signed paid commitment within 90 days.",
-      "continuationGate": { "minimumCommitments": 1, "days": 90 },
+      "target": {
+        "classification": "approved-spec-gate",
+        "minimumCommitments": 1,
+        "days": 90
+      },
       "stopRule": "Stop the pilot path at day 90 without one paid pilot or credible signed paid commitment, or immediately if permissions, pricing authority, or evidence provenance is unresolved.",
       "status": "proposed",
       "evidenceClassification": "no-data",

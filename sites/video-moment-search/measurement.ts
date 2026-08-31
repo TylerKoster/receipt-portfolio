@@ -210,16 +210,18 @@ const expectedExperiments = [
     id: 'creator-authorization',
     metric: 'creator referral clicks',
     measures: ['creator referral clicks', 'correction rate'],
-    continuationGate: { authorizedCreators: 3, coveredVideos: 100 },
-    targetTokens: ['3', '100'],
+    target: {
+      classification: 'approved-spec-gate',
+      authorizedCreators: 3,
+      coveredVideos: 100,
+    },
   },
   {
     rank: 2,
     id: 'corpus-growth',
     metric: 'correction rate',
     measures: ['correction rate'],
-    continuationGate: { verifiedMoments: 500 },
-    targetTokens: ['500'],
+    target: { classification: 'approved-spec-gate', verifiedMoments: 500 },
   },
   {
     rank: 3,
@@ -232,43 +234,51 @@ const expectedExperiments = [
       'task completion',
       'time-to-value',
     ],
-    continuationGate: { minimumPercent: 80 },
-    targetTokens: ['80'],
+    target: { classification: 'approved-spec-gate', minimumPercent: 80 },
   },
   {
     rank: 4,
     id: 'exact-moment-routing',
     metric: 'exact-moment click rate',
     measures: ['exact-moment click rate', 'timestamp landing error'],
-    continuationGate: {
+    target: {
+      classification: 'approved-spec-gate',
       minimumPercent: 30,
       denominator: 'successful-searches',
     },
-    targetTokens: ['30'],
   },
   {
     rank: 5,
     id: 'non-branded-discovery',
     metric: 'non-branded impressions',
     measures: ['non-branded impressions'],
-    continuationGate: { observationTarget: 100, days: 90, provisional: true },
-    targetTokens: ['100', '90'],
+    target: {
+      classification: 'provisional-operator-hypothesis',
+      observationTarget: 100,
+      days: 90,
+    },
   },
   {
     rank: 6,
     id: 'offer-interest',
     metric: 'offer clicks',
     measures: ['offer clicks'],
-    continuationGate: { observationTarget: 10, days: 90, provisional: true },
-    targetTokens: ['10', '90'],
+    target: {
+      classification: 'provisional-operator-hypothesis',
+      observationTarget: 10,
+      days: 90,
+    },
   },
   {
     rank: 7,
     id: 'paid-pilot-evidence',
     metric: 'paid pilot evidence',
     measures: ['paid pilot evidence'],
-    continuationGate: { minimumCommitments: 1, days: 90 },
-    targetTokens: ['one', '90'],
+    target: {
+      classification: 'approved-spec-gate',
+      minimumCommitments: 1,
+      days: 90,
+    },
   },
 ] as const;
 
@@ -305,14 +315,6 @@ function sameGate(
     Object.keys(gate).length === expectedEntries.length &&
     expectedEntries.every(([key, expectedValue]) => gate[key] === expectedValue)
   );
-}
-
-function containsTargetToken(target: string, token: string): boolean {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  return new RegExp(
-    `(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`,
-    'u',
-  ).test(target);
 }
 
 /** Validates the local operator ledger without accepting outcome claims. */
@@ -406,33 +408,19 @@ export function validateExperimentLedger(
         `${prefix}.measures must match the approved operating measures`,
       );
     }
-    if (!sameGate(record.continuationGate, expected.continuationGate)) {
-      diagnostics.push(
-        `${prefix}.continuationGate must match the approved gate`,
-      );
+    if (!sameGate(record.target, expected.target)) {
+      diagnostics.push(`${prefix}.target must match the approved gate`);
     }
     for (const field of [
       'id',
       'hypothesis',
       'metric',
       'baseline',
-      'target',
       'stopRule',
       'status',
     ] as const) {
       if (!nonBlank(record[field]))
         diagnostics.push(`${prefix}.${field} is required`);
-    }
-    const target = record.target;
-    if (
-      nonBlank(target) &&
-      !expected.targetTokens.every((token) =>
-        containsTargetToken(target.toLocaleLowerCase('en-US'), token),
-      )
-    ) {
-      diagnostics.push(
-        `${prefix}.target must state the approved continuation gate`,
-      );
     }
     if (
       !Array.isArray(record.evidencePaths) ||
