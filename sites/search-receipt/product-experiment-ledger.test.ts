@@ -282,7 +282,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -306,7 +306,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
@@ -330,7 +330,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(ledger.experiments[8]).toMatchObject({
       id: 'shareable-filter-view-v1',
       rank: 9,
@@ -413,5 +413,24 @@ describe('Search Receipt product experiment ledger', () => {
     expect(() =>
       assertEvergreenGuideReleaseEvidenceMatchesLedger(guide, mutatedLedger),
     ).toThrow();
+  });
+
+  it('records the adapter-pending investigation worksheet without claiming an outcome', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[10]).toMatchObject({
+      id: 'source-bound-investigation-worksheet-v1',
+      rank: 11,
+      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      metric:
+        'Deterministic admission of every required worksheet-contract element and admitted source binding.',
+      target: '100% deterministic admission before any public-route proposal.',
+      stopRule:
+        'Stop publication preparation if a required boundary or source binding cannot be admitted.',
+      noDataBoundary:
+        'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
+      coordinatorDependency:
+        'A coordinator-owned shared static route adapter is required before this non-public worksheet contract can be publicly reachable.',
+    });
   });
 });
