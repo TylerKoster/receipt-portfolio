@@ -556,6 +556,43 @@ describe('privacy-preserving measurement contract', () => {
     );
   });
 
+  it.each([
+    ['removal', (paths: { role: string; path: string }[]) => paths.slice(0, 2)],
+    [
+      'role rename',
+      (paths: { role: string; path: string }[]) =>
+        paths.map((entry) =>
+          entry.role === 'heuristic-relevance-benchmark'
+            ? { ...entry, role: 'relevance-benchmark' }
+            : entry,
+        ),
+    ],
+    [
+      'path substitution',
+      (paths: { role: string; path: string }[]) =>
+        paths.map((entry) =>
+          entry.role === 'heuristic-relevance-benchmark'
+            ? {
+                ...entry,
+                path: 'docs/video-moment-search/other-benchmark.json',
+              }
+            : entry,
+        ),
+    ],
+  ] as const)(
+    'rejects rank-3 relevance-benchmark evidence %s',
+    (_, mutatePaths) => {
+      const invalid = structuredClone(ledger);
+      invalid.experiments[2].evidencePaths = mutatePaths(
+        invalid.experiments[2].evidencePaths,
+      );
+
+      expect(validateExperimentLedger(invalid).diagnostics).toContain(
+        'experiments[2].evidencePaths must match the approved evidence roles',
+      );
+    },
+  );
+
   it('rejects a fabricated measured-outcome baseline', () => {
     const invalid = structuredClone(ledger);
     invalid.experiments[0].baseline =

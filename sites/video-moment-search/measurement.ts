@@ -388,6 +388,10 @@ const expectedExperiments = [
         role: 'released-historical-artifact',
         path: 'sites/video-moment-search/product-experiment-ledger.json',
       },
+      {
+        role: 'heuristic-relevance-benchmark',
+        path: 'docs/video-moment-search/researcher-relevance-benchmark.json',
+      },
     ],
   },
   {

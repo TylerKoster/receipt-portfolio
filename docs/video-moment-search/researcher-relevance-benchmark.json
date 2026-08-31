@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "siteId": "video-moment-search",
+  "evidenceClassification": "heuristic-regression-only",
+  "limitations": {
+    "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
+    "transcriptDerivedCases": "prohibited",
+    "prohibitedClaims": [
+      "user",
+      "usability",
+      "demand",
+      "creator",
+      "referral",
+      "conversion",
+      "revenue"
+    ]
+  },
+  "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+  "target": {
+    "minimumTopThreePercent": 80,
+    "maximumTimestampLandingErrorSeconds": 0,
+    "negativeControlFalsePositiveCount": 0
+  },
+  "cases": [
+    {
+      "query": "robots control",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "keep robots under control",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "robots",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "control",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "lecture robots",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "neural networks",
+      "queryBasis": "synthetic-unrelated-negative-control",
+      "expectedMomentId": null,
+      "expectedStartSeconds": null,
+      "expectedTimestampSuffix": null
+    },
+    {
+      "query": "gardening tomatoes",
+      "queryBasis": "synthetic-unrelated-negative-control",
+      "expectedMomentId": null,
+      "expectedStartSeconds": null,
+      "expectedTimestampSuffix": null
+    },
+    {
+      "query": "quantum computing",
+      "queryBasis": "synthetic-unrelated-negative-control",
+      "expectedMomentId": null,
+      "expectedStartSeconds": null,
+      "expectedTimestampSuffix": null
+    },
+    {
+      "query": "climate adaptation",
+      "queryBasis": "synthetic-unrelated-negative-control",
+      "expectedMomentId": null,
+      "expectedStartSeconds": null,
+      "expectedTimestampSuffix": null
+    }
+  ],
+  "expectedEvaluation": {
+    "positiveTopThreeHits": {
+      "numerator": 5,
+      "denominator": 5
+    },
+    "negativeZeroResults": {
+      "numerator": 4,
+      "denominator": 4
+    },
+    "aggregateZeroResultRate": {
+      "numerator": 4,
+      "denominator": 9
+    },
+    "maximumTimestampLandingErrorSeconds": 0
+  }
+}
