@@ -96,6 +96,44 @@ describe('privacy-preserving measurement contract', () => {
     });
   });
 
+  it('rejects an unknown runtime event type without throwing or echoing it', () => {
+    const untrustedType: unknown = 'browser-extension-event';
+
+    expect(() =>
+      createMeasurementEvent(untrustedType, {
+        occurredAt: '2026-08-31T12:00:00.000Z',
+        query: 'agent evaluation',
+      }),
+    ).not.toThrow();
+    expect(
+      createMeasurementEvent(untrustedType, {
+        occurredAt: '2026-08-31T12:00:00.000Z',
+      }),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    {
+      schemaVersion: 1,
+      eventType: 'browser-extension-event',
+      occurredAt: '2026-08-31T12:00:00.000Z',
+    },
+    {
+      schemaVersion: 1,
+      eventType: 'search',
+      occurredAt: '2026-08-31T12:00:00.000Z',
+      query: 'agent evaluation',
+    },
+  ])(
+    'discards fabricated delivery input without echoing its event type',
+    (input) => {
+      expect(deliverMeasurementEvent(input)).toEqual({
+        measurementStatus: 'not-configured',
+        disposition: 'discarded',
+      });
+    },
+  );
+
   it('keeps future measurement hooks non-executing and preserves the released exact source href', () => {
     const html = renderSearchShell(
       fixture,
@@ -144,5 +182,39 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[2].target');
     expect(diagnostics).toContain('requiredMetrics');
     expect(diagnostics).toContain('personas[1].testability');
+  });
+
+  it('rejects a reordered or substituted experiment even when its rank remains numeric', () => {
+    const reordered = structuredClone(ledger);
+    [reordered.experiments[0], reordered.experiments[1]] = [
+      reordered.experiments[1],
+      reordered.experiments[0],
+    ];
+    const substituted = structuredClone(ledger);
+    substituted.experiments[3].id = 'alternate-routing';
+
+    expect(
+      validateExperimentLedger(reordered).diagnostics.join('\n'),
+    ).toContain('experiments[0].id');
+    expect(
+      validateExperimentLedger(substituted).diagnostics.join('\n'),
+    ).toContain('experiments[3].id');
+  });
+
+  it('binds each ranked experiment to its primary metric, required measures, and approved continuation gate', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[2].metric = 'exact-moment click rate';
+    invalid.experiments[2].measures = invalid.experiments[2].measures.filter(
+      (metric: string) => metric !== 'time-to-value',
+    );
+    invalid.experiments[2].continuationGate.minimumPercent = 1;
+    invalid.experiments[2].target = '1';
+
+    const diagnostics =
+      validateExperimentLedger(invalid).diagnostics.join('\n');
+    expect(diagnostics).toContain('experiments[2].metric');
+    expect(diagnostics).toContain('experiments[2].measures');
+    expect(diagnostics).toContain('experiments[2].continuationGate');
+    expect(diagnostics).toContain('experiments[2].target');
   });
 });
