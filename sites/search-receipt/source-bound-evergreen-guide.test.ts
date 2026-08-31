@@ -28,16 +28,16 @@ function admittedManifests() {
 }
 
 describe('Search Receipt source-bound evergreen guide', () => {
-  it('checks in a route-unpublished guide contract before it can be proposed for shared rendering', () => {
+  it('binds the admitted guide contract to the coordinator route adapter', () => {
     expect(existsSync(guidePath)).toBe(true);
 
     const guide = JSON.parse(readFileSync(guidePath, 'utf8'));
     expect(guide).toMatchObject({
       id: 'source-bound-evergreen-guide-v1',
       publication: {
-        status: 'ROUTE_UNPUBLISHED',
-        coordinatorDependency:
-          'A shared public-route adapter is coordinator-owned; this lane does not publish the guide.',
+        status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+        route: '/guides/is-google-search-down-or-my-site/',
+        adapter: 'shared-static-guide-v1',
       },
     });
   });
@@ -124,6 +124,36 @@ describe('Search Receipt source-bound evergreen guide', () => {
       diagnostics: expect.arrayContaining([
         'CURRENTNESS_OR_NO_CAUSATION_BOUNDARY_MISSING',
       ]),
+    });
+
+    const missingSourcePurpose = structuredClone(guide);
+    delete missingSourcePurpose.sourceBindings[0].purpose;
+
+    expect(
+      validateSourceBoundEvergreenGuide(
+        missingSourcePurpose,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining([
+        'SOURCE_BINDING_INVALID:google-search-status',
+      ]),
+    });
+
+    const duplicateSourceBinding = structuredClone(guide);
+    duplicateSourceBinding.sourceBindings.push(
+      structuredClone(duplicateSourceBinding.sourceBindings[0]),
+    );
+
+    expect(
+      validateSourceBoundEvergreenGuide(
+        duplicateSourceBinding,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining(['SOURCE_BINDINGS_INCOMPLETE']),
     });
   });
 });

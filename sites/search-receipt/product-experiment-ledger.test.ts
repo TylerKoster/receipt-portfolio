@@ -335,7 +335,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[9]).toMatchObject({
       id: 'source-bound-evergreen-guide-v1',
       rank: 10,
-      status: 'READY_FOR_COORDINATOR_ROUTE_ADAPTER',
+      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
       metric:
         'Deterministic admission of every required guide-contract element and source binding.',
       target: '100% deterministic admission before any public-route proposal.',
@@ -344,7 +344,7 @@ describe('Search Receipt product experiment ledger', () => {
       noDataBoundary:
         'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'A shared public-route adapter is coordinator-owned; this lane does not publish the guide.',
+        'The coordinator-owned shared-static-guide-v1 adapter is integrated; release and public verification remain coordinator-owned.',
     });
   });
 

@@ -27,6 +27,7 @@ const REQUIRED_SITE_FILES: Readonly<
 > = {
   'search-receipt': [
     ...RECEIPT_SITE_FILES,
+    'guides/is-google-search-down-or-my-site/index.html',
     'search-interface.css',
     'search-interface.js',
   ],

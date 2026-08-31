@@ -15,6 +15,7 @@ const EXPECTED_PATHS = [
   'favicon.ico',
   'index.html',
   'portfolio.css',
+  'search-receipt/guides/is-google-search-down-or-my-site/index.html',
   'search-receipt/index.html',
   'search-receipt/methodology/index.html',
   `search-receipt/receipts/${'a'.repeat(64)}/index.html`,
@@ -47,7 +48,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '6dec825eadf41cb9a59cfbc5820542dfaad3e254b97ef836270b4515788d9274';
+  '0a47b9b0e947ed13b2178c5b1b715962e014b01a5d3c87a5e11bc9162ce477d4';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

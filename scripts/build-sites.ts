@@ -31,6 +31,11 @@ import {
   type VideoCorpus,
 } from '../packages/video-moment-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
+import {
+  renderSearchReceiptEvergreenGuide,
+  type SourceBoundEvergreenGuide,
+} from '../sites/search-receipt/render-evergreen-guide.js';
+import { validateSourceBoundEvergreenGuide } from '../sites/search-receipt/source-bound-evergreen-guide.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
   DEFAULT_PUBLIC_BASE_URL,
@@ -325,6 +330,53 @@ async function writeSiteTree(
   publicBaseUrl: string,
   includeVideoMomentSearch: boolean,
 ): Promise<void> {
+  const [searchGuide, searchStatusManifest, searchCentralManifest] =
+    await Promise.all([
+      readFile(
+        join(
+          projectRoot(),
+          'sites',
+          'search-receipt',
+          'source-bound-evergreen-guide.json',
+        ),
+        'utf8',
+      ).then((content) => JSON.parse(content) as SourceBoundEvergreenGuide),
+      readFile(
+        join(
+          projectRoot(),
+          'manifests',
+          'search-receipt',
+          'google-search-status.json',
+        ),
+        'utf8',
+      ).then(
+        (content) =>
+          JSON.parse(content) as { sourceId: string; endpoint: string },
+      ),
+      readFile(
+        join(
+          projectRoot(),
+          'manifests',
+          'search-receipt',
+          'google-search-central-blog.json',
+        ),
+        'utf8',
+      ).then(
+        (content) =>
+          JSON.parse(content) as { sourceId: string; endpoint: string },
+      ),
+    ]);
+  const guideValidation = validateSourceBoundEvergreenGuide(searchGuide, {
+    [searchStatusManifest.sourceId]: searchStatusManifest,
+    [searchCentralManifest.sourceId]: searchCentralManifest,
+  });
+  if (!guideValidation.ok) {
+    throw new Error(
+      `Search Receipt evergreen guide is not admitted: ${guideValidation.diagnostics.join(', ')}`,
+    );
+  }
+  const guidePath = `${searchGuide.metadata.canonicalSlugProposal}/`;
+
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
     join(projectRoot(), 'sites', 'shared', 'styles.css'),
@@ -358,6 +410,15 @@ async function writeSiteTree(
       join(directory, 'styles.css'),
     );
     if (site.siteId === 'search-receipt') {
+      await mkdir(
+        join(
+          directory,
+          ...searchGuide.metadata.canonicalSlugProposal
+            .split('/')
+            .filter((segment) => segment !== ''),
+        ),
+        { recursive: true },
+      );
       await Promise.all([
         copyFile(
           join(projectRoot(), 'sites', 'search-receipt', 'search-interface.js'),
@@ -372,11 +433,34 @@ async function writeSiteTree(
           ),
           join(directory, 'search-interface.css'),
         ),
+        writeFile(
+          join(
+            directory,
+            ...searchGuide.metadata.canonicalSlugProposal
+              .split('/')
+              .filter((segment) => segment !== ''),
+            'index.html',
+          ),
+          renderSearchReceiptEvergreenGuide(site, searchGuide, publicBaseUrl),
+        ),
       ]);
     }
     await writeFile(
       join(directory, 'index.html'),
-      renderSite(site, visible, publicBaseUrl),
+      renderSite(
+        site,
+        visible,
+        publicBaseUrl,
+        site.siteId === 'search-receipt'
+          ? {
+              featuredGuide: {
+                path: guidePath,
+                title: searchGuide.metadata.title,
+                description: searchGuide.metadata.description,
+              },
+            }
+          : {},
+      ),
     );
     await writeFile(
       join(directory, 'methodology', 'index.html'),
@@ -388,7 +472,12 @@ async function writeSiteTree(
     );
     await writeFile(
       join(directory, 'sitemap.xml'),
-      renderSitemap(site, visible, publicBaseUrl),
+      renderSitemap(
+        site,
+        visible,
+        publicBaseUrl,
+        site.siteId === 'search-receipt' ? [guidePath] : [],
+      ),
     );
     await writeFile(
       join(directory, 'robots.txt'),

@@ -10,8 +10,9 @@
     "canonicalSlugProposal": "/guides/is-google-search-down-or-my-site"
   },
   "publication": {
-    "status": "ROUTE_UNPUBLISHED",
-    "coordinatorDependency": "A shared public-route adapter is coordinator-owned; this lane does not publish the guide."
+    "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+    "route": "/guides/is-google-search-down-or-my-site/",
+    "adapter": "shared-static-guide-v1"
   },
   "sourceBindings": [
     {

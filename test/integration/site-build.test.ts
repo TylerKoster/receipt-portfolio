@@ -344,6 +344,39 @@ describe('static receipt site build', () => {
     expect(home).toContain('href="/search-receipt/styles.css"');
   });
 
+  it('publishes the admitted Search Receipt evergreen guide and discovery links', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const [home, guide, sitemap] = await Promise.all([
+      readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8'),
+      readFile(
+        join(
+          outputDirectory,
+          'search-receipt',
+          'guides',
+          'is-google-search-down-or-my-site',
+          'index.html',
+        ),
+        'utf8',
+      ),
+      readFile(join(outputDirectory, 'search-receipt', 'sitemap.xml'), 'utf8'),
+    ]);
+
+    expect(home).toContain(
+      'href="/search-receipt/guides/is-google-search-down-or-my-site/"',
+    );
+    expect(guide).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/search-receipt/guides/is-google-search-down-or-my-site/">',
+    );
+    expect(guide).toContain('"@type":"FAQPage"');
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/search-receipt/guides/is-google-search-down-or-my-site/</loc>',
+    );
+  });
+
   it('normalizes a production base and includes its project path exactly once on every URL surface', async () => {
     const publicBaseUrl = 'https://tylerkoster.github.io/receipt-portfolio////';
     const productionBase = 'https://tylerkoster.github.io/receipt-portfolio/';
@@ -921,6 +954,34 @@ describe('static receipt site build', () => {
             'sites',
             'search-receipt',
             'search-interface.css',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-evergreen-guide.json',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-evergreen-guide.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-evergreen-guide.json',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-evergreen-guide.json',
           ),
         ),
       ]);

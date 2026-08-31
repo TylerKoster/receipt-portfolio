@@ -243,7 +243,7 @@ function receiptCard(
 </article>`;
 }
 
-function page(
+export function renderStaticPage(
   site: SiteDefinition,
   options: {
     readonly path: string;
@@ -306,6 +306,13 @@ export function renderSite(
   site: SiteDefinition,
   receipts: readonly Receipt[],
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+  options: {
+    readonly featuredGuide?: {
+      readonly path: string;
+      readonly title: string;
+      readonly description: string;
+    };
+  } = {},
 ): string {
   const visible = accepted(receipts);
   const assetPolicy = renderSiteAssetPolicy(site);
@@ -357,13 +364,17 @@ export function renderSite(
     <p><strong>What you get:</strong> ${escapeHtml(site.outcome)}</p>
     <p><strong>What it cannot tell you:</strong> ${escapeHtml(site.unknowns)}</p>
     <p><a class="primary-action" href="#${site.primaryAction.targetId}">${escapeHtml(site.primaryAction.label)}</a></p></section>`;
-  return page(
+  const featuredGuide =
+    options.featuredGuide === undefined
+      ? ''
+      : `<section class="information-panel" aria-labelledby="featured-guide-heading"><p class="eyebrow">Source-bound guide</p><h2 id="featured-guide-heading">${escapeHtml(options.featuredGuide.title)}</h2><p>${escapeHtml(options.featuredGuide.description)}</p><p><a class="primary-action" href="${escapeHtml(sitePath(site, options.featuredGuide.path, publicBaseUrl))}">Read the three-step guide</a></p></section>`;
+  return renderStaticPage(
     site,
     {
       path: '/',
       title: site.title,
       description: site.description,
-      body: `${startHere}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
+      body: `${startHere}${featuredGuide}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
     <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>${offer}`,
       scriptPath: assetPolicy.scriptPath,
       stylePath: assetPolicy.stylePath,
@@ -390,7 +401,7 @@ export function renderMethodology(
   site: SiteDefinition,
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
-  return page(
+  return renderStaticPage(
     site,
     {
       path: '/methodology/',
@@ -423,7 +434,7 @@ export function renderSources(
         `<li><strong>${escapeHtml(receipt.payload.sourceId)}</strong> · ${sourceLink(receipt.payload.sourceUrl, receipt.payload.provenance.evidenceClass)} · ${escapeHtml(receipt.payload.provenance.publisherName)} · ${receipt.payload.provenance.evidenceClass === 'controlled-example' ? 'Controlled fixture example; not live/current evidence' : 'Official primary live-source manifest'}</li>`,
     )
     .join('');
-  return page(
+  return renderStaticPage(
     site,
     {
       path: '/sources/',
@@ -435,7 +446,7 @@ export function renderSources(
   );
 }
 
-function jsonForHtml(value: unknown): string {
+export function jsonForHtml(value: unknown): string {
   return JSON.stringify(value)
     .replaceAll('&', '\\u0026')
     .replaceAll('<', '\\u003c')
@@ -450,7 +461,7 @@ export function renderReceiptDetail(
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
   const url = canonicalUrl(site, `/receipts/${receipt.id}/`, publicBaseUrl);
-  return page(
+  return renderStaticPage(
     site,
     {
       path: `/receipts/${receipt.id}/`,
@@ -480,7 +491,7 @@ export function renderTopic(
     .filter((receipt) => receipt.payload.topicSlug === topicSlug)
     .map((receipt) => receiptCard(site, receipt, publicBaseUrl))
     .join('\n');
-  return page(
+  return renderStaticPage(
     site,
     {
       path: `/topics/${topicSlug}/`,
@@ -496,6 +507,7 @@ export function renderSitemap(
   site: SiteDefinition,
   receipts: readonly Receipt[],
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+  additionalPaths: readonly string[] = [],
 ): string {
   const visible = accepted(receipts);
   const paths = [
@@ -506,6 +518,7 @@ export function renderSitemap(
     ...[...new Set(visible.map((receipt) => receipt.payload.topicSlug))].map(
       (topic) => `/topics/${topic}/`,
     ),
+    ...additionalPaths,
   ].sort(compareText);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths.map((path) => `  <url><loc>${escapeXml(canonicalUrl(site, path, publicBaseUrl))}</loc></url>`).join('\n')}\n</urlset>\n`;
 }
