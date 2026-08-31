@@ -7,6 +7,10 @@ type Job = Readonly<{
   permissions: Readonly<Record<string, string>>;
   steps: readonly Step[];
 }>;
+type Workflow = Readonly<{
+  permissions: Readonly<Record<string, string>>;
+  jobs: ReadonlyMap<string, Job>;
+}>;
 
 const genericCollection = 'npm run evidence -- collect-fixtures';
 const focusedSourceRightsTest =
@@ -21,26 +25,41 @@ const publicRoutes = [
   'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/',
 ] as const;
 
-function parseWorkflow(workflow: string): ReadonlyMap<string, Job> {
+function parseWorkflow(workflow: string): Workflow {
   const jobs = new Map<
     string,
     { needs: string[]; permissions: Record<string, string>; steps: Step[] }
   >();
+  const topLevelPermissions: Record<string, string> = {};
   let activeJob:
     | { needs: string[]; permissions: Record<string, string>; steps: Step[] }
     | undefined;
   let activeStep: { name: string; run?: string; uses?: string } | undefined;
   let parsingPermissions = false;
+  let parsingTopLevelPermissions = false;
   let parsingJobs = false;
 
   const lines = workflow.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]!;
-    if (line === 'jobs:') {
-      parsingJobs = true;
+    if (!parsingJobs) {
+      if (line === 'permissions:') {
+        parsingTopLevelPermissions = true;
+        continue;
+      }
+      if (parsingTopLevelPermissions) {
+        const permissionMatch = line.match(/^\s{2}([a-z-]+): (.+)$/);
+        if (permissionMatch) {
+          topLevelPermissions[permissionMatch[1]!] = permissionMatch[2]!;
+          continue;
+        }
+        parsingTopLevelPermissions = false;
+      }
+      if (line === 'jobs:') {
+        parsingJobs = true;
+      }
       continue;
     }
-    if (!parsingJobs) continue;
     const jobMatch = line.match(/^\s{2}([a-z][a-z0-9-]*):$/);
     if (jobMatch) {
       activeJob = { needs: [], permissions: {}, steps: [] };
@@ -104,7 +123,7 @@ function parseWorkflow(workflow: string): ReadonlyMap<string, Job> {
       activeStep.run = run;
     }
   }
-  return jobs;
+  return { permissions: topLevelPermissions, jobs };
 }
 
 function requiredJob(jobs: ReadonlyMap<string, Job>, name: string): Job {
@@ -120,6 +139,14 @@ function requiredStep(job: Job, name: string, run?: string): Step {
   return step!;
 }
 
+function hasExactRunLine(step: Step, line: string): boolean {
+  return (step.run ?? '').split('\n').some((candidate) => candidate === line);
+}
+
+function requiredRunLine(step: Step, line: string): void {
+  expect(hasExactRunLine(step, line), `missing exact ${line}`).toBe(true);
+}
+
 function orderedCommands(job: Job, commands: readonly string[]): void {
   let previous = { step: -1, line: -1 };
   for (const command of commands) {
@@ -127,8 +154,7 @@ function orderedCommands(job: Job, commands: readonly string[]): void {
     for (const [stepIndex, step] of job.steps.entries()) {
       for (const [lineIndex, line] of (step.run ?? '').split('\n').entries()) {
         const candidate = line.trim();
-        const matches =
-          candidate === command || candidate.startsWith(`${command} `);
+        const matches = candidate === command;
         if (
           matches &&
           (stepIndex > previous.step ||
@@ -146,7 +172,9 @@ function orderedCommands(job: Job, commands: readonly string[]): void {
 }
 
 function assertVerifyContract(workflow: string): void {
-  const jobs = parseWorkflow(workflow);
+  const parsedWorkflow = parseWorkflow(workflow);
+  const jobs = parsedWorkflow.jobs;
+  expect(parsedWorkflow.permissions).toEqual({ contents: 'read' });
   expect([...jobs.keys()]).toEqual(['verify']);
   const verify = requiredJob(jobs, 'verify');
   requiredStep(
@@ -175,12 +203,18 @@ function assertVerifyContract(workflow: string): void {
     'npm run evidence -- verify --all',
     'npm run evidence -- test-mutation',
     'npm run build',
-    'npm run build:manifest',
+    'npm run build:manifest > artifacts/build-manifest-first.txt',
   ]);
-  expect(requiredStep(verify, 'Build first clean static tree').run).toContain(
+  requiredRunLine(
+    requiredStep(verify, 'Build first clean static tree'),
+    'rm -rf dist/sites',
+  );
+  requiredRunLine(
+    requiredStep(verify, 'Build first clean static tree'),
     'npm run build:manifest > artifacts/build-manifest-first.txt',
   );
-  expect(requiredStep(verify, 'Build second clean static tree').run).toContain(
+  requiredRunLine(
+    requiredStep(verify, 'Build second clean static tree'),
     'npm run build:manifest > artifacts/build-manifest-second.txt',
   );
   expect(
@@ -191,7 +225,7 @@ function assertVerifyContract(workflow: string): void {
 }
 
 function assertDeployContract(workflow: string): void {
-  const jobs = parseWorkflow(workflow);
+  const jobs = parseWorkflow(workflow).jobs;
   expect([...jobs.keys()]).toEqual(['build', 'deploy', 'public-health']);
   const build = requiredJob(jobs, 'build');
   const deploy = requiredJob(jobs, 'deploy');
@@ -233,13 +267,16 @@ function assertDeployContract(workflow: string): void {
     'npm run evidence -- verify --all',
     'npm run evidence -- test-mutation',
     'npm run build',
-    'npm run build:manifest',
+    'npm run build:manifest | tee artifacts/pages-build-manifest.txt',
   ]);
   expect(
     build.steps.findIndex((step) => step.uses === 'actions/configure-pages@v5'),
   ).toBeGreaterThan(
     build.steps.findIndex((step) =>
-      step.run?.includes('npm run build:manifest'),
+      hasExactRunLine(
+        step,
+        'npm run build:manifest | tee artifacts/pages-build-manifest.txt',
+      ),
     ),
   );
   expect(
@@ -262,13 +299,15 @@ function assertDeployContract(workflow: string): void {
   const health = requiredStep(
     publicHealth,
     'Verify AI Moment Index public routes and timestamp documents',
-  ).run!;
-  for (const route of publicRoutes) expect(health).toContain(route);
-  expect(health).toContain(`source_timestamp='${sourceTimestamp}'`);
-  expect(health).toContain(
+  );
+  for (const route of publicRoutes) requiredRunLine(health, `  '${route}' \\`);
+  requiredRunLine(health, `source_timestamp='${sourceTimestamp}'`);
+  requiredRunLine(
+    health,
     'grep --fixed-strings -- "$source_timestamp" "$video_document"',
   );
-  expect(health).toContain(
+  requiredRunLine(
+    health,
     'grep --fixed-strings -- "$source_timestamp" "$moment_document"',
   );
 }
@@ -327,6 +366,36 @@ describe('AI Moment Index release workflow contract', () => {
         deployWorkflow.replace(
           `      - name: Collect controlled and pinned-source evidence\n        run: ${genericCollection}\n      - name: Validate AI Moment Index controlled fixture and source rights\n        run: ${focusedSourceRightsTest}`,
           `      - name: Validate AI Moment Index controlled fixture and source rights\n        run: ${focusedSourceRightsTest}\n      - name: Collect controlled and pinned-source evidence\n        run: ${genericCollection}`,
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a suffixed evidence verification command', () => {
+    expect(() =>
+      assertDeployContract(
+        deployWorkflow.replace(
+          'run: npm run evidence -- verify --all',
+          'run: npm run evidence -- verify --all --unsafe-suffix',
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a changed top-level verification permission', () => {
+    expect(() =>
+      assertVerifyContract(
+        verifyWorkflow.replace('contents: read', 'contents: write'),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a missing top-level verification permission', () => {
+    expect(() =>
+      assertVerifyContract(
+        verifyWorkflow.replace(
+          'permissions:\n  contents: read\n\njobs:',
+          'jobs:',
         ),
       ),
     ).toThrow();
