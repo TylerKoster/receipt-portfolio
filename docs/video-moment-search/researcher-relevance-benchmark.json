@@ -4,12 +4,16 @@
   "evidenceClassification": "heuristic-regression-only",
   "limitations": {
     "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
+    "caseReview": "independent-code-review-not-user-research",
     "transcriptDerivedCases": "prohibited",
     "evaluatedCorpusSemanticSha256": "d727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557",
     "prohibitedClaims": [
       "user",
       "usability",
       "demand",
+      "general-relevance",
+      "task-completion",
+      "time-to-value",
       "creator",
       "referral",
       "conversion",
@@ -18,6 +22,7 @@
   },
   "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
   "target": {
+    "minimumControlledPositiveCases": 20,
     "minimumTopThreePercent": 80,
     "maximumTimestampLandingErrorSeconds": 0,
     "negativeControlFalsePositiveCount": 0
@@ -59,6 +64,111 @@
       "expectedTimestampSuffix": "#t=132"
     },
     {
+      "query": "how can we keep robots under control",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "robots under control",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "keep robots",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "under control",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "how can we keep robots",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "how robots control",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "can we control robots",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "lecture how can we keep robots",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "timestamped robots",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "review robots control",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "original robots annotation",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "index robots control",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "lecture control",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "review point robots",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
+      "query": "timestamped review robots",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-robots-control",
+      "expectedStartSeconds": 132,
+      "expectedTimestampSuffix": "#t=132"
+    },
+    {
       "query": "neural networks",
       "queryBasis": "synthetic-unrelated-negative-control",
       "expectedMomentId": null,
@@ -89,8 +199,8 @@
   ],
   "expectedEvaluation": {
     "positiveTopThreeHits": {
-      "numerator": 5,
-      "denominator": 5
+      "numerator": 20,
+      "denominator": 20
     },
     "negativeZeroResults": {
       "numerator": 4,
@@ -98,7 +208,7 @@
     },
     "aggregateZeroResultRate": {
       "numerator": 4,
-      "denominator": 9
+      "denominator": 24
     },
     "maximumTimestampLandingErrorSeconds": 0
   }

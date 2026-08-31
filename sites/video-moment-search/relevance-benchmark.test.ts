@@ -30,12 +30,14 @@ type ResearcherRelevanceBenchmark = {
   readonly evidenceClassification: string;
   readonly limitations: {
     readonly benchmarkStrings: string;
+    readonly caseReview: string;
     readonly transcriptDerivedCases: string;
     readonly prohibitedClaims: readonly string[];
     readonly evaluatedCorpusSemanticSha256: string;
   };
   readonly corpusId: string;
   readonly target: {
+    readonly minimumControlledPositiveCases: number;
     readonly minimumTopThreePercent: number;
     readonly maximumTimestampLandingErrorSeconds: number;
     readonly negativeControlFalsePositiveCount: number;
@@ -57,6 +59,83 @@ type ResearcherRelevanceBenchmark = {
     readonly maximumTimestampLandingErrorSeconds: number;
   };
 };
+
+function normalizedTokens(value: string): readonly string[] {
+  return (
+    value
+      .normalize('NFKC')
+      .toLocaleLowerCase('en-US')
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  );
+}
+
+function controlledPositiveContractDiagnostics(
+  benchmark: ResearcherRelevanceBenchmark,
+): readonly string[] {
+  const positiveCases = benchmark.cases.filter(
+    (benchmarkCase) => benchmarkCase.expectedMomentId !== null,
+  );
+  const diagnostics: string[] = [];
+  if (
+    positiveCases.length !== benchmark.target.minimumControlledPositiveCases
+  ) {
+    diagnostics.push(
+      `expected ${benchmark.target.minimumControlledPositiveCases} positive cases, got ${positiveCases.length}`,
+    );
+  }
+
+  const normalizedQueries = positiveCases.map((benchmarkCase) =>
+    normalizedTokens(benchmarkCase.query).join(' '),
+  );
+  if (new Set(normalizedQueries).size !== normalizedQueries.length) {
+    diagnostics.push('positive queries must be normalized-unique');
+  }
+
+  const moment = fixture.moments.find(
+    ({ id }) => id === 'moment-robots-control',
+  )!;
+  const video = fixture.videos.find(({ id }) => id === moment.videoId)!;
+  const annotation = fixture.cues
+    .filter(
+      ({ videoId, evidenceKind }) =>
+        videoId === moment.videoId && evidenceKind === 'editorial-annotation',
+    )
+    .map(({ text }) => text)
+    .join(' ');
+  const supportedTokensByBasis = {
+    title: new Set(normalizedTokens(video.title)),
+    'title-and-topic': new Set(
+      normalizedTokens(`${video.title} ${moment.topicSlugs.join(' ')}`),
+    ),
+    'title-and-original-editorial-annotation': new Set(
+      normalizedTokens(`${video.title} ${annotation}`),
+    ),
+  } as const;
+
+  for (const benchmarkCase of positiveCases) {
+    const queryTokens = normalizedTokens(benchmarkCase.query);
+    if (
+      !queryTokens.some((token) => token === 'robots' || token === 'control')
+    ) {
+      diagnostics.push('positive query must include robots or control');
+    }
+    if (queryTokens.includes('transcript')) {
+      diagnostics.push('positive query must not contain transcript');
+    }
+    const supportedTokens =
+      benchmarkCase.queryBasis === 'synthetic-unrelated-negative-control'
+        ? undefined
+        : supportedTokensByBasis[benchmarkCase.queryBasis];
+    for (const token of queryTokens) {
+      if (!supportedTokens?.has(token)) {
+        diagnostics.push(
+          `query token ${token} is not supported by ${benchmarkCase.queryBasis}`,
+        );
+      }
+    }
+  }
+  return diagnostics;
+}
 
 type Mutable<T> = {
   -readonly [Key in keyof T]: T[Key] extends readonly (infer Item)[]
@@ -126,11 +205,15 @@ describe('controlled researcher-relevance benchmark', () => {
     expect(benchmark.corpusId).toBe('wikimedia-commons-ai-video-reviewed-v1');
     expect(benchmark.limitations).toEqual({
       benchmarkStrings: 'controlled-synthetic-not-raw-user-queries',
+      caseReview: 'independent-code-review-not-user-research',
       transcriptDerivedCases: 'prohibited',
       prohibitedClaims: [
         'user',
         'usability',
         'demand',
+        'general-relevance',
+        'task-completion',
+        'time-to-value',
         'creator',
         'referral',
         'conversion',
@@ -140,6 +223,7 @@ describe('controlled researcher-relevance benchmark', () => {
         'd727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557',
     });
     expect(benchmark.target).toEqual({
+      minimumControlledPositiveCases: 20,
       minimumTopThreePercent: 80,
       maximumTimestampLandingErrorSeconds: 0,
       negativeControlFalsePositiveCount: 0,
@@ -188,7 +272,7 @@ describe('controlled researcher-relevance benchmark', () => {
     );
   });
 
-  it('retrieves the five released positive cases at the stored moment and timestamp', () => {
+  it('retrieves the twenty released controlled positive cases at the stored moment and timestamp', () => {
     const benchmark = loadBenchmark();
     expect(
       validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
@@ -235,7 +319,152 @@ describe('controlled researcher-relevance benchmark', () => {
         expectedStartSeconds: 132,
         expectedTimestampSuffix: '#t=132',
       },
+      {
+        query: 'how can we keep robots under control',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'robots under control',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'keep robots',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'under control',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'how can we keep robots',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'how robots control',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'can we control robots',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'lecture how can we keep robots',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'timestamped robots',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'review robots control',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'original robots annotation',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'index robots control',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'lecture control',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'review point robots',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'timestamped review robots',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-robots-control',
+        expectedStartSeconds: 132,
+        expectedTimestampSuffix: '#t=132',
+      },
     ]);
+    expect(positiveCases).toHaveLength(
+      benchmark.target.minimumControlledPositiveCases,
+    );
+    expect(controlledPositiveContractDiagnostics(benchmark)).toEqual([]);
+
+    const withoutPositive = structuredClone(
+      benchmark,
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    withoutPositive.cases = withoutPositive.cases.filter(
+      (benchmarkCase) =>
+        benchmarkCase.expectedMomentId === null ||
+        benchmarkCase.query !== 'robots control',
+    );
+    expect(controlledPositiveContractDiagnostics(withoutPositive)).toContain(
+      'expected 20 positive cases, got 19',
+    );
+
+    const withDuplicateNormalizedQuery = structuredClone(
+      benchmark,
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    withDuplicateNormalizedQuery.cases[1]!.query = ' ROBOTS   CONTROL ';
+    expect(
+      controlledPositiveContractDiagnostics(withDuplicateNormalizedQuery),
+    ).toContain('positive queries must be normalized-unique');
+
+    const withUnsupportedToken = structuredClone(
+      benchmark,
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    withUnsupportedToken.cases[1]!.query = 'unsupported robots';
+    expect(
+      controlledPositiveContractDiagnostics(withUnsupportedToken),
+    ).toContain('query token unsupported is not supported by title');
+
+    const withTranscript = structuredClone(
+      benchmark,
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    withTranscript.cases[1]!.query = 'transcript robots';
+    expect(controlledPositiveContractDiagnostics(withTranscript)).toContain(
+      'positive query must not contain transcript',
+    );
 
     const evaluation = evaluateBenchmark(
       index,
@@ -329,9 +558,9 @@ describe('controlled researcher-relevance benchmark', () => {
     const benchmark = loadBenchmark();
 
     expect(benchmark.expectedEvaluation).toEqual({
-      positiveTopThreeHits: { numerator: 5, denominator: 5 },
+      positiveTopThreeHits: { numerator: 20, denominator: 20 },
       negativeZeroResults: { numerator: 4, denominator: 4 },
-      aggregateZeroResultRate: { numerator: 4, denominator: 9 },
+      aggregateZeroResultRate: { numerator: 4, denominator: 24 },
       maximumTimestampLandingErrorSeconds: 0,
     });
   });
