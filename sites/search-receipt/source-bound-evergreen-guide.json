@@ -10,9 +10,14 @@
     "canonicalSlugProposal": "/guides/is-google-search-down-or-my-site"
   },
   "publication": {
-    "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+    "status": "ROUTE_RELEASE_VERIFIED",
     "route": "/guides/is-google-search-down-or-my-site/",
-    "adapter": "shared-static-guide-v1"
+    "adapter": "shared-static-guide-v1",
+    "coordinatorReleaseEvidence": {
+      "releaseHead": "dbed8d57d42a4b6b0801d386462699d0335f9e43",
+      "tag": "v0.1.35",
+      "provenance": "Coordinator-provided accepted release evidence."
+    }
   },
   "sourceBindings": [
     {

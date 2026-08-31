@@ -2,9 +2,18 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const ledgerPath = new URL('./product-experiment-ledger.json', import.meta.url);
+const guidePath = new URL(
+  './source-bound-evergreen-guide.json',
+  import.meta.url,
+);
 
 const observationBlocker =
   'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
+const coordinatorReleaseEvidence = {
+  releaseHead: 'dbed8d57d42a4b6b0801d386462699d0335f9e43',
+  tag: 'v0.1.35',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 
 const sessionExperimentHistory = [
   {
@@ -130,6 +139,23 @@ function assertSessionExperimentsRemainObservationBlocked(
       blockedBy: experiment.blockedBy,
     })),
   ).toEqual(sessionExperimentHistory);
+}
+
+function assertEvergreenGuideReleaseEvidenceMatchesLedger(
+  guide: Record<string, unknown>,
+  ledger: Record<string, unknown>,
+) {
+  const publication = guide.publication as Record<string, unknown>;
+  const guideReleaseEvidence = publication.coordinatorReleaseEvidence;
+  const experiments = ledger.experiments as Array<Record<string, unknown>>;
+  const rankTen = experiments.find((experiment) => experiment.rank === 10);
+
+  expect(guideReleaseEvidence).toEqual(coordinatorReleaseEvidence);
+  expect(rankTen).toMatchObject({
+    id: 'source-bound-evergreen-guide-v1',
+    rank: 10,
+  });
+  expect(rankTen?.coordinatorReleaseEvidence).toEqual(guideReleaseEvidence);
 }
 
 describe('Search Receipt product experiment ledger', () => {
@@ -335,7 +361,7 @@ describe('Search Receipt product experiment ledger', () => {
     expect(ledger.experiments[9]).toMatchObject({
       id: 'source-bound-evergreen-guide-v1',
       rank: 10,
-      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      status: 'ROUTE_RELEASE_VERIFIED',
       metric:
         'Deterministic admission of every required guide-contract element and source binding.',
       target: '100% deterministic admission before any public-route proposal.',
@@ -344,7 +370,10 @@ describe('Search Receipt product experiment ledger', () => {
       noDataBoundary:
         'Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'The coordinator-owned shared-static-guide-v1 adapter is integrated; release and public verification remain coordinator-owned.',
+        'The coordinator-owned shared-static-guide-v1 adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.',
+      coordinatorReleaseEvidence,
+      nextSafeAction:
+        'Maintain admitted source bindings and guide boundaries; do not claim traffic, demand, conversion, revenue, or another commercial outcome.',
     });
   });
 
@@ -361,6 +390,28 @@ describe('Search Receipt product experiment ledger', () => {
       assertSessionExperimentsRemainObservationBlocked(
         mutatedLedger.experiments,
       ),
+    ).toThrow();
+  });
+
+  it('keeps the guide and rank-ten ledger release evidence in one accepted contract', () => {
+    const guide = JSON.parse(readFileSync(guidePath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    assertEvergreenGuideReleaseEvidenceMatchesLedger(guide, ledger);
+  });
+
+  it('rejects a rank-ten ledger release-evidence mutation', () => {
+    const guide = JSON.parse(readFileSync(guidePath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankTen = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 10,
+    );
+
+    rankTen.coordinatorReleaseEvidence.releaseHead = 'stale-release-head';
+
+    expect(() =>
+      assertEvergreenGuideReleaseEvidenceMatchesLedger(guide, mutatedLedger),
     ).toThrow();
   });
 });

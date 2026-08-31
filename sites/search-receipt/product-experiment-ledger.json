@@ -168,15 +168,20 @@
     {
       "id": "source-bound-evergreen-guide-v1",
       "rank": 10,
-      "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+      "status": "ROUTE_RELEASE_VERIFIED",
       "hypothesis": "A narrowly scoped source-bound guide may help a visitor choose what to inspect first without claiming current incident state, cause, search traffic, demand, conversion, revenue, or another commercial outcome.",
       "firstUserOutcome": "Use a three-step separation of official current-status checking, historical controlled examples, and own-site evidence while retaining uncertainty about cause.",
       "metric": "Deterministic admission of every required guide-contract element and source binding.",
       "target": "100% deterministic admission before any public-route proposal.",
       "stopRule": "Stop publication preparation if a required boundary or source binding cannot be admitted.",
       "noDataBoundary": "Internal content-quality completion is not SEO traffic, demand, conversion, revenue, or commercial-outcome evidence.",
-      "coordinatorDependency": "The coordinator-owned shared-static-guide-v1 adapter is integrated; release and public verification remain coordinator-owned.",
-      "nextSafeAction": "Run combined release gates and public route verification; do not claim traffic, demand, conversion, revenue, or another commercial outcome."
+      "coordinatorDependency": "The coordinator-owned shared-static-guide-v1 adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.",
+      "coordinatorReleaseEvidence": {
+        "releaseHead": "dbed8d57d42a4b6b0801d386462699d0335f9e43",
+        "tag": "v0.1.35",
+        "provenance": "Coordinator-provided accepted release evidence."
+      },
+      "nextSafeAction": "Maintain admitted source bindings and guide boundaries; do not claim traffic, demand, conversion, revenue, or another commercial outcome."
     }
   ]
 }

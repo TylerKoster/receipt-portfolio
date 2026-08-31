@@ -52,12 +52,22 @@ interface SourceBoundGuideCandidate {
     readonly status?: string;
     readonly route?: string;
     readonly adapter?: string;
+    readonly coordinatorReleaseEvidence?: {
+      readonly releaseHead?: string;
+      readonly tag?: string;
+      readonly provenance?: string;
+    };
   };
 }
 
 const approvedSourceBindings: Readonly<Record<string, string>> = Object.freeze({
   'google-search-status': 'https://status.search.google.com/incidents.json',
   'google-search-central-blog': 'https://feeds.feedburner.com/blogspot/amDG',
+});
+const acceptedCoordinatorReleaseEvidence = Object.freeze({
+  releaseHead: 'dbed8d57d42a4b6b0801d386462699d0335f9e43',
+  tag: 'v0.1.35',
+  provenance: 'Coordinator-provided accepted release evidence.',
 });
 
 function nonEmptyString(value: unknown): value is string {
@@ -232,12 +242,23 @@ export function validateSourceBoundEvergreenGuide(
   }
 
   if (
-    candidate.publication?.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
+    candidate.publication?.status !== 'ROUTE_RELEASE_VERIFIED' ||
     candidate.publication?.route !==
       `${candidate.metadata?.canonicalSlugProposal ?? ''}/` ||
     candidate.publication?.adapter !== 'shared-static-guide-v1'
   ) {
     diagnostics.push('ROUTE_ADAPTER_DEPENDENCY_MISSING');
+  }
+
+  if (
+    candidate.publication?.coordinatorReleaseEvidence?.releaseHead !==
+      acceptedCoordinatorReleaseEvidence.releaseHead ||
+    candidate.publication?.coordinatorReleaseEvidence?.tag !==
+      acceptedCoordinatorReleaseEvidence.tag ||
+    candidate.publication?.coordinatorReleaseEvidence?.provenance !==
+      acceptedCoordinatorReleaseEvidence.provenance
+  ) {
+    diagnostics.push('COORDINATOR_RELEASE_EVIDENCE_INVALID');
   }
 
   return { ok: diagnostics.length === 0, diagnostics };

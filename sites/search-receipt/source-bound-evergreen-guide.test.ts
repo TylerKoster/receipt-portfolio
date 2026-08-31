@@ -14,6 +14,11 @@ const searchCentralManifestPath = new URL(
   '../../manifests/search-receipt/google-search-central-blog.json',
   import.meta.url,
 );
+const coordinatorReleaseEvidence = {
+  releaseHead: 'dbed8d57d42a4b6b0801d386462699d0335f9e43',
+  tag: 'v0.1.35',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 
 function admittedManifests() {
   const status = JSON.parse(readFileSync(statusManifestPath, 'utf8'));
@@ -28,16 +33,17 @@ function admittedManifests() {
 }
 
 describe('Search Receipt source-bound evergreen guide', () => {
-  it('binds the admitted guide contract to the coordinator route adapter', () => {
+  it('records the coordinator-verified public route without treating release verification as an outcome', () => {
     expect(existsSync(guidePath)).toBe(true);
 
     const guide = JSON.parse(readFileSync(guidePath, 'utf8'));
     expect(guide).toMatchObject({
       id: 'source-bound-evergreen-guide-v1',
       publication: {
-        status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+        status: 'ROUTE_RELEASE_VERIFIED',
         route: '/guides/is-google-search-down-or-my-site/',
         adapter: 'shared-static-guide-v1',
+        coordinatorReleaseEvidence,
       },
     });
   });
@@ -154,6 +160,28 @@ describe('Search Receipt source-bound evergreen guide', () => {
     ).toMatchObject({
       ok: false,
       diagnostics: expect.arrayContaining(['SOURCE_BINDINGS_INCOMPLETE']),
+    });
+  });
+
+  it('fails closed when coordinator release evidence does not match the accepted release', () => {
+    const guide = JSON.parse(readFileSync(guidePath, 'utf8'));
+    const staleRelease = structuredClone(guide);
+    staleRelease.publication = {
+      ...staleRelease.publication,
+      status: 'ROUTE_RELEASE_VERIFIED',
+      coordinatorReleaseEvidence: {
+        ...coordinatorReleaseEvidence,
+        releaseHead: '0000000000000000000000000000000000000000',
+      },
+    };
+
+    expect(
+      validateSourceBoundEvergreenGuide(staleRelease, admittedManifests()),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining([
+        'COORDINATOR_RELEASE_EVIDENCE_INVALID',
+      ]),
     });
   });
 });
