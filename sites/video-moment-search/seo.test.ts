@@ -126,6 +126,18 @@ describe('video moment search SEO', () => {
       endOffset: 188,
       url: 'https://video.example/agent-evals?t=132',
     });
+    expect(data).not.toHaveProperty('contentUrl');
+  });
+
+  it('never emits the production bare media URL as structured content', () => {
+    const productionVideo = corpus.videos[0]!;
+    const data = videoStructuredData(productionVideo, corpus.moments, baseUrl);
+    const serialized = JSON.stringify(data);
+    expect(serialized).not.toContain(
+      `"contentUrl":"${productionVideo.sourceUrl}"`,
+    );
+    expect(serialized).not.toContain(`"${productionVideo.sourceUrl}"`);
+    expect(data.hasPart[0]!.url).toBe(`${productionVideo.sourceUrl}#t=132`);
   });
 
   it('omits structured fields that have no source evidence', () => {
@@ -219,6 +231,10 @@ describe('video moment search SEO', () => {
       text: 'This project-original comparison distinguishes the two independent source annotations and their evidence limits.',
       isProjectOriginal: true,
     } as const;
+    const guideSynthesis = {
+      text: 'This separate project-original guide explains a verification workflow for the independently sourced annotations and their boundaries.',
+      isProjectOriginal: true,
+    } as const;
     const xml = renderSitemap(syntheticCorpus, baseUrl, {
       topics: [{ slug: 'robots-control', synthesis }],
       guides: [
@@ -229,7 +245,7 @@ describe('video moment search SEO', () => {
           summary: 'A synthetic local-only guide entry.',
           updatedAt: '2026-08-30T12:00:00.000Z',
           sourceMomentIds: syntheticCorpus.moments.map((moment) => moment.id),
-          synthesis,
+          synthesis: guideSynthesis,
         },
       ],
     });
@@ -281,6 +297,19 @@ describe('video moment search SEO', () => {
     ).toBe(false);
   });
 
+  it('rejects punctuation-only and trivial synthesis before publication', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const momentIds = syntheticCorpus.moments.map((moment) => moment.id);
+    for (const text of ['!!! ... ---', 'Original thoughts.']) {
+      expect(
+        isDiscoveryPageEligible(syntheticCorpus, momentIds, {
+          text,
+          isProjectOriginal: true,
+        }),
+      ).toBe(false);
+    }
+  });
+
   it('rejects two video records that resolve to the same source URL', () => {
     const syntheticCorpus = twoSourceCorpus();
     const sharedSource = syntheticCorpus.videos[0]!.sourceUrl;
@@ -322,5 +351,51 @@ describe('video moment search SEO', () => {
     ]);
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContain('SEO_BODY_SUBSTANTIALLY_DUPLICATE:1');
+  });
+
+  it('rejects duplicate discovery sets from sitemap and feed publication', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const momentIds = syntheticCorpus.moments.map((moment) => moment.id);
+    const baseGuide = {
+      id: 'guide-base',
+      slug: 'guide-base',
+      title: 'Compare independent source annotations',
+      summary: 'A distinct summary about evidence boundaries and verification.',
+      updatedAt: '2026-08-30T12:00:00.000Z',
+      sourceMomentIds: momentIds,
+      synthesis: {
+        text: 'This project-original guide compares two independent source annotations and explains their separate evidence boundaries clearly.',
+        isProjectOriginal: true,
+      },
+    } as const;
+    const distinct = {
+      id: 'guide-distinct',
+      slug: 'guide-distinct',
+      title: 'Trace provenance across reviewed moments',
+      summary: 'A separate summary about context, provenance, and limitations.',
+      updatedAt: '2026-08-30T13:00:00.000Z',
+      sourceMomentIds: momentIds,
+      synthesis: {
+        text: 'Independent analysis connects the reviewed moments while separating provenance context limitations and verification steps.',
+        isProjectOriginal: true,
+      },
+    } as const;
+    const duplicateCases = [
+      { ...distinct, title: baseGuide.title },
+      { ...distinct, summary: baseGuide.summary },
+      { ...distinct, slug: baseGuide.slug },
+      { ...distinct, synthesis: baseGuide.synthesis },
+      { ...distinct, id: baseGuide.id },
+    ];
+
+    for (const duplicate of duplicateCases) {
+      const guides = [baseGuide, duplicate];
+      expect(renderSitemap(syntheticCorpus, baseUrl, { guides })).not.toContain(
+        '/guides/',
+      );
+      expect(renderAtomFeed(syntheticCorpus, baseUrl, guides)).not.toContain(
+        '/guides/',
+      );
+    }
   });
 });

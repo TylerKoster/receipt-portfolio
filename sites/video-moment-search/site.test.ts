@@ -929,6 +929,10 @@ describe('AI Moment Index public search surface', () => {
       text: 'Project-original comparison of two sources <script>alert(1)</script> with explicit evidence limits.',
       isProjectOriginal: true,
     } as const;
+    const guideSynthesis = {
+      text: 'A separate project-original guide explains how to verify two sources without extending their evidence claims.',
+      isProjectOriginal: true,
+    } as const;
     const guideRecord = {
       id: 'guide-accepted',
       slug: 'compare-annotations',
@@ -936,7 +940,7 @@ describe('AI Moment Index public search surface', () => {
       summary: 'A synthetic local-only guide entry.',
       updatedAt: '2026-08-30T12:00:00.000Z',
       sourceMomentIds: syntheticCorpus.moments.map((moment) => moment.id),
-      synthesis,
+      synthesis: guideSynthesis,
     } as const;
     const discovery = {
       topics: [{ slug: 'robots-control', synthesis }],
@@ -989,6 +993,7 @@ describe('AI Moment Index public search surface', () => {
     expect(guide).toContain(
       '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/guides/compare-annotations/">',
     );
+    expect(guide).toContain('"name":"Compare source-bound annotations"');
     expect(guide).toContain('/videos/independent-source/');
     expect(guide).toContain('/topics/robots-control/');
     for (const canonicalPage of canonicalPages) {
@@ -1013,6 +1018,51 @@ describe('AI Moment Index public search surface', () => {
     );
     expect(topic).toContain(synthesis.text);
     expect(topic).toContain('<meta name="robots" content="index,follow">');
+  });
+
+  it('fails guide page publication closed when the shared set has duplicate metadata', () => {
+    const syntheticCorpus = twoSourceFixture();
+    const momentIds = syntheticCorpus.moments.map((moment) => moment.id);
+    const synthesis = {
+      text: 'This project-original guide compares two independent source annotations and explains their separate evidence boundaries clearly.',
+      isProjectOriginal: true,
+    } as const;
+    const guide = {
+      id: 'guide-base',
+      slug: 'guide-base',
+      title: 'Duplicate guide title',
+      summary: 'A distinct source-bound guide summary.',
+      updatedAt: '2026-08-30T12:00:00.000Z',
+      sourceMomentIds: momentIds,
+      synthesis,
+    } as const;
+    const duplicate = {
+      ...guide,
+      id: 'guide-duplicate',
+      slug: 'guide-duplicate',
+      summary: 'Another distinct source-bound guide summary.',
+      synthesis: {
+        text: 'Independent analysis connects reviewed moments while separating provenance context limitations and verification steps carefully.',
+        isProjectOriginal: true,
+      },
+    } as const;
+    const duplicateCanonical = {
+      ...duplicate,
+      id: 'guide-duplicate-canonical',
+      slug: guide.slug,
+      title: 'A unique title with a duplicate canonical',
+    } as const;
+    for (const conflictingGuide of [duplicate, duplicateCanonical]) {
+      expect(
+        renderGuidePage(
+          syntheticCorpus,
+          buildSearchIndex(syntheticCorpus),
+          baseUrl,
+          guide,
+          { guides: [guide, conflictingGuide] },
+        ),
+      ).toBeNull();
+    }
   });
 
   it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {

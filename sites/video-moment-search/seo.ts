@@ -17,6 +17,7 @@ export interface SeoDocument {
   readonly description: string;
   readonly canonical: string;
   readonly body: string;
+  readonly feedId?: string;
 }
 
 export interface SeoValidation {
@@ -37,7 +38,6 @@ export interface VideoObjectStructuredData {
   readonly '@type': 'VideoObject';
   readonly name: string;
   readonly description?: string;
-  readonly contentUrl: string;
   readonly duration: string;
   readonly url: string;
   readonly hasPart: readonly ClipStructuredData[];
@@ -144,7 +144,6 @@ export function videoStructuredData(
     '@type': 'VideoObject',
     name: video.title,
     ...(description === undefined ? {} : { description }),
-    contentUrl: video.sourceUrl,
     duration: isoDuration(video.durationSeconds),
     url: canonicalUrl(origin, `videos/${encodeURIComponent(video.slug)}/`),
     hasPart: publicMoments.map((moment) => ({
@@ -157,16 +156,30 @@ export function videoStructuredData(
   };
 }
 
+function normalizedWords(value: string): readonly string[] {
+  return value
+    .replace(/<[^>]*>/gu, ' ')
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^a-z0-9]+/gu, ' ')
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean);
+}
+
 function bodyWords(body: string): Set<string> {
-  return new Set(
-    body
-      .replace(/<[^>]*>/gu, ' ')
-      .normalize('NFKC')
-      .toLocaleLowerCase('en-US')
-      .replace(/[^a-z0-9]+/gu, ' ')
-      .trim()
-      .split(/\s+/u)
-      .filter(Boolean),
+  return new Set(normalizedWords(body));
+}
+
+function hasSubstantiveOriginalSynthesis(
+  synthesis: OriginalSynthesis | undefined,
+): synthesis is OriginalSynthesis {
+  if (synthesis?.isProjectOriginal !== true) return false;
+  const words = normalizedWords(synthesis.text);
+  return (
+    words.length >= 8 &&
+    new Set(words).size >= 6 &&
+    words.join(' ').length >= 50
   );
 }
 
@@ -187,11 +200,14 @@ export function validateUniqueSeoDocuments(
     ['TITLE', (document: SeoDocument) => document.title],
     ['DESCRIPTION', (document: SeoDocument) => document.description],
     ['CANONICAL', (document: SeoDocument) => document.canonical],
+    ['FEED_ID', (document: SeoDocument) => document.feedId],
   ] as const;
   for (const [label, select] of fields) {
     const seen = new Set<string>();
     documents.forEach((document, index) => {
-      const value = select(document).normalize('NFKC').trim().toLowerCase();
+      const selected = select(document);
+      if (selected === undefined) return;
+      const value = selected.normalize('NFKC').trim().toLowerCase();
       if (seen.has(value)) diagnostics.push(`SEO_${label}_DUPLICATE:${index}`);
       seen.add(value);
     });
@@ -216,10 +232,7 @@ export function isDiscoveryPageEligible(
 ): boolean {
   const validation = validateVideoCorpus(corpus);
   if (!validation.ok) return false;
-  if (
-    synthesis?.isProjectOriginal !== true ||
-    synthesis.text.trim().length === 0
-  ) {
+  if (!hasSubstantiveOriginalSynthesis(synthesis)) {
     return false;
   }
   const requestedIds = new Set(sourceMomentIds);
@@ -239,15 +252,16 @@ export function isDiscoveryPageEligible(
   ) {
     return false;
   }
-  const normalizedSynthesis = [...bodyWords(synthesis.text)].join(' ');
+  const normalizedSynthesis = normalizedWords(synthesis.text).join(' ');
   return !moments.some(
     (moment) =>
-      [...bodyWords(moment.excerpt)].join(' ') === normalizedSynthesis,
+      normalizedWords(moment.excerpt).join(' ') === normalizedSynthesis,
   );
 }
 
 export function eligibleDiscoveryRoutes(
   corpus: VideoCorpus,
+  origin: string,
   routes: DiscoveryRoutes = {},
 ): EligibleDiscoveryRoutes {
   const topics = (routes.topics ?? [])
@@ -262,11 +276,6 @@ export function eligibleDiscoveryRoutes(
           topic.synthesis,
         ),
     )
-    .filter(
-      (topic, index, candidates) =>
-        candidates.findIndex((candidate) => candidate.slug === topic.slug) ===
-        index,
-    )
     .toSorted((left, right) => left.slug.localeCompare(right.slug));
   const guides = (routes.guides ?? [])
     .filter(
@@ -274,12 +283,28 @@ export function eligibleDiscoveryRoutes(
         hasCompleteFeedMetadata(guide) &&
         isDiscoveryPageEligible(corpus, guide.sourceMomentIds, guide.synthesis),
     )
-    .filter(
-      (guide, index, candidates) =>
-        candidates.findIndex((candidate) => candidate.slug === guide.slug) ===
-        index,
-    )
     .toSorted((left, right) => left.slug.localeCompare(right.slug));
+  const documents: SeoDocument[] = [
+    ...topics.map((topic) => {
+      const topicName = topic.slug.replaceAll('-', ' ');
+      return {
+        title: `${topicName} video moments | AI Moment Index`,
+        description: `A project-original comparison of independently sourced, reviewed ${topicName} moments.`,
+        canonical: canonicalUrl(origin, `topics/${topic.slug}/`),
+        body: topic.synthesis.text,
+      };
+    }),
+    ...guides.map((guide) => ({
+      title: `${guide.title} | AI Moment Index`,
+      description: guide.summary,
+      canonical: canonicalUrl(origin, `guides/${guide.slug}/`),
+      body: guide.synthesis.text,
+      feedId: canonicalUrl(origin, `feed-guide-${guide.id}`),
+    })),
+  ];
+  if (!validateUniqueSeoDocuments(documents).ok) {
+    return { topics: [], guides: [] };
+  }
   return { topics, guides };
 }
 
@@ -296,7 +321,7 @@ export function renderSitemap(
       .filter((video) => videoIds.has(video.id))
       .map((video) => video.creatorId),
   );
-  const discovery = eligibleDiscoveryRoutes(corpus, discoveryRoutes);
+  const discovery = eligibleDiscoveryRoutes(corpus, origin, discoveryRoutes);
   const locations = [
     ...corpus.videos
       .filter((video) => videoIds.has(video.id))
@@ -355,7 +380,9 @@ export function renderAtomFeed(
   const videos = new Map(corpus.videos.map((video) => [video.id, video]));
   const grants = new Map(corpus.rights.map((grant) => [grant.id, grant]));
   const moments = corpus.moments.filter(isPublicMoment);
-  const eligibleGuides = eligibleDiscoveryRoutes(corpus, { guides }).guides;
+  const eligibleGuides = eligibleDiscoveryRoutes(corpus, origin, {
+    guides,
+  }).guides;
   const updates = [
     ...moments.map(
       (moment) => grants.get(moment.rightsGrantId)!.permissionVerifiedAt,

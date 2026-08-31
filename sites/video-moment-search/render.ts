@@ -204,6 +204,40 @@ function detailRows(entry: PublicSearchEntry): string {
 
 const noDiscoveryRoutes: EligibleDiscoveryRoutes = { topics: [], guides: [] };
 
+function sameStringValues(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function sameTopicRecord(
+  left: { readonly slug: string; readonly synthesis: OriginalSynthesis },
+  right: { readonly slug: string; readonly synthesis: OriginalSynthesis },
+): boolean {
+  return (
+    left.slug === right.slug &&
+    left.synthesis.text === right.synthesis.text &&
+    left.synthesis.isProjectOriginal === right.synthesis.isProjectOriginal
+  );
+}
+
+function sameGuideRecord(left: FeedGuide, right: FeedGuide): boolean {
+  return (
+    left.id === right.id &&
+    left.slug === right.slug &&
+    left.title === right.title &&
+    left.summary === right.summary &&
+    left.updatedAt === right.updatedAt &&
+    sameStringValues(left.sourceMomentIds, right.sourceMomentIds) &&
+    left.synthesis.text === right.synthesis.text &&
+    left.synthesis.isProjectOriginal === right.synthesis.isProjectOriginal
+  );
+}
+
 function contextualLinks(
   entry: PublicSearchEntry,
   baseUrl: string,
@@ -524,7 +558,7 @@ export function renderVideoPage(
   }
   const title = `${video.title} moments | AI Moment Index`;
   const suffix = `videos/${encodeURIComponent(video.slug)}/`;
-  const discovery = eligibleDiscoveryRoutes(corpus, discoveryRoutes);
+  const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, discoveryRoutes);
   return filteredPage(
     title,
     `Reviewed moments from ${video.title} by ${video.creatorName}, with exact source timestamps and evidence boundaries.`,
@@ -560,7 +594,7 @@ export function renderMomentPage(
       ? 'Moment unavailable | AI Moment Index'
       : `${entry.videoTitle} at ${formatSeconds(entry.startSeconds)} | AI Moment Index`;
   const suffix = `moments/${encodeURIComponent(momentId)}/`;
-  const discovery = eligibleDiscoveryRoutes(corpus, discoveryRoutes);
+  const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, discoveryRoutes);
   return filteredPage(
     title,
     entry === undefined
@@ -587,14 +621,15 @@ export function renderTopicPage(
   const entries = initialResults(corpus, searchIndex).filter((entry) =>
     entry.topicSlugs.includes(topicSlug),
   );
-  const discovery = eligibleDiscoveryRoutes(corpus, {
+  const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, {
     topics:
       synthesis === undefined
         ? discoveryRoutes.topics
         : [
             { slug: topicSlug, synthesis },
             ...(discoveryRoutes.topics ?? []).filter(
-              (topic) => topic.slug !== topicSlug,
+              (topic) =>
+                !sameTopicRecord(topic, { slug: topicSlug, synthesis }),
             ),
           ],
     guides: discoveryRoutes.guides,
@@ -634,7 +669,7 @@ export function renderCreatorPage(
   );
   const creatorName = entries[0]?.creatorName ?? creatorId;
   const title = `${creatorName} video moments | AI Moment Index`;
-  const discovery = eligibleDiscoveryRoutes(corpus, discoveryRoutes);
+  const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, discoveryRoutes);
   return filteredPage(
     title,
     `Reviewed source moments attributed to ${creatorName}, with exact timestamps and rights provenance.`,
@@ -656,12 +691,12 @@ export function renderGuidePage(
   discoveryRoutes: DiscoveryRoutes = {},
 ): string | null {
   if (guide === undefined) return null;
-  const discovery = eligibleDiscoveryRoutes(corpus, {
+  const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, {
     topics: discoveryRoutes.topics,
     guides: [
       guide,
       ...(discoveryRoutes.guides ?? []).filter(
-        (candidate) => candidate.slug !== guide.slug,
+        (candidate) => !sameGuideRecord(candidate, guide),
       ),
     ],
   });
@@ -681,6 +716,6 @@ export function renderGuidePage(
   return page(title, body, baseUrl, suffix, false, {
     indexable: true,
     description,
-    structuredData: [breadcrumbs(baseUrl, 'Guide', suffix)],
+    structuredData: [breadcrumbs(baseUrl, admittedGuide.title, suffix)],
   });
 }
