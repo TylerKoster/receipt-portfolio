@@ -59,4 +59,18 @@ describe('Search Receipt decision-aid discovery route', () => {
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   });
+
+  it('refuses to render the superseded adapter-pending publication state', () => {
+    const pendingAdapter = structuredClone(discovery);
+    pendingAdapter.publication.status =
+      'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER';
+    delete pendingAdapter.publication.route;
+
+    expect(() =>
+      renderSearchReceiptDecisionAidDiscovery(
+        searchReceiptSite,
+        pendingAdapter,
+      ),
+    ).toThrow(/integrated route/i);
+  });
 });

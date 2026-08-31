@@ -48,6 +48,12 @@ export interface SourceBoundDecisionAidDiscovery {
     readonly routeBindingIds: readonly string[];
   }[];
   readonly correctionAndCurrentnessPolicy: string;
+  readonly publication: {
+    readonly status: string;
+    readonly adapter: string;
+    readonly coordinatorDependency: string;
+    readonly route?: string;
+  };
 }
 
 function canonicalDiscoveryUrl(
@@ -82,6 +88,15 @@ export function renderSearchReceiptDecisionAidDiscovery(
   discovery: SourceBoundDecisionAidDiscovery,
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
 ): string {
+  if (
+    discovery.publication.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
+    discovery.publication.adapter !==
+      'coordinator-owned shared static route adapter' ||
+    discovery.publication.route !==
+      '/discover/choose-google-search-guide-or-worksheet/'
+  ) {
+    throw new Error('Decision aid requires an admitted integrated route');
+  }
   const canonical = canonicalDiscoveryUrl(site, discovery, publicBaseUrl);
   const decisions = discovery.decisionAids
     .map((aid) => {

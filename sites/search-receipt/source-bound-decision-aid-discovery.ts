@@ -258,14 +258,14 @@ export function validateSourceBoundDecisionAidDiscovery(
   }
 
   if (
-    candidate.publication?.status !==
-      'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER' ||
+    candidate.publication?.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
     candidate.publication?.adapter !==
       'coordinator-owned shared static route adapter' ||
     !nonEmptyString(candidate.publication?.coordinatorDependency) ||
-    candidate.publication?.route !== undefined
+    candidate.publication?.route !==
+      '/discover/choose-google-search-guide-or-worksheet/'
   ) {
-    diagnostics.push('PUBLIC_ADAPTER_DEPENDENCY_MISSING');
+    diagnostics.push('PUBLIC_ROUTE_INTEGRATION_INVALID');
   }
 
   return { ok: diagnostics.length === 0, diagnostics };

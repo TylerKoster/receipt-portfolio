@@ -42,7 +42,8 @@ describe('Search Receipt source-bound decision-aid discovery contract', () => {
       }),
     ]);
     expect(discovery.publication).toMatchObject({
-      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      route: '/discover/choose-google-search-guide-or-worksheet/',
     });
   });
 
@@ -93,6 +94,26 @@ describe('Search Receipt source-bound decision-aid discovery contract', () => {
     ).toMatchObject({
       ok: false,
       diagnostics: expect.arrayContaining(['SOURCE_BINDINGS_INVALID']),
+    });
+  });
+
+  it('rejects the superseded adapter-pending state from public admission', async () => {
+    const { validateSourceBoundDecisionAidDiscovery } =
+      await import('./source-bound-decision-aid-discovery.js');
+    const discovery = JSON.parse(readFileSync(discoveryPath, 'utf8'));
+    const pendingAdapter = structuredClone(discovery);
+    pendingAdapter.publication.status =
+      'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER';
+    delete pendingAdapter.publication.route;
+
+    expect(
+      validateSourceBoundDecisionAidDiscovery(
+        pendingAdapter,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining(['PUBLIC_ROUTE_INTEGRATION_INVALID']),
     });
   });
 });

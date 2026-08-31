@@ -187,13 +187,17 @@ function assertWorksheetReleaseEvidenceMatchesLedger(
 }
 
 describe('Search Receipt product experiment ledger', () => {
-  it('records the ranked decision-aid discovery contract as adapter-pending rather than an outcome', () => {
+  it('records the ranked decision-aid route as integrated pending release rather than an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.experiments[11]).toMatchObject({
       id: 'source-bound-decision-aid-discovery-v1',
       rank: 12,
-      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      noDataBoundary:
+        'Internal content/discoverability contract admission is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
+      coordinatorDependency:
+        'The coordinator-owned shared static route adapter is integrated; release and public verification remain pending and cannot be inferred from this contract.',
     });
   });
 
