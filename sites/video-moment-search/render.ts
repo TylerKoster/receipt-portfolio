@@ -8,6 +8,11 @@ import {
 import { escapeHtml, normalizePublicBaseUrl } from '../shared/render.js';
 import { videoMomentSearchSite } from './index.js';
 import type { PublicSearchEntry, PublicSearchIndex } from './search-client.js';
+import {
+  isDiscoveryPageEligible,
+  videoStructuredData,
+  type OriginalSynthesis,
+} from './seo.js';
 import { validateCommonsSourceEvidence } from './source-evidence.js';
 
 function routePath(baseUrl: string, suffix = ''): string {
@@ -194,7 +199,24 @@ function detailRows(entry: PublicSearchEntry): string {
     .join('');
 }
 
-function renderEntry(entry: PublicSearchEntry): string {
+function contextualLinks(entry: PublicSearchEntry, baseUrl: string): string {
+  const root = routeUrl(baseUrl);
+  const links = [
+    ['Portfolio', normalizePublicBaseUrl(baseUrl)],
+    ['Search', root],
+    ['Video', routeUrl(baseUrl, `videos/${entry.videoSlug}/`)],
+    ['Moment', routeUrl(baseUrl, `moments/${entry.momentId}/`)],
+    ['Creator', routeUrl(baseUrl, `creators/${entry.creatorId}/`)],
+  ];
+  return `<nav aria-label="Related pages">${links
+    .map(
+      ([label, href]) =>
+        `<a href="${escapeHtml(href)}">${escapeHtml(label)}</a>`,
+    )
+    .join(' · ')}</nav>`;
+}
+
+function renderEntry(entry: PublicSearchEntry, baseUrl?: string): string {
   const timestampUrl = exactTimestampUrl(
     entry.sourceUrl,
     entry.startSeconds,
@@ -207,12 +229,17 @@ function renderEntry(entry: PublicSearchEntry): string {
   return `<article class="moment-card" data-moment-id="${escapeHtml(entry.momentId)}" aria-labelledby="heading-${escapeHtml(entry.momentId)}">
   <p class="eyebrow">Controlled fixture moment</p>
   <h3 id="heading-${escapeHtml(entry.momentId)}">${link}</h3>
-  <dl class="moment-meta">${detailRows(entry)}</dl>
+  <dl class="moment-meta">${detailRows(entry)}</dl>${baseUrl === undefined ? '' : `\n  ${contextualLinks(entry, baseUrl)}`}
 </article>`;
 }
 
-function renderEntries(entries: readonly PublicSearchEntry[]): string {
-  return `<div class="moment-list">${entries.map(renderEntry).join('\n')}</div>`;
+function renderEntries(
+  entries: readonly PublicSearchEntry[],
+  baseUrl?: string,
+): string {
+  return `<div class="moment-list">${entries
+    .map((entry) => renderEntry(entry, baseUrl))
+    .join('\n')}</div>`;
 }
 
 export function renderSearchResults(
@@ -235,12 +262,32 @@ export function renderSearchResults(
     : renderEntries(found);
 }
 
+interface PageMetadata {
+  readonly indexable: boolean;
+  readonly description: string;
+  readonly openGraphType?: 'article' | 'video.other' | 'website';
+  readonly structuredData?: readonly object[];
+}
+
+function jsonForHtml(value: object): string {
+  return JSON.stringify(value)
+    .replaceAll('&', '\\u0026')
+    .replaceAll('<', '\\u003c')
+    .replaceAll('>', '\\u003e')
+    .replaceAll('\u2028', '\\u2028')
+    .replaceAll('\u2029', '\\u2029');
+}
+
 function page(
   title: string,
   body: string,
   baseUrl: string,
   suffix = '',
   includeClient = false,
+  metadata: PageMetadata = {
+    indexable: false,
+    description: videoMomentSearchSite.description,
+  },
 ): string {
   const canonical = routeUrl(baseUrl, suffix);
   const styles = routePath(baseUrl, 'styles.css');
@@ -248,17 +295,32 @@ function page(
   const script = includeClient
     ? `\n  <script type="module" src="${escapeHtml(client)}"></script>`
     : '';
+  const socialMetadata = metadata.indexable
+    ? `\n  <meta property="og:type" content="${escapeHtml(metadata.openGraphType ?? 'article')}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(metadata.description)}">
+  <meta property="og:url" content="${escapeHtml(canonical)}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(metadata.description)}">`
+    : '';
+  const structuredData = (metadata.structuredData ?? [])
+    .map(
+      (data) =>
+        `\n  <script type="application/ld+json">${jsonForHtml(data)}</script>`,
+    )
+    .join('');
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
+  <meta name="robots" content="${metadata.indexable ? 'index,follow' : 'noindex,nofollow'}">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; style-src 'self'; script-src 'self'; connect-src 'self'">
-  <meta name="description" content="${escapeHtml(videoMomentSearchSite.description)}">
+  <meta name="description" content="${escapeHtml(metadata.description)}">${socialMetadata}
   <link rel="canonical" href="${escapeHtml(canonical)}">
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="${escapeHtml(styles)}">${script}
+  <link rel="stylesheet" href="${escapeHtml(styles)}">${script}${structuredData}
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -351,21 +413,57 @@ export function renderVideoMomentHome(
   return renderSearchShell(corpus, searchIndex, baseUrl, sourceEvidence);
 }
 
+function breadcrumbs(
+  baseUrl: string,
+  currentName: string,
+  suffix: string,
+): object {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'AI Moment Index',
+        item: routeUrl(baseUrl),
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: currentName,
+        item: routeUrl(baseUrl, suffix),
+      },
+    ],
+  };
+}
+
 function filteredPage(
   title: string,
+  description: string,
   entries: readonly PublicSearchEntry[],
   baseUrl: string,
   suffix: string,
+  structuredData: readonly object[] = [breadcrumbs(baseUrl, title, suffix)],
+  customBody?: string,
+  openGraphType?: PageMetadata['openGraphType'],
 ): string {
   const content =
     entries.length === 0
       ? '<p class="guidance">No controlled fixture moments are available for this view.</p>'
-      : renderEntries(entries);
+      : renderEntries(entries, baseUrl);
   return page(
     title,
-    `<section><h2>${escapeHtml(title)}</h2>${content}</section>`,
+    customBody ?? `<section><h2>${escapeHtml(title)}</h2>${content}</section>`,
     baseUrl,
     suffix,
+    false,
+    {
+      indexable: entries.length > 0,
+      description,
+      structuredData,
+      openGraphType,
+    },
   );
 }
 
@@ -375,13 +473,39 @@ export function renderVideoPage(
   videoId: string,
   baseUrl: string,
 ): string {
+  const video = corpus.videos.find(
+    (candidate) => candidate.id === videoId || candidate.slug === videoId,
+  );
+  const entries = initialResults(corpus, searchIndex).filter(
+    (entry) => entry.videoId === video?.id,
+  );
+  if (video === undefined) {
+    return filteredPage(
+      'Video unavailable | AI Moment Index',
+      'No verified video moments are available for this page.',
+      [],
+      baseUrl,
+      `videos/${encodeURIComponent(videoId)}/`,
+    );
+  }
+  const title = `${video.title} moments | AI Moment Index`;
+  const suffix = `videos/${encodeURIComponent(video.slug)}/`;
   return filteredPage(
-    'Video moments',
-    initialResults(corpus, searchIndex).filter(
-      (entry) => entry.videoId === videoId,
-    ),
+    title,
+    `Reviewed moments from ${video.title} by ${video.creatorName}, with exact source timestamps and evidence boundaries.`,
+    entries,
     baseUrl,
-    `videos/${encodeURIComponent(videoId)}/`,
+    suffix,
+    [
+      breadcrumbs(baseUrl, video.title, suffix),
+      videoStructuredData(
+        video,
+        corpus.moments.filter((moment) => moment.videoId === video.id),
+        baseUrl,
+      ),
+    ],
+    undefined,
+    'video.other',
   );
 }
 
@@ -391,13 +515,22 @@ export function renderMomentPage(
   momentId: string,
   baseUrl: string,
 ): string {
+  const entry = initialResults(corpus, searchIndex).find(
+    (candidate) => candidate.momentId === momentId,
+  );
+  const title =
+    entry === undefined
+      ? 'Moment unavailable | AI Moment Index'
+      : `${entry.videoTitle} at ${formatSeconds(entry.startSeconds)} | AI Moment Index`;
+  const suffix = `moments/${encodeURIComponent(momentId)}/`;
   return filteredPage(
-    'Moment detail',
-    initialResults(corpus, searchIndex).filter(
-      (entry) => entry.momentId === momentId,
-    ),
+    title,
+    entry === undefined
+      ? 'No verified moment is available for this page.'
+      : `${entry.excerpt} Open the verified source at the stored exact second.`,
+    entry === undefined ? [] : [entry],
     baseUrl,
-    `moments/${encodeURIComponent(momentId)}/`,
+    suffix,
   );
 }
 
@@ -406,14 +539,32 @@ export function renderTopicPage(
   searchIndex: SearchIndex,
   topicSlug: string,
   baseUrl: string,
-): string {
+  synthesis?: OriginalSynthesis,
+): string | null {
+  const entries = initialResults(corpus, searchIndex).filter((entry) =>
+    entry.topicSlugs.includes(topicSlug),
+  );
+  if (
+    !isDiscoveryPageEligible(
+      corpus,
+      entries.map((entry) => entry.momentId),
+      synthesis,
+    )
+  ) {
+    return null;
+  }
+  const topicName = topicSlug.replaceAll('-', ' ');
+  const title = `${topicName} video moments | AI Moment Index`;
+  const suffix = `topics/${encodeURIComponent(topicSlug)}/`;
+  const body = `<article><h2>${escapeHtml(title)}</h2><p>${escapeHtml(synthesis!.text)}</p>${renderEntries(entries, baseUrl)}</article>`;
   return filteredPage(
-    `Topic: ${topicSlug}`,
-    initialResults(corpus, searchIndex).filter((entry) =>
-      entry.topicSlugs.includes(topicSlug),
-    ),
+    title,
+    `A project-original comparison of independently sourced, reviewed ${topicName} moments.`,
+    entries,
     baseUrl,
-    `topics/${encodeURIComponent(topicSlug)}/`,
+    suffix,
+    [breadcrumbs(baseUrl, topicName, suffix)],
+    body,
   );
 }
 
@@ -423,21 +574,44 @@ export function renderCreatorPage(
   creatorId: string,
   baseUrl: string,
 ): string {
+  const entries = initialResults(corpus, searchIndex).filter(
+    (entry) => entry.creatorId === creatorId,
+  );
+  const creatorName = entries[0]?.creatorName ?? creatorId;
+  const title = `${creatorName} video moments | AI Moment Index`;
   return filteredPage(
-    'Creator moments',
-    initialResults(corpus, searchIndex).filter(
-      (entry) => entry.creatorId === creatorId,
-    ),
+    title,
+    `Reviewed source moments attributed to ${creatorName}, with exact timestamps and rights provenance.`,
+    entries,
     baseUrl,
     `creators/${encodeURIComponent(creatorId)}/`,
   );
 }
 
-export function renderGuidePage(baseUrl: string): string {
-  return page(
-    'How to recover a moment',
-    '<article><h2>How to recover a moment</h2><ol><li>Search the phrase you remember.</li><li>Inspect rights, provenance, and correction state.</li><li>Open the exact second and verify the surrounding source context.</li></ol><p>This guide applies only to the controlled fixture experiment.</p></article>',
-    baseUrl,
-    'guide/',
-  );
+export function renderGuidePage(
+  corpus: VideoCorpus,
+  searchIndex: SearchIndex,
+  baseUrl: string,
+  synthesis?: OriginalSynthesis,
+): string | null {
+  const entries = initialResults(corpus, searchIndex);
+  if (
+    !isDiscoveryPageEligible(
+      corpus,
+      entries.map((entry) => entry.momentId),
+      synthesis,
+    )
+  ) {
+    return null;
+  }
+  const title = 'How to recover a verified video moment | AI Moment Index';
+  const description =
+    'A project-original guide grounded in at least two independently sourced moments, with exact timestamp and rights checks.';
+  const suffix = 'guide/';
+  const body = `<article><h2>${escapeHtml(title)}</h2><p>${escapeHtml(synthesis!.text)}</p><ol><li>Search the phrase you remember.</li><li>Inspect rights, provenance, and correction state.</li><li>Open the exact second and verify the surrounding source context.</li></ol>${renderEntries(entries, baseUrl)}</article>`;
+  return page(title, body, baseUrl, suffix, false, {
+    indexable: true,
+    description,
+    structuredData: [breadcrumbs(baseUrl, 'Guide', suffix)],
+  });
 }

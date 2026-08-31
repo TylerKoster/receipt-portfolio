@@ -1,0 +1,272 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  type VideoCorpus,
+  type VideoMoment,
+  type VideoRecord,
+} from '../../packages/video-moment-core/src/index.js';
+import {
+  isDiscoveryPageEligible,
+  renderAtomFeed,
+  renderSitemap,
+  renderSitemapIndex,
+  renderVideoSitemap,
+  validateUniqueSeoDocuments,
+  videoStructuredData,
+} from './seo.js';
+
+const corpus = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../fixtures/video-moment-search/authorized-ai-video-v1.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+) as VideoCorpus;
+const baseUrl = 'https://receipt-portfolio.example/';
+
+const video: VideoRecord = {
+  id: 'video-agent-evals',
+  slug: 'agent-evals',
+  title: 'Practical agent evaluations',
+  creatorId: 'creator-lab',
+  creatorName: 'Creator Lab',
+  sourceUrl: 'https://video.example/agent-evals',
+  durationSeconds: 600,
+};
+const activeMoments: readonly VideoMoment[] = [
+  {
+    id: 'moment-agent-evals-scorecard',
+    videoId: video.id,
+    startSeconds: 132,
+    endSeconds: 188,
+    excerpt: 'A reviewed explanation of a practical evaluation scorecard.',
+    topicSlugs: ['agent-evals'],
+    state: 'active',
+    rightsGrantId: 'rights-agent-evals',
+  },
+];
+
+function twoSourceCorpus(): VideoCorpus {
+  const firstVideo = corpus.videos[0]!;
+  const firstGrant = corpus.rights[0]!;
+  const firstCue = corpus.cues[0]!;
+  const firstMoment = corpus.moments[0]!;
+  const secondSource = 'https://video.example/independent-source';
+  return {
+    ...corpus,
+    corpusId: 'synthetic-two-source-corpus',
+    videos: [
+      firstVideo,
+      {
+        id: 'video-independent-source',
+        slug: 'independent-source',
+        title: 'Independent controlled source',
+        creatorId: 'synthetic-creator',
+        creatorName: 'Synthetic Creator',
+        sourceUrl: secondSource,
+        durationSeconds: 300,
+      },
+    ],
+    rights: [
+      firstGrant,
+      {
+        id: 'rights-independent-source',
+        creatorId: 'synthetic-creator',
+        basis: 'creator-supplied',
+        coveredVideoIds: ['video-independent-source'],
+        coveredSourceUrls: [secondSource],
+        coveredCaptionHashes: [],
+        coveredAnnotationHashes: [firstCue.contentSha256!],
+        allowedUses: {
+          commercialUse: true,
+          excerpts: true,
+          timestampLinks: true,
+        },
+        maxExcerptCharacters: 280,
+        licenseNote: 'Synthetic local-only creator-supplied fixture.',
+        permissionVerifiedAt: '2026-08-30T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        revocationContact: 'https://video.example/rights',
+      },
+    ],
+    cues: [
+      firstCue,
+      {
+        ...firstCue,
+        id: 'annotation-independent-source-45',
+        videoId: 'video-independent-source',
+        startSeconds: 45,
+        endSeconds: 46,
+      },
+    ],
+    moments: [
+      firstMoment,
+      {
+        ...firstMoment,
+        id: 'moment-independent-source',
+        videoId: 'video-independent-source',
+        startSeconds: 45,
+        endSeconds: 46,
+        topicSlugs: ['robots-control'],
+        rightsGrantId: 'rights-independent-source',
+      },
+    ],
+  };
+}
+
+describe('video moment search SEO', () => {
+  it('emits source-bound VideoObject and Clip data for a watch page', () => {
+    const data = videoStructuredData(video, activeMoments, baseUrl);
+    expect(data['@type']).toBe('VideoObject');
+    expect(data.hasPart[0]).toMatchObject({
+      '@type': 'Clip',
+      startOffset: 132,
+      endOffset: 188,
+      url: 'https://video.example/agent-evals?t=132',
+    });
+  });
+
+  it('omits structured fields that have no source evidence', () => {
+    const data = videoStructuredData(video, activeMoments, baseUrl);
+    expect(data).not.toHaveProperty('thumbnailUrl');
+    expect(data).not.toHaveProperty('uploadDate');
+    expect(data).not.toHaveProperty('embedUrl');
+  });
+
+  it('lists every canonical watch page in both normal and video sitemaps', () => {
+    expect(renderVideoSitemap(corpus, baseUrl)).toContain(
+      '/videos/robots-under-control/',
+    );
+    expect(renderSitemap(corpus, baseUrl)).toContain(
+      '/videos/robots-under-control/',
+    );
+  });
+
+  it('includes a stable thumbnail only when explicit media evidence supplies it', () => {
+    const xml = renderVideoSitemap(corpus, baseUrl, {
+      'video-robots-under-control': {
+        thumbnailUrl: 'https://images.example/synthetic-reviewed-thumbnail.jpg',
+      },
+    });
+    expect(xml).toContain(
+      '<video:thumbnail_loc>https://images.example/synthetic-reviewed-thumbnail.jpg</video:thumbnail_loc>',
+    );
+    expect(xml).toContain('<video:player_loc>');
+  });
+
+  it('preserves the accepted exact integer timestamp in discovery output', () => {
+    expect(renderVideoSitemap(corpus, baseUrl)).toContain('#t=132');
+    expect(renderAtomFeed(corpus, baseUrl)).toContain('#t=132');
+  });
+
+  it('includes only eligible project-original guides in the Atom feed', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const momentIds = syntheticCorpus.moments.map((moment) => moment.id);
+    const feed = renderAtomFeed(syntheticCorpus, baseUrl, [
+      {
+        id: 'guide-accepted',
+        slug: 'compare-annotations',
+        title: 'Compare source-bound annotations',
+        summary: 'A synthetic local-only guide entry.',
+        updatedAt: '2026-08-30T12:00:00.000Z',
+        sourceMomentIds: momentIds,
+        synthesis: {
+          text: 'This project-original comparison distinguishes the two independent source annotations and their evidence limits.',
+          isProjectOriginal: true,
+        },
+      },
+      {
+        id: 'guide-rejected',
+        slug: 'one-source-only',
+        title: 'One source only',
+        summary: 'This must not be published.',
+        updatedAt: '2026-08-30T13:00:00.000Z',
+        sourceMomentIds: [momentIds[0]!],
+        synthesis: {
+          text: 'This has only one source moment.',
+          isProjectOriginal: true,
+        },
+      },
+      {
+        id: 'guide-invalid-date',
+        slug: 'invalid-date',
+        title: 'Invalid update evidence',
+        summary: 'This must not be published.',
+        updatedAt: 'not-a-date',
+        sourceMomentIds: momentIds,
+        synthesis: {
+          text: 'This otherwise eligible synthesis has no valid publication timestamp.',
+          isProjectOriginal: true,
+        },
+      },
+    ]);
+    expect(feed).toContain('/guides/compare-annotations/');
+    expect(feed).not.toContain('one-source-only');
+    expect(feed).not.toContain('invalid-date');
+  });
+
+  it('fails closed instead of fabricating an update date for an empty feed', () => {
+    const emptyCorpus: VideoCorpus = {
+      corpusId: 'synthetic-empty-corpus',
+      label: 'SYNTHETIC LOCAL-ONLY EMPTY CORPUS',
+      videos: [],
+      rights: [],
+      cues: [],
+      moments: [],
+    };
+    expect(() => renderAtomFeed(emptyCorpus, baseUrl)).toThrow(
+      'No verified feed entries',
+    );
+  });
+
+  it('renders a stable sitemap index without inventing query URLs', () => {
+    const xml = renderSitemapIndex(baseUrl);
+    expect(xml).toContain('/sitemap.xml');
+    expect(xml).toContain('/video-sitemap.xml');
+    expect(xml).not.toContain('?q=');
+  });
+
+  it('admits discovery pages only with two distinct source moments and attested original synthesis', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const momentIds = syntheticCorpus.moments.map((moment) => moment.id);
+    expect(
+      isDiscoveryPageEligible(syntheticCorpus, momentIds, {
+        text: 'This project-original comparison explains what the two independently sourced annotations contribute and where their evidence stops.',
+        isProjectOriginal: true,
+      }),
+    ).toBe(true);
+    expect(
+      isDiscoveryPageEligible(corpus, [corpus.moments[0]!.id], {
+        text: 'One source is not enough.',
+        isProjectOriginal: true,
+      }),
+    ).toBe(false);
+    expect(
+      isDiscoveryPageEligible(syntheticCorpus, momentIds, {
+        text: 'Unattested synthesis is rejected.',
+        isProjectOriginal: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects duplicate metadata and substantially identical bodies', () => {
+    const result = validateUniqueSeoDocuments([
+      {
+        title: 'First page',
+        description: 'A unique first description.',
+        canonical: 'https://receipt-portfolio.example/video-moment-search/a/',
+        body: '<p>Compare the two reviewed moments and explain their limits.</p>',
+      },
+      {
+        title: 'Second page',
+        description: 'A unique second description.',
+        canonical: 'https://receipt-portfolio.example/video-moment-search/b/',
+        body: '<article>Compare the two reviewed moments, and explain their limits!</article>',
+      },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toContain('SEO_BODY_SUBSTANTIALLY_DUPLICATE:1');
+  });
+});

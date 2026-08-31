@@ -49,6 +49,74 @@ const sourceRightsEvidence = JSON.parse(
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 
+function twoSourceFixture(): VideoCorpus {
+  const firstVideo = fixture.videos[0]!;
+  const firstGrant = fixture.rights[0]!;
+  const firstCue = fixture.cues[0]!;
+  const firstMoment = fixture.moments[0]!;
+  const secondSource = 'https://video.example/independent-source';
+  return {
+    ...fixture,
+    corpusId: 'synthetic-two-source-site-corpus',
+    videos: [
+      firstVideo,
+      {
+        id: 'video-independent-source',
+        slug: 'independent-source',
+        title: 'Independent controlled source',
+        creatorId: 'synthetic-creator',
+        creatorName: 'Synthetic Creator',
+        sourceUrl: secondSource,
+        durationSeconds: 300,
+      },
+    ],
+    rights: [
+      firstGrant,
+      {
+        id: 'rights-independent-source',
+        creatorId: 'synthetic-creator',
+        basis: 'creator-supplied',
+        coveredVideoIds: ['video-independent-source'],
+        coveredSourceUrls: [secondSource],
+        coveredCaptionHashes: [],
+        coveredAnnotationHashes: [firstCue.contentSha256!],
+        allowedUses: {
+          commercialUse: true,
+          excerpts: true,
+          timestampLinks: true,
+        },
+        maxExcerptCharacters: 280,
+        licenseNote: 'Synthetic local-only creator-supplied fixture.',
+        permissionVerifiedAt: '2026-08-30T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        revocationContact: 'https://video.example/rights',
+      },
+    ],
+    cues: [
+      firstCue,
+      {
+        ...firstCue,
+        id: 'annotation-independent-source-45',
+        videoId: 'video-independent-source',
+        startSeconds: 45,
+        endSeconds: 46,
+      },
+    ],
+    moments: [
+      firstMoment,
+      {
+        ...firstMoment,
+        id: 'moment-independent-source',
+        videoId: 'video-independent-source',
+        startSeconds: 45,
+        endSeconds: 46,
+        topicSlugs: ['robots-control'],
+        rightsGrantId: 'rights-independent-source',
+      },
+    ],
+  };
+}
+
 type Mutable<Value> = {
   -readonly [Key in keyof Value]: Mutable<Value[Key]>;
 };
@@ -805,31 +873,81 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
-  it('exposes bounded video, moment, topic, creator, and guide pages', () => {
-    expect(
-      renderVideoPage(
-        fixture,
-        searchIndex,
-        'video-robots-under-control',
-        baseUrl,
-      ),
-    ).toContain('How can we keep robots under control?');
-    expect(
-      renderMomentPage(fixture, searchIndex, 'moment-robots-control', baseUrl),
-    ).toContain('#t=132');
+  it('keeps search noindex while canonical video, moment, and creator pages are indexable', () => {
+    const search = renderVideoMomentHome(fixture, searchIndex, baseUrl);
+    expect(search).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(search).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/">',
+    );
+
+    const video = renderVideoPage(
+      fixture,
+      searchIndex,
+      'video-robots-under-control',
+      baseUrl,
+    );
+    expect(video).toContain('How can we keep robots under control?');
+    expect(video).toContain('<meta name="robots" content="index,follow">');
+    expect(video).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/videos/robots-under-control/">',
+    );
+    expect(video).toContain('property="og:type" content="video.other"');
+    expect(video).toContain('property="og:title"');
+    expect(video).toContain('name="twitter:card"');
+    expect(video).toContain('"@type":"VideoObject"');
+
+    const moment = renderMomentPage(
+      fixture,
+      searchIndex,
+      'moment-robots-control',
+      baseUrl,
+    );
+    expect(moment).toContain('#t=132');
+    expect(moment).toContain('<meta name="robots" content="index,follow">');
+    expect(moment).toContain('"@type":"BreadcrumbList"');
+
+    const creator = renderCreatorPage(
+      fixture,
+      searchIndex,
+      'university-of-the-netherlands',
+      baseUrl,
+    );
+    expect(creator).toContain('University of the Netherlands');
+    expect(creator).toContain('<meta name="robots" content="index,follow">');
+
     expect(
       renderTopicPage(fixture, searchIndex, 'robots-control', baseUrl),
-    ).toContain('moment-robots-control');
-    expect(
-      renderCreatorPage(
-        fixture,
-        searchIndex,
-        'university-of-the-netherlands',
-        baseUrl,
-      ),
-    ).toContain('University of the Netherlands');
-    expect(renderGuidePage(baseUrl)).toContain('How to recover a moment');
+    ).toBeNull();
+    expect(renderGuidePage(fixture, searchIndex, baseUrl)).toBeNull();
     expect(videoMomentSearchSite.siteId).toBe('video-moment-search');
+  });
+
+  it('renders eligible topic and guide pages with escaped original synthesis and contextual links', () => {
+    const syntheticCorpus = twoSourceFixture();
+    const syntheticIndex = buildSearchIndex(syntheticCorpus);
+    const synthesis = {
+      text: 'Project-original comparison of two sources <script>alert(1)</script> with explicit evidence limits.',
+      isProjectOriginal: true,
+    } as const;
+    const topic = renderTopicPage(
+      syntheticCorpus,
+      syntheticIndex,
+      'robots-control',
+      baseUrl,
+      synthesis,
+    );
+    const guide = renderGuidePage(
+      syntheticCorpus,
+      syntheticIndex,
+      baseUrl,
+      synthesis,
+    );
+    expect(topic).toContain('<meta name="robots" content="index,follow">');
+    expect(topic).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(topic).not.toContain('<script>alert(1)</script>');
+    expect(topic).toContain('/moments/moment-independent-source/');
+    expect(guide).toContain('<meta name="robots" content="index,follow">');
+    expect(guide).toContain('/videos/independent-source/');
   });
 
   it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {
