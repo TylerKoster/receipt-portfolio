@@ -26,6 +26,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const projectRoot = fileURLToPath(new URL('../..', import.meta.url));
+const CLI_SUBPROCESS_TIMEOUT_MS = 15_000;
 const temporaryDirectories: string[] = [];
 let testEvidenceDirectory: string;
 
@@ -342,26 +343,32 @@ describe('fixture-backed evidence pipeline', () => {
     );
   });
 
-  it('fails an unknown CLI command with concise usage', async () => {
-    const command =
-      process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
-    const arguments_ =
-      process.platform === 'win32'
-        ? ['/d', '/s', '/c', 'npm run evidence -- unknown-command']
-        : ['run', 'evidence', '--', 'unknown-command'];
-    let failure: unknown;
+  it(
+    'fails an unknown CLI command with concise usage',
+    async () => {
+      const command =
+        process.platform === 'win32'
+          ? (process.env.ComSpec ?? 'cmd.exe')
+          : 'npm';
+      const arguments_ =
+        process.platform === 'win32'
+          ? ['/d', '/s', '/c', 'npm run evidence -- unknown-command']
+          : ['run', 'evidence', '--', 'unknown-command'];
+      let failure: unknown;
 
-    try {
-      await execFileAsync(command, arguments_, { cwd: projectRoot });
-    } catch (error) {
-      failure = error;
-    }
+      try {
+        await execFileAsync(command, arguments_, { cwd: projectRoot });
+      } catch (error) {
+        failure = error;
+      }
 
-    expect(failure).toMatchObject({ code: 1 });
-    expect(failure).toMatchObject({
-      stderr: expect.stringContaining(
-        'Usage: evidence <collect-fixtures|verify --all>',
-      ),
-    });
-  });
+      expect(failure).toMatchObject({ code: 1 });
+      expect(failure).toMatchObject({
+        stderr: expect.stringContaining(
+          'Usage: evidence <collect-fixtures|verify --all>',
+        ),
+      });
+    },
+    CLI_SUBPROCESS_TIMEOUT_MS,
+  );
 });
