@@ -147,6 +147,23 @@ function requiredRunBlock(step: Step, lines: readonly string[]): void {
   expect(step.run, `unexpected ${step.name} run block`).toBe(lines.join('\n'));
 }
 
+function replaceWorkflowFragment(
+  workflow: string,
+  expected: string,
+  replacement: string,
+): string {
+  const usesCrLf = workflow.includes('\r\n');
+  const normalizedWorkflow = workflow.replaceAll('\r\n', '\n');
+  const normalizedExpected = expected.replaceAll('\r\n', '\n');
+  const normalizedReplacement = replacement.replaceAll('\r\n', '\n');
+  const fragments = normalizedWorkflow.split(normalizedExpected);
+  if (fragments.length !== 2) {
+    throw new Error('Expected exactly one workflow fragment to mutate');
+  }
+  const mutated = fragments.join(normalizedReplacement);
+  return usesCrLf ? mutated.replaceAll('\n', '\r\n') : mutated;
+}
+
 function orderedCommands(job: Job, commands: readonly string[]): void {
   let previous = { step: -1, line: -1 };
   for (const command of commands) {
@@ -369,7 +386,8 @@ describe('AI Moment Index release workflow contract', () => {
   it('rejects a public-health job that does not depend on deployment', () => {
     expect(() =>
       assertDeployContract(
-        deployWorkflow.replace(
+        replaceWorkflowFragment(
+          deployWorkflow,
           '  public-health:\n    needs: deploy',
           '  public-health:\n    needs: build',
         ),
@@ -380,7 +398,8 @@ describe('AI Moment Index release workflow contract', () => {
   it('rejects a focused source-rights gate ordered before collection', () => {
     expect(() =>
       assertDeployContract(
-        deployWorkflow.replace(
+        replaceWorkflowFragment(
+          deployWorkflow,
           `      - name: Collect controlled and pinned-source evidence\n        run: ${genericCollection}\n      - name: Validate AI Moment Index controlled fixture and source rights\n        run: ${focusedSourceRightsTest}`,
           `      - name: Validate AI Moment Index controlled fixture and source rights\n        run: ${focusedSourceRightsTest}\n      - name: Collect controlled and pinned-source evidence\n        run: ${genericCollection}`,
         ),
@@ -410,7 +429,8 @@ describe('AI Moment Index release workflow contract', () => {
   it('rejects a missing top-level verification permission', () => {
     expect(() =>
       assertVerifyContract(
-        verifyWorkflow.replace(
+        replaceWorkflowFragment(
+          verifyWorkflow,
           'permissions:\n  contents: read\n\njobs:',
           'jobs:',
         ),
@@ -421,7 +441,8 @@ describe('AI Moment Index release workflow contract', () => {
   it('rejects a second deterministic build without a clean output reset', () => {
     expect(() =>
       assertVerifyContract(
-        verifyWorkflow.replace(
+        replaceWorkflowFragment(
+          verifyWorkflow,
           '      - name: Build second clean static tree\n        shell: bash\n        run: |\n          rm -rf dist/sites\n',
           '      - name: Build second clean static tree\n        shell: bash\n        run: |\n',
         ),
@@ -470,7 +491,8 @@ describe('AI Moment Index release workflow contract', () => {
   it('rejects a home health fetch that permits HTTP errors', () => {
     expect(() =>
       assertDeployContract(
-        deployWorkflow.replace(
+        replaceWorkflowFragment(
+          deployWorkflow,
           "curl --fail --show-error --silent --location \\\n            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/'",
           "curl --show-error --silent --location \\\n            'https://tylerkoster.github.io/receipt-portfolio/video-moment-search/'",
         ),
