@@ -99,6 +99,19 @@ function isHttpsUrl(value) {
   }
 }
 
+function isExactImmutableRawGithubUrl(url, pathname) {
+  return (
+    url.protocol === 'https:' &&
+    url.hostname === 'raw.githubusercontent.com' &&
+    url.port === '' &&
+    url.username === '' &&
+    url.password === '' &&
+    url.search === '' &&
+    url.hash === '' &&
+    url.pathname === pathname
+  );
+}
+
 function isStrictObservedTimestamp(value) {
   if (
     typeof value !== 'string' ||
@@ -197,15 +210,15 @@ function isSourceBoundPublicSkillRecord(record) {
     record.source.repository === 'https://github.com/microsoft/skills' &&
     /^[a-f0-9]{40}$/u.test(record.source.commit) &&
     record.source.path === '.github/skills/skill-creator/SKILL.md' &&
-    rawUrl.protocol === 'https:' &&
-    rawUrl.hostname === 'raw.githubusercontent.com' &&
-    rawUrl.pathname.includes(`/${record.source.commit}/`) &&
-    rawUrl.pathname.endsWith(`/${record.source.path}`) &&
+    isExactImmutableRawGithubUrl(
+      rawUrl,
+      `/microsoft/skills/${record.source.commit}/${record.source.path}`,
+    ) &&
     repositoryUrl.protocol === 'https:' &&
-    licenseUrl.protocol === 'https:' &&
-    licenseUrl.hostname === 'raw.githubusercontent.com' &&
-    licenseUrl.pathname.includes(`/${record.source.commit}/`) &&
-    licenseUrl.pathname.endsWith('/LICENSE') &&
+    isExactImmutableRawGithubUrl(
+      licenseUrl,
+      `/microsoft/skills/${record.source.commit}/LICENSE`,
+    ) &&
     isStrictObservedTimestamp(record.source.observedAt) &&
     Object.values(record.hashes).every(isSha256) &&
     isNonEmptyString(record.declaredMetadata.packageId) &&
@@ -423,6 +436,28 @@ function appendDetail(documentOwner, list, label, value) {
   list.append(row);
 }
 
+function appendUserInitiatedLinkDetail(
+  documentOwner,
+  list,
+  label,
+  url,
+  dataAttribute,
+) {
+  const row = documentOwner.createElement('div');
+  const term = createTextElement(documentOwner, 'dt', label);
+  const detail = documentOwner.createElement('dd');
+  detail.append(
+    createTextElement(documentOwner, 'a', url, {
+      [dataAttribute]: '',
+      href: url,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    }),
+  );
+  row.append(term, detail);
+  list.append(row);
+}
+
 function dependencyText(record) {
   if (record.evidenceClass === 'source-bound-observation') {
     return 'Not assessed';
@@ -494,7 +529,17 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
       : 'Controlled example',
   );
   appendDetail(documentOwner, details, 'Source ID', record.source.sourceId);
-  appendDetail(documentOwner, details, 'Source URL', record.source.url);
+  if (record.evidenceClass === 'source-bound-observation') {
+    appendUserInitiatedLinkDetail(
+      documentOwner,
+      details,
+      'Immutable raw source URL',
+      record.source.url,
+      'data-skill-ledger-original-source-link',
+    );
+  } else {
+    appendDetail(documentOwner, details, 'Source URL', record.source.url);
+  }
   appendDetail(
     documentOwner,
     details,
@@ -570,11 +615,12 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
     staticSignalText(record),
   );
   if (record.evidenceClass === 'source-bound-observation') {
-    appendDetail(
+    appendUserInitiatedLinkDetail(
       documentOwner,
       details,
       'License evidence URL',
       record.inheritedLicense.url,
+      'data-skill-ledger-license-evidence-link',
     );
     appendDetail(
       documentOwner,

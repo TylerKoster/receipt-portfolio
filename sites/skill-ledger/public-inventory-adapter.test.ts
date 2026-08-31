@@ -530,6 +530,83 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.textContent).toContain('Declared description');
     expect(root.textContent).toContain('Declared dependenciesNot assessed');
     expect(root.textContent).toContain(sourceBound.boundary);
+    const rawSourceLink = root.querySelector(
+      '[data-skill-ledger-original-source-link]',
+    );
+    expect(rawSourceLink?.tagName).toBe('a');
+    expect(rawSourceLink?.textContent).toBe(sourceBound.source.url);
+    expect(rawSourceLink?.attributes.get('href')).toBe(sourceBound.source.url);
+    expect(rawSourceLink?.attributes.get('target')).toBe('_blank');
+    expect(rawSourceLink?.attributes.get('rel')).toBe('noopener noreferrer');
+    const licenseEvidenceLink = root.querySelector(
+      '[data-skill-ledger-license-evidence-link]',
+    );
+    expect(licenseEvidenceLink?.tagName).toBe('a');
+    expect(licenseEvidenceLink?.textContent).toBe(
+      sourceBound.inheritedLicense.url,
+    );
+    expect(licenseEvidenceLink?.attributes.get('href')).toBe(
+      sourceBound.inheritedLicense.url,
+    );
+    expect(licenseEvidenceLink?.attributes.get('target')).toBe('_blank');
+    expect(licenseEvidenceLink?.attributes.get('rel')).toBe(
+      'noopener noreferrer',
+    );
+    expect(
+      root
+        .querySelectorAll(
+          `[data-skill-ledger-record="${sourceBound.receiptId}"]`,
+        )[0]
+        ?.querySelectorAll('a'),
+    ).toHaveLength(2);
+    expect(
+      root
+        .querySelectorAll('[data-skill-ledger-record="receipt-a"]')[0]
+        ?.querySelectorAll('a'),
+    ).toHaveLength(0);
+
+    for (const malformedSourceBound of [
+      {
+        ...sourceBound,
+        source: {
+          ...sourceBound.source,
+          url: sourceBound.source.url.replace(
+            '/microsoft/skills/',
+            '/other-owner/other-repository/',
+          ),
+        },
+      },
+      {
+        ...sourceBound,
+        source: {
+          ...sourceBound.source,
+          url: `${sourceBound.source.url}?unexpected=query`,
+        },
+      },
+      {
+        ...sourceBound,
+        inheritedLicense: {
+          ...sourceBound.inheritedLicense,
+          url: sourceBound.inheritedLicense.url.replace(
+            'https://',
+            'https://user@',
+          ),
+        },
+      },
+    ]) {
+      const malformedRoot = document.createElement('section');
+      initializePublicSkillLedgerInventory(
+        malformedRoot as unknown as PublicSkillLedgerRoot,
+        [malformedSourceBound],
+      );
+      expect(malformedRoot.attributes.get('data-skill-ledger-state')).toBe(
+        'error',
+      );
+      expect(
+        malformedRoot.querySelectorAll('[data-skill-ledger-record]'),
+      ).toHaveLength(0);
+      expect(malformedRoot.querySelectorAll('a')).toHaveLength(0);
+    }
 
     const query = root.querySelector('[data-skill-ledger-query]');
     if (!query) throw new Error('expected query control');

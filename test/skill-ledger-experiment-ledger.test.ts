@@ -65,13 +65,13 @@ describe('SkillLedger synthetic usability ledger', () => {
       {
         area: 'current-original-guides',
         rank: 1,
-        experiment: 'microsoft-skill-creator-source-contract-v1',
+        experiment: 'source-bound-original-link-utility-v1',
         status: 'active',
-        metric: 'designated source contract coverage',
+        metric: 'source-bound original-link rendering coverage',
         target:
-          'A prospective record admits only coordinator-designated Microsoft skill frontmatter and source/hash fields with no instruction body.',
+          'Each strictly admitted source-bound observation renders exact immutable raw source and same-commit license evidence URL anchors that users can choose to follow; controlled examples render neither anchor.',
         stopRule:
-          'Contract validation does not collect, publish, execute, verify currentness or provenance, or establish security, safety, adoption, suitability, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
+          'Anchors use supplied admitted URLs only and do not fetch, collect, publish instruction bodies, execute, verify currentness or provenance, or establish security, safety, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
       },
       {
         area: 'current-original-guides',
@@ -168,6 +168,12 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-public-controlled-adapter',
         boundary:
           'Controlled public adapter completion is not real source evidence and does not establish real users, demand, conversion, revenue, provenance, currentness, safety, adoption, suitability, recommendation, endorsement, or public deployment.',
+      },
+      {
+        experiment: 'microsoft-skill-creator-source-contract-v1',
+        status: 'completed-source-bound-observation',
+        boundary:
+          'The released admitted observation validates designated source and hash fields only; it does not establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
       },
     ]);
     expect(ledger.rejectedCandidates).toEqual([
