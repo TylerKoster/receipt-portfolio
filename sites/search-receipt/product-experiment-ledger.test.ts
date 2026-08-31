@@ -14,6 +14,10 @@ const discoveryPath = new URL(
   './source-bound-decision-aid-discovery.json',
   import.meta.url,
 );
+const handoffPath = new URL(
+  './source-bound-investigation-handoff.json',
+  import.meta.url,
+);
 
 const observationBlocker =
   'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
@@ -215,6 +219,46 @@ function assertDiscoveryReleaseEvidenceMatchesLedger(
 }
 
 describe('Search Receipt product experiment ledger', () => {
+  it('records the adapter-pending source-bound investigation handoff without implying any outcome', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[12]).toMatchObject({
+      id: 'source-bound-investigation-handoff-v1',
+      rank: 13,
+      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      metric:
+        'Deterministic admission of every required handoff-contract element and admitted source binding.',
+      target:
+        '100% deterministic admission before any public-route adapter proposal.',
+      stopRule:
+        'Stop publication preparation if a required boundary, source binding, or adapter dependency cannot be admitted.',
+      noDataBoundary:
+        'Internal content-quality completion is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
+      coordinatorDependency:
+        'A coordinator-owned shared static route adapter is required before any public route can render this handoff contract.',
+      nextSafeAction:
+        'Maintain admitted source bindings and handoff boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.',
+    });
+  });
+
+  it('keeps the rank-thirteen ledger contract aligned with the admitted handoff contract', () => {
+    const handoff = JSON.parse(readFileSync(handoffPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const rankThirteen = ledger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 13,
+    );
+
+    expect(rankThirteen).toMatchObject({
+      id: handoff.id,
+      status: handoff.publication.status,
+      hypothesis: expect.stringContaining('manual handoff checklist'),
+    });
+    expect(handoff.publication).toMatchObject({
+      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER',
+      adapter: 'coordinator-owned shared static route adapter',
+    });
+  });
+
   it('records the verified decision-aid route without claiming an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
@@ -380,7 +424,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -404,7 +448,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
@@ -428,7 +472,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     expect(ledger.experiments[8]).toMatchObject({
       id: 'shareable-filter-view-v1',
       rank: 9,

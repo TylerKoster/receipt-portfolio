@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "id": "source-bound-investigation-handoff-v1",
+  "queryIntent": "What should I record before escalating a Google Search change?",
+  "intendedAudience": "Site owners and team members preparing a manual, evidence-bounded handoff before escalating an unexplained Google Search change.",
+  "decision": "Decide what to record before escalating a Google Search change, while keeping a decision-time official observation, controlled historical context, dated own-site evidence, and unknowns separate rather than presenting a diagnosis or causal explanation.",
+  "metadata": {
+    "title": "What should I record before escalating a Google Search change?",
+    "description": "A source-bound four-part manual handoff checklist for recording official status, controlled historical context, dated own-site evidence, and unknowns before escalation without stating current status or cause.",
+    "canonicalSlugProposal": "/checklists/record-before-escalating-google-search-change"
+  },
+  "sourceBindings": [
+    {
+      "sourceId": "google-search-status",
+      "endpoint": "https://status.search.google.com/incidents.json",
+      "purpose": "Official Google Search Status source to inspect directly at the decision time recorded in a handoff.",
+      "citation": "Google Search Status"
+    },
+    {
+      "sourceId": "google-search-central-blog",
+      "endpoint": "https://feeds.feedburner.com/blogspot/amDG",
+      "purpose": "Official Google Search Central source material for bounded historical and operational context.",
+      "citation": "Google Search Central"
+    }
+  ],
+  "factualStatements": [
+    {
+      "text": "The official-status entry is bound to the admitted Google Search Status endpoint for a decision-time observation.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "text": "Controlled historical context is kept distinct from a decision-time official-status observation.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    },
+    {
+      "text": "The checklist records dated own-site evidence separately from the admitted official sources.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    }
+  ],
+  "checklist": [
+    {
+      "step": 1,
+      "kind": "official-status-at-decision-time",
+      "instruction": "Record the date and time, then record exactly what the admitted official Google Search Status source shows directly at decision time.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "step": 2,
+      "kind": "controlled-historical-context",
+      "instruction": "Record any relevant controlled historical context separately; it is not current incident evidence.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    },
+    {
+      "step": 3,
+      "kind": "own-site-dated-evidence",
+      "instruction": "Record dated own-site evidence separately, including what changed and when it was observed."
+    },
+    {
+      "step": 4,
+      "kind": "unknowns-no-causation",
+      "instruction": "State what remains unknown and that the recorded observations do not establish cause before escalating."
+    }
+  ],
+  "boundaries": {
+    "currentOfficialStatus": "Check the admitted official Google Search Status source directly at decision time; this handoff contract does not report a current status or incident.",
+    "historicalControlledExamples": "controlled historical context is not current incident evidence and must remain separate from the decision-time official observation.",
+    "ownSiteEvidence": "dated own-site evidence is separate from official-status and controlled historical context, and it remains evidence to review rather than a diagnosis.",
+    "noCausation": "This handoff contract does not diagnose a Google Search change and does not establish cause from a status observation, controlled context, or own-site evidence.",
+    "unknowns": [
+      "The checklist cannot determine whether Google Search is currently down.",
+      "The checklist cannot establish the cause of a change on an own site.",
+      "A relationship between an official-status observation and own-site evidence remains unknown without independently reviewed evidence."
+    ],
+    "privacyAndMeasurement": "This content contract does not collect, transmit, or retain handoff information, does not use telemetry or accounts, and does not measure users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+  },
+  "faqs": [
+    {
+      "question": "What official information should be recorded first?",
+      "answer": "Record what the admitted Google Search Status source shows directly at decision time, including the time of observation rather than a claim about its present result.",
+      "sourceBindingIds": ["google-search-status"]
+    },
+    {
+      "question": "Should historical examples be included in an escalation handoff?",
+      "answer": "They may be recorded only as controlled historical context and not as current incident evidence or an explanation for an own-site change.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    },
+    {
+      "question": "Does this checklist diagnose the change before escalation?",
+      "answer": "No. Keep dated own-site evidence and unknowns separate because the checklist does not establish cause from the recorded observations.",
+      "sourceBindingIds": ["google-search-status", "google-search-central-blog"]
+    }
+  ],
+  "correctionAndCurrentnessPolicy": "Inspect the admitted official source directly at decision time and make a correction to this contract before any route proposal if a source binding, citation, checklist instruction, or boundary is inaccurate; do not convert controlled historical context into current incident evidence.",
+  "publication": {
+    "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+    "adapter": "coordinator-owned shared static route adapter",
+    "coordinatorDependency": "A coordinator-owned shared static route adapter is required before any public route can render this handoff contract."
+  }
+}

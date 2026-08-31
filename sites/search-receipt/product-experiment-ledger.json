@@ -218,6 +218,19 @@
         "provenance": "Coordinator-provided accepted release evidence."
       },
       "nextSafeAction": "Maintain admitted route bindings and decision boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+    },
+    {
+      "id": "source-bound-investigation-handoff-v1",
+      "rank": 13,
+      "status": "CONTENT_CONTRACT_ADMITTED_PENDING_ADAPTER",
+      "hypothesis": "A narrowly scoped source-bound manual handoff checklist may help site owners and team members record evidence before escalation without stating a current incident, diagnosis, causal explanation, traffic outcome, demand, conversion, willingness to pay, revenue, or another commercial outcome.",
+      "firstUserOutcome": "Prepare a four-part handoff that separates decision-time official status, controlled historical context, dated own-site evidence, and explicit unknowns before escalation.",
+      "metric": "Deterministic admission of every required handoff-contract element and admitted source binding.",
+      "target": "100% deterministic admission before any public-route adapter proposal.",
+      "stopRule": "Stop publication preparation if a required boundary, source binding, or adapter dependency cannot be admitted.",
+      "noDataBoundary": "Internal content-quality completion is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
+      "coordinatorDependency": "A coordinator-owned shared static route adapter is required before any public route can render this handoff contract.",
+      "nextSafeAction": "Maintain admitted source bindings and handoff boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
     }
   ]
 }
