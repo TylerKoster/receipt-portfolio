@@ -6,6 +6,7 @@ import { canonicalJson, sha256 } from '../packages/evidence-core/src/index.js';
 const PUBLIC_SITE_ROOTS = [
   'search-receipt',
   'skill-ledger',
+  'video-moment-search',
   'workflow-test-lab',
 ] as const;
 const ROOT_SHELL_FILES = [
@@ -13,7 +14,7 @@ const ROOT_SHELL_FILES = [
   'index.html',
   'portfolio.css',
 ] as const;
-const FIXED_SITE_FILES = [
+const RECEIPT_SITE_FILES = [
   'index.html',
   'methodology/index.html',
   'robots.txt',
@@ -21,12 +22,22 @@ const FIXED_SITE_FILES = [
   'sources/index.html',
   'styles.css',
 ] as const;
-const SITE_SPECIFIC_FILES: Readonly<
+const REQUIRED_SITE_FILES: Readonly<
   Record<(typeof PUBLIC_SITE_ROOTS)[number], readonly string[]>
 > = {
-  'search-receipt': ['search-interface.css', 'search-interface.js'],
-  'skill-ledger': [],
-  'workflow-test-lab': [],
+  'search-receipt': [
+    ...RECEIPT_SITE_FILES,
+    'search-interface.css',
+    'search-interface.js',
+  ],
+  'skill-ledger': RECEIPT_SITE_FILES,
+  'video-moment-search': [
+    'index.html',
+    'search-client.js',
+    'search-index.json',
+    'styles.css',
+  ],
+  'workflow-test-lab': RECEIPT_SITE_FILES,
 };
 
 export interface PublicBuildInventoryEntry {
@@ -68,12 +79,12 @@ function allowedSiteFile(
   siteRelativePath: string,
 ): boolean {
   return (
-    FIXED_SITE_FILES.includes(
-      siteRelativePath as (typeof FIXED_SITE_FILES)[number],
-    ) ||
-    SITE_SPECIFIC_FILES[siteRoot].includes(siteRelativePath) ||
-    /^receipts\/[a-f0-9]{64}\/index\.html$/.test(siteRelativePath) ||
-    /^topics\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(siteRelativePath)
+    REQUIRED_SITE_FILES[siteRoot].includes(siteRelativePath) ||
+    (siteRoot !== 'video-moment-search' &&
+      (/^receipts\/[a-f0-9]{64}\/index\.html$/.test(siteRelativePath) ||
+        /^topics\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(
+          siteRelativePath,
+        )))
   );
 }
 
@@ -103,7 +114,7 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
   const productDirectories = roots.filter((entry) => entry.isDirectory());
   if (productDirectories.length !== PUBLIC_SITE_ROOTS.length) {
     throw new Error(
-      'Incomplete public output: expected exactly three site roots',
+      'Incomplete public output: expected exactly four site roots',
     );
   }
   for (const rootFile of ROOT_SHELL_FILES) {
@@ -149,22 +160,25 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
       .map((path) =>
         relative(join(outputDirectory, siteRoot), path).split(sep).join('/'),
       );
-    for (const fixed of [
-      ...FIXED_SITE_FILES,
-      ...SITE_SPECIFIC_FILES[siteRoot],
-    ]) {
+    for (const fixed of REQUIRED_SITE_FILES[siteRoot]) {
       if (!siteFiles.includes(fixed)) {
         throw new Error(
           `Incomplete public output: missing ${siteRoot}/${fixed}`,
         );
       }
     }
-    if (!siteFiles.some((path) => /^receipts\//.test(path))) {
+    if (
+      siteRoot !== 'video-moment-search' &&
+      !siteFiles.some((path) => /^receipts\//.test(path))
+    ) {
       throw new Error(
         `Incomplete public output: ${siteRoot} has no receipt detail`,
       );
     }
-    if (!siteFiles.some((path) => /^topics\//.test(path))) {
+    if (
+      siteRoot !== 'video-moment-search' &&
+      !siteFiles.some((path) => /^topics\//.test(path))
+    ) {
       throw new Error(
         `Incomplete public output: ${siteRoot} has no topic page`,
       );

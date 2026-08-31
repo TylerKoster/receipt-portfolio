@@ -5,15 +5,9 @@ import {
   type SearchIndex,
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
-import {
-  escapeHtml,
-  normalizePublicBaseUrl,
-} from '../shared/render.js';
+import { escapeHtml, normalizePublicBaseUrl } from '../shared/render.js';
 import { videoMomentSearchSite } from './index.js';
-import type {
-  PublicSearchEntry,
-  PublicSearchIndex,
-} from './search-client.js';
+import type { PublicSearchEntry, PublicSearchIndex } from './search-client.js';
 import { validateCommonsSourceEvidence } from './source-evidence.js';
 
 function routePath(baseUrl: string, suffix = ''): string {
@@ -61,7 +55,9 @@ export function serializePublicSearchIndex(
 ): PublicSearchIndex {
   const validation = validateVideoCorpus(corpus);
   if (!validation.ok) {
-    throw new Error(`Invalid video corpus: ${validation.diagnostics.join(', ')}`);
+    throw new Error(
+      `Invalid video corpus: ${validation.diagnostics.join(', ')}`,
+    );
   }
   if (sourceEvidence !== undefined) {
     const evidenceValidation = validateCommonsSourceEvidence(
@@ -100,7 +96,9 @@ export function serializePublicSearchIndex(
       reviewEvidence !== undefined &&
       !isReviewedSourceEvidenceSubstantive(reviewEvidence)
     ) {
-      throw new Error(`Invalid reviewed-source evidence for ${entry.moment.id}`);
+      throw new Error(
+        `Invalid reviewed-source evidence for ${entry.moment.id}`,
+      );
     }
     const cueIds = (cuesByVideo.get(entry.video.id) ?? [])
       .filter(
@@ -140,8 +138,7 @@ export function serializePublicSearchIndex(
           ? `Corpus ${corpus.corpusId}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`
           : `Corpus ${corpus.corpusId}; evidence ${reviewEvidence.evidenceId}; immutable rights revision ${reviewEvidence.immutableRightsRevisionUrl}; reviewed by ${reviewEvidence.reviewer} on ${reviewEvidence.reviewedOn}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`,
       timestampUrl,
-      timestampStrategy:
-        entry.video.timestampStrategy ?? 'query-parameter',
+      timestampStrategy: entry.video.timestampStrategy ?? 'query-parameter',
       reviewEvidence,
     };
   });
@@ -264,14 +261,14 @@ function page(
   <link rel="stylesheet" href="${escapeHtml(styles)}">${script}
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to moment search</a>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <header class="site-header"><div class="shell">
     <p class="eyebrow">Controlled fixture experiment</p>
     <h1>${escapeHtml(videoMomentSearchSite.name)}</h1>
     <p class="proposition">${escapeHtml(videoMomentSearchSite.proposition)}</p>
   </div></header>
   <main id="main-content" class="shell">${body}</main>
-  <footer><div class="shell">Local deterministic integration candidate · No accounts, analytics, query retention, scraping, media download, or external communication.</div></footer>
+  <footer><div class="shell">Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies. No accounts, analytics, scraping, or media hosting.</div></footer>
 </body>
 </html>
 `;
@@ -303,10 +300,30 @@ export function renderSearchShell(
   const initialHeading = allInitialEntriesReviewed
     ? 'Initial reviewed moments'
     : 'Initial controlled moments';
+  const reviewedOnDates = [
+    ...new Set(
+      initial.flatMap((entry) =>
+        entry.reviewEvidence === undefined
+          ? []
+          : [entry.reviewEvidence.reviewedOn],
+      ),
+    ),
+  ].sort();
+  const historicalReviewBoundary = allInitialEntriesReviewed
+    ? ` Source and license availability was reviewed on ${reviewedOnDates.join(', ')}; this is historical evidence, not current verification.`
+    : '';
   const rightsBoundary = allInitialEntriesReviewed
-    ? 'This reviewed Commons source provides a timestamp link plus an original editorial annotation only. It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.'
+    ? `This reviewed Commons source provides a timestamp link plus an original editorial annotation only.${historicalReviewBoundary} It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.`
     : 'Each controlled result exposes its stored rights, provenance, and correction state. Review status is shown only when a validated evidence record is present. This route does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence.';
-  const body = `<section id="moment-search-controls" class="search-panel" aria-labelledby="search-heading">
+  const body = `<section class="information-panel" aria-labelledby="start-heading">
+    <h2 id="start-heading">Recover the explanation, then verify its context</h2>
+    <p><strong>For:</strong> ${escapeHtml(videoMomentSearchSite.audience)}</p>
+    <p><strong>Use this when:</strong> ${escapeHtml(videoMomentSearchSite.useCase)}</p>
+    <h3>How to use it</h3><ol>${videoMomentSearchSite.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
+    <p><strong>What you get:</strong> ${escapeHtml(videoMomentSearchSite.outcome)}</p>
+    <p class="boundary"><strong>Rights boundary:</strong> ${escapeHtml(rightsBoundary)}</p>
+  </section>
+  <section id="moment-search-controls" class="search-panel" aria-labelledby="search-heading">
     <p class="eyebrow">Find an exact explanation</p>
     <h2 id="search-heading">${escapeHtml(searchHeading)}</h2>
     <form class="search-controls" role="search" data-moment-search>
@@ -316,14 +333,6 @@ export function renderSearchShell(
     <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>
     <p class="error" data-search-error hidden>Search could not load. The initial controlled moments remain available below.</p>
     <div class="moment-list" data-client-results></div>
-  </section>
-  <section class="information-panel" aria-labelledby="start-heading">
-    <h2 id="start-heading">Recover the explanation, then verify its context</h2>
-    <p><strong>For:</strong> ${escapeHtml(videoMomentSearchSite.audience)}</p>
-    <p><strong>Use this when:</strong> ${escapeHtml(videoMomentSearchSite.useCase)}</p>
-    <h3>How to use it</h3><ol>${videoMomentSearchSite.howTo.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
-    <p><strong>What you get:</strong> ${escapeHtml(videoMomentSearchSite.outcome)}</p>
-    <p class="boundary"><strong>Rights boundary:</strong> ${escapeHtml(rightsBoundary)}</p>
   </section>
   <section aria-labelledby="initial-heading" data-server-results>
     <p class="eyebrow">Available without JavaScript</p>

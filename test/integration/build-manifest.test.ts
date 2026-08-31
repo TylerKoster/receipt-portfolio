@@ -33,6 +33,10 @@ const EXPECTED_PATHS = [
   'skill-ledger/sources/index.html',
   'skill-ledger/styles.css',
   'skill-ledger/topics/example-topic/index.html',
+  'video-moment-search/index.html',
+  'video-moment-search/search-client.js',
+  'video-moment-search/search-index.json',
+  'video-moment-search/styles.css',
   'workflow-test-lab/index.html',
   'workflow-test-lab/methodology/index.html',
   `workflow-test-lab/receipts/${'c'.repeat(64)}/index.html`,
@@ -43,7 +47,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  'f7a2a21138a4e53cbfb96ec7beec41017ee6f628c8adcf7ea2b0790274dd5b04';
+  '6dec825eadf41cb9a59cfbc5820542dfaad3e254b97ef836270b4515788d9274';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -117,6 +121,46 @@ describe('public build manifest', () => {
     await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
       /incomplete public output/i,
     );
+  });
+
+  it('rejects a missing AI Moment Index artifact', async () => {
+    await rm(join(outputDirectory, 'video-moment-search', 'search-index.json'));
+
+    await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+      /incomplete public output/i,
+    );
+  });
+
+  it('rejects an unexpected AI Moment Index artifact', async () => {
+    await writePublicFile(
+      'video-moment-search/receipts/unreviewed/index.html',
+      'unreviewed artifact',
+    );
+
+    await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+      /unexpected public output/i,
+    );
+  });
+
+  it('rejects a symbolic entry inside AI Moment Index output', async () => {
+    const externalDirectory = join(dirname(outputDirectory), 'external-video');
+    const linkedDirectory = join(
+      outputDirectory,
+      'video-moment-search',
+      'linked',
+    );
+    await mkdir(externalDirectory);
+    await writeFile(join(externalDirectory, 'index.html'), 'external');
+    await symlink(
+      externalDirectory,
+      linkedDirectory,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(/symbolic/i);
+    await expect(
+      readFile(join(externalDirectory, 'index.html'), 'utf8'),
+    ).resolves.toBe('external');
   });
 
   it('rejects a symbolic public site root', async () => {

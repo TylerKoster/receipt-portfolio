@@ -200,13 +200,37 @@ function executeClientPayload(): ClientHarness {
 }
 
 describe('AI Moment Index public search surface', () => {
-  it('puts an enterable search form and exact timestamped initial results first', () => {
+  it('explains the audience and workflow before the enterable search form', () => {
     const html = renderVideoMomentHome(fixture, searchIndex, baseUrl);
+    expect(html).toContain(
+      '<a class="skip-link" href="#main-content">Skip to main content</a>',
+    );
     expect(html).toContain('<input');
     expect(html).toContain('name="q"');
     expect(html).toContain('Search moments');
     expect(html).toContain('#t=132');
-    expect(html.indexOf('name="q"')).toBeLessThan(html.indexOf('<strong>For:</strong>'));
+    expect(html.indexOf('<strong>For:</strong>')).toBeLessThan(
+      html.indexOf('name="q"'),
+    );
+    expect(html.indexOf('<h3>How to use it</h3>')).toBeLessThan(
+      html.indexOf('name="q"'),
+    );
+  });
+
+  it('states the historical-review and external-media boundaries truthfully', () => {
+    const html = renderVideoMomentHome(
+      fixture,
+      searchIndex,
+      baseUrl,
+      sourceRightsEvidence,
+    );
+    expect(html).toContain(
+      'Source and license availability was reviewed on 2022-01-18; this is historical evidence, not current verification.',
+    );
+    expect(html).toContain(
+      'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
+    );
+    expect(html).not.toContain('media download, or external communication');
   });
 
   it('keeps arbitrary query state out of indexable URLs and persistent state', () => {
@@ -220,7 +244,9 @@ describe('AI Moment Index public search surface', () => {
 
   it('renders the fixed query with the reviewed moment first and exact source second', () => {
     const html = renderSearchResults(fixture, searchIndex, 'robots control');
-    expect(html.indexOf('data-moment-id="moment-robots-control"')).toBeGreaterThanOrEqual(0);
+    expect(
+      html.indexOf('data-moment-id="moment-robots-control"'),
+    ).toBeGreaterThanOrEqual(0);
     expect(html).toContain(
       'href="https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"',
     );
@@ -337,7 +363,9 @@ describe('AI Moment Index public search surface', () => {
     });
 
     const publicEntry = serializePublicSearchIndex(fixture, searchIndex)
-      .entries[0] as ReturnType<typeof serializePublicSearchIndex>['entries'][number] & {
+      .entries[0] as ReturnType<
+      typeof serializePublicSearchIndex
+    >['entries'][number] & {
       reviewEvidence?: unknown;
     };
     expect(publicEntry.reviewEvidence).toEqual(
@@ -346,7 +374,9 @@ describe('AI Moment Index public search surface', () => {
     expect(publicEntry.rightsStatus).toContain(evidence.license.name);
     expect(publicEntry.verificationDate).toBe(evidence.reviewRecord.reviewedOn);
     expect(publicEntry.provenance).toContain(evidence.evidenceId);
-    expect(publicEntry.provenance).toContain(evidence.immutableRightsRevisionUrl);
+    expect(publicEntry.provenance).toContain(
+      evidence.immutableRightsRevisionUrl,
+    );
     expect(publicEntry.provenance).toContain(evidence.reviewRecord.reviewer);
 
     const html = renderSearchResults(fixture, searchIndex, 'robots control');
@@ -426,8 +456,7 @@ describe('AI Moment Index public search surface', () => {
     );
 
     const dateDrift = structuredClone(fixture) as Mutable<VideoCorpus>;
-    dateDrift.rights[0]!.permissionVerifiedAt =
-      '2022-01-19T00:00:00.000Z';
+    dateDrift.rights[0]!.permissionVerifiedAt = '2022-01-19T00:00:00.000Z';
     expect(validateVideoCorpus(dateDrift).diagnostics).toContain(
       'RIGHTS_REVIEW_DATE_MISMATCH:rights-commons-robots-control',
     );
@@ -449,7 +478,9 @@ describe('AI Moment Index public search surface', () => {
       buildSearchIndex(unreviewedMedia),
     ).entries[0]!;
     expect(entry.timestampStrategy).toBe('media-fragment');
-    expect(entry.confidenceClass).toBe('Rights-validated controlled fixture match');
+    expect(entry.confidenceClass).toBe(
+      'Rights-validated controlled fixture match',
+    );
     expect(entry.reviewEvidence).toBeUndefined();
   });
 
@@ -662,12 +693,9 @@ describe('AI Moment Index public search surface', () => {
         name,
       ).toThrow('Invalid video corpus');
       let html: string | undefined;
-      expect(
-        () => {
-          html = renderVideoMomentHome(candidate, searchIndex, baseUrl);
-        },
-        name,
-      ).toThrow('Invalid video corpus');
+      expect(() => {
+        html = renderVideoMomentHome(candidate, searchIndex, baseUrl);
+      }, name).toThrow('Invalid video corpus');
       expect(html, name).toBeUndefined();
     }
   });
@@ -717,7 +745,9 @@ describe('AI Moment Index public search surface', () => {
     expect(hostileHtml).toContain(
       '&lt;button onclick=alert(1)&gt;open&lt;/button&gt;',
     );
-    expect(hostileHtml).not.toMatch(/<script>alert|<img src=x|<button onclick=/u);
+    expect(hostileHtml).not.toMatch(
+      /<script>alert|<img src=x|<button onclick=/u,
+    );
 
     const validPublicIndex = serializePublicSearchIndex(fixture, searchIndex);
     const malformedIndex = {
@@ -776,18 +806,28 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('exposes bounded video, moment, topic, creator, and guide pages', () => {
-    expect(renderVideoPage(fixture, searchIndex, 'video-robots-under-control', baseUrl)).toContain(
-      'How can we keep robots under control?',
-    );
-    expect(renderMomentPage(fixture, searchIndex, 'moment-robots-control', baseUrl)).toContain(
-      '#t=132',
-    );
-    expect(renderTopicPage(fixture, searchIndex, 'robots-control', baseUrl)).toContain(
-      'moment-robots-control',
-    );
-    expect(renderCreatorPage(fixture, searchIndex, 'university-of-the-netherlands', baseUrl)).toContain(
-      'University of the Netherlands',
-    );
+    expect(
+      renderVideoPage(
+        fixture,
+        searchIndex,
+        'video-robots-under-control',
+        baseUrl,
+      ),
+    ).toContain('How can we keep robots under control?');
+    expect(
+      renderMomentPage(fixture, searchIndex, 'moment-robots-control', baseUrl),
+    ).toContain('#t=132');
+    expect(
+      renderTopicPage(fixture, searchIndex, 'robots-control', baseUrl),
+    ).toContain('moment-robots-control');
+    expect(
+      renderCreatorPage(
+        fixture,
+        searchIndex,
+        'university-of-the-netherlands',
+        baseUrl,
+      ),
+    ).toContain('University of the Netherlands');
     expect(renderGuidePage(baseUrl)).toContain('How to recover a moment');
     expect(videoMomentSearchSite.siteId).toBe('video-moment-search');
   });
@@ -813,7 +853,8 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('keeps shipped payload ranking equal to phrase-bonus helper ranking', async () => {
-    const baseEntry = serializePublicSearchIndex(fixture, searchIndex).entries[0]!;
+    const baseEntry = serializePublicSearchIndex(fixture, searchIndex)
+      .entries[0]!;
     const exactPhrase = {
       ...baseEntry,
       momentId: 'moment-exact-phrase',
@@ -868,7 +909,8 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('keeps all shipped equal-score tie breakers equal to the helper/core order', async () => {
-    const baseEntry = serializePublicSearchIndex(fixture, searchIndex).entries[0]!;
+    const baseEntry = serializePublicSearchIndex(fixture, searchIndex)
+      .entries[0]!;
     const tiedEntries = [
       {
         ...baseEntry,
@@ -1039,9 +1081,9 @@ describe('AI Moment Index public search surface', () => {
     );
 
     harness.submit('robots control');
-    expect(
-      descendants(harness.results, 'article')[0]?.dataset.momentId,
-    ).toBe('moment-robots-control');
+    expect(descendants(harness.results, 'article')[0]?.dataset.momentId).toBe(
+      'moment-robots-control',
+    );
   });
 
   it('catches unexpected submit-time rendering errors into the same fallback', async () => {
@@ -1071,7 +1113,10 @@ describe('AI Moment Index public search surface', () => {
 
   it('records the bounded deterministic-route experiment without usability or demand claims', () => {
     const ledger = JSON.parse(
-      readFileSync(new URL('./product-experiment-ledger.json', import.meta.url), 'utf8'),
+      readFileSync(
+        new URL('./product-experiment-ledger.json', import.meta.url),
+        'utf8',
+      ),
     );
     expect(ledger).toMatchObject({
       siteId: 'video-moment-search',
@@ -1092,7 +1137,9 @@ describe('AI Moment Index public search surface', () => {
         },
       },
     });
-    expect(JSON.stringify(ledger)).toContain('not usability or demand evidence');
+    expect(JSON.stringify(ledger)).toContain(
+      'not usability or demand evidence',
+    );
     expect(JSON.stringify(ledger)).not.toContain('video.example');
   });
 });
