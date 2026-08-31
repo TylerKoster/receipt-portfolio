@@ -289,7 +289,7 @@ function renderEntry(
   const link =
     timestampUrl === null || timestampUrl !== entry.timestampUrl
       ? '<span class="invalid-source">Exact source link unavailable</span>'
-      : `<a href="${escapeHtml(timestampUrl)}">${escapeHtml(entry.videoTitle)} at ${escapeHtml(formatSeconds(entry.startSeconds))}</a>`;
+      : `<a href="${escapeHtml(timestampUrl)}" data-measurement-event="moment_click" data-measurement-status="not-configured">${escapeHtml(entry.videoTitle)} at ${escapeHtml(formatSeconds(entry.startSeconds))}</a>`;
   return `<article class="moment-card" data-moment-id="${escapeHtml(entry.momentId)}" aria-labelledby="heading-${escapeHtml(entry.momentId)}">
   <p class="eyebrow">Controlled fixture moment</p>
   <h3 id="heading-${escapeHtml(entry.momentId)}">${link}</h3>
@@ -455,10 +455,11 @@ export function renderSearchShell(
   <section id="moment-search-controls" class="search-panel" aria-labelledby="search-heading">
     <p class="eyebrow">Find an exact explanation</p>
     <h2 id="search-heading">${escapeHtml(searchHeading)}</h2>
-    <form class="search-controls" action="${escapeHtml(routeUrl(baseUrl))}" method="get" role="search" data-moment-search>
+    <form class="search-controls" action="${escapeHtml(routeUrl(baseUrl))}" method="get" role="search" data-moment-search data-measurement-event="search" data-measurement-status="not-configured">
       <div><label for="moment-query">What explanation do you remember?</label><input id="moment-query" type="search" autocomplete="off" data-moment-query></div>
       <button type="submit">Search moments</button>
     </form>
+    <p class="boundary" data-measurement-status="not-configured">No measurement endpoint is configured. Future measurement hooks do not send or store search text or event data.</p>
     <noscript><p class="guidance">Interactive search requires JavaScript; the admitted initial moments remain available below without sending your query.</p></noscript>
     <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>
     <p class="error" data-search-error hidden>Search could not load. The initial controlled moments remain available below.</p>
