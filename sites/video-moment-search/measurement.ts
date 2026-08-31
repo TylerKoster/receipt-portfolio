@@ -177,7 +177,8 @@ function isMeasurementEvent(value: unknown): value is MeasurementEvent {
   return Object.entries(event).every(([field, fieldValue]) => {
     if (!allowedFields.has(field)) return false;
     if (field === 'schemaVersion' || field === 'eventType') return true;
-    return allowedValue(field as AllowedField, fieldValue) === fieldValue;
+    const sanitized = allowedValue(field as AllowedField, fieldValue);
+    return sanitized !== undefined && sanitized === fieldValue;
   });
 }
 
@@ -306,6 +307,14 @@ function sameGate(
   );
 }
 
+function containsTargetToken(target: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return new RegExp(
+    `(?:^|[^\\p{L}\\p{N}])${escaped}(?=$|[^\\p{L}\\p{N}])`,
+    'u',
+  ).test(target);
+}
+
 /** Validates the local operator ledger without accepting outcome claims. */
 export function validateExperimentLedger(
   value: unknown,
@@ -418,7 +427,7 @@ export function validateExperimentLedger(
     if (
       nonBlank(target) &&
       !expected.targetTokens.every((token) =>
-        target.toLocaleLowerCase('en-US').includes(token),
+        containsTargetToken(target.toLocaleLowerCase('en-US'), token),
       )
     ) {
       diagnostics.push(

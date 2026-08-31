@@ -134,6 +134,55 @@ describe('privacy-preserving measurement contract', () => {
     },
   );
 
+  it.each([
+    [
+      'an explicitly undefined numeric field',
+      createMeasurementEvent('search', {
+        resultCount: 2,
+        occurredAt: '2026-08-31T12:00:00.000Z',
+      }),
+      'resultCount',
+      undefined,
+    ],
+    [
+      'an invalid numeric field',
+      createMeasurementEvent('moment_click', {
+        momentId: 'moment-robots-control',
+        resultPosition: 1,
+        occurredAt: '2026-08-31T12:00:00.000Z',
+      }),
+      'resultPosition',
+      0,
+    ],
+    [
+      'an explicitly undefined string field',
+      createMeasurementEvent('moment_click', {
+        momentId: 'moment-robots-control',
+        resultPosition: 1,
+        occurredAt: '2026-08-31T12:00:00.000Z',
+      }),
+      'momentId',
+      undefined,
+    ],
+    [
+      'a malformed string field',
+      createMeasurementEvent('creator_referral', {
+        referralCampaignId: 'creator-preview-a',
+        occurredAt: '2026-08-31T12:00:00.000Z',
+      }),
+      'referralCampaignId',
+      'creator preview',
+    ],
+  ] as const)(
+    'discards a fabricated event with %s',
+    (_, event, field, value) => {
+      expect(deliverMeasurementEvent({ ...event, [field]: value })).toEqual({
+        measurementStatus: 'not-configured',
+        disposition: 'discarded',
+      });
+    },
+  );
+
   it('keeps future measurement hooks non-executing and preserves the released exact source href', () => {
     const html = renderSearchShell(
       fixture,
@@ -216,5 +265,14 @@ describe('privacy-preserving measurement contract', () => {
     expect(diagnostics).toContain('experiments[2].measures');
     expect(diagnostics).toContain('experiments[2].continuationGate');
     expect(diagnostics).toContain('experiments[2].target');
+  });
+
+  it('rejects a numeric target that contains but does not equal the approved gate', () => {
+    const invalid = structuredClone(ledger);
+    invalid.experiments[2].target = '>=800% top-three relevance.';
+
+    expect(validateExperimentLedger(invalid).diagnostics.join('\n')).toContain(
+      'experiments[2].target',
+    );
   });
 });
