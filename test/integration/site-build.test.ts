@@ -749,7 +749,13 @@ describe('static receipt site build', () => {
     ).toEqual(Object.keys(SITE_HEADINGS).sort());
     expect(
       entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-    ).toEqual(['favicon.ico', 'index.html', 'portfolio.css']);
+    ).toEqual([
+      'favicon.ico',
+      'index.html',
+      'portfolio.css',
+      'robots.txt',
+      'sitemap.xml',
+    ]);
 
     const hub = await readFile(join(outputDirectory, 'index.html'), 'utf8');
     expect(hub).toContain('Evidence receipt portfolio');
@@ -803,7 +809,13 @@ describe('static receipt site build', () => {
     ).toEqual(Object.keys(SITE_HEADINGS).sort());
     expect(
       entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-    ).toEqual(['favicon.ico', 'index.html', 'portfolio.css']);
+    ).toEqual([
+      'favicon.ico',
+      'index.html',
+      'portfolio.css',
+      'robots.txt',
+      'sitemap.xml',
+    ]);
 
     for (const siteId of Object.keys(SITE_HEADINGS)) {
       const html = await readFile(
@@ -1030,6 +1042,10 @@ describe('static receipt site build', () => {
       expect(inventory).toContain('search-receipt/methodology/index.html');
       expect(inventory).toContain('skill-ledger/sources/index.html');
       expect(inventory).toContain('workflow-test-lab/sitemap.xml');
+      expect(inventory).toContain('video-moment-search/index.html');
+      expect(inventory).toContain('video-moment-search/sitemap.xml');
+      expect(inventory).toContain('robots.txt');
+      expect(inventory).toContain('sitemap.xml');
       expect(inventory.some((path) => /\/receipts\//.test(path))).toBe(true);
       await expect(
         readFile(
@@ -1488,8 +1504,12 @@ describe('static receipt site build', () => {
   });
 
   it('rejects a mutated receipt before rendering any public page', async () => {
-    await mkdir(outputDirectory, { recursive: true });
-    await writeFile(join(outputDirectory, 'previous.html'), 'previous output');
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+      includeVideoMomentSearch: true,
+    });
+    const previousInventory = await fileInventory(outputDirectory);
     const entry = (await searchReceiptEntries())[0]!;
     const receipt = entry.receipt;
     const path = entry.path;
@@ -1503,11 +1523,9 @@ describe('static receipt site build', () => {
       buildSites({
         evidenceDirectory: testEvidenceDirectory,
         outputDirectory,
+        includeVideoMomentSearch: true,
       }),
     ).rejects.toThrow(/digest/i);
-    await expect(
-      readFile(join(outputDirectory, 'previous.html'), 'utf8'),
-    ).resolves.toBe('previous output');
-    expect(await readdir(outputDirectory)).toEqual(['previous.html']);
+    expect(await fileInventory(outputDirectory)).toEqual(previousInventory);
   });
 });

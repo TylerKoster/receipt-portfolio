@@ -54,6 +54,24 @@ describe('atomic AI Moment Index build', () => {
         .map((entry) => entry.name)
         .sort(),
     ).toEqual(['search-receipt', 'skill-ledger', 'workflow-test-lab']);
+
+    const [robots, sitemap] = await Promise.all([
+      readFile(join(outputDirectory, 'robots.txt'), 'utf8'),
+      readFile(join(outputDirectory, 'sitemap.xml'), 'utf8'),
+    ]);
+    expect(robots).toContain(
+      'Sitemap: https://receipt-portfolio.example/sitemap.xml',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/search-receipt/sitemap.xml</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/skill-ledger/sitemap.xml</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/workflow-test-lab/sitemap.xml</loc>',
+    );
+    expect(sitemap).not.toContain('video-moment-search/sitemap.xml');
   });
 
   it('atomically emits the enterable route and exact query-to-timestamp assets when enabled', async () => {
@@ -65,12 +83,15 @@ describe('atomic AI Moment Index build', () => {
     });
 
     const routeDirectory = join(outputDirectory, 'video-moment-search');
-    const [html, indexJson, client, styles] = await Promise.all([
-      readFile(join(routeDirectory, 'index.html'), 'utf8'),
-      readFile(join(routeDirectory, 'search-index.json'), 'utf8'),
-      readFile(join(routeDirectory, 'search-client.js'), 'utf8'),
-      readFile(join(routeDirectory, 'styles.css'), 'utf8'),
-    ]);
+    const [html, indexJson, client, styles, robots, rootSitemap] =
+      await Promise.all([
+        readFile(join(routeDirectory, 'index.html'), 'utf8'),
+        readFile(join(routeDirectory, 'search-index.json'), 'utf8'),
+        readFile(join(routeDirectory, 'search-client.js'), 'utf8'),
+        readFile(join(routeDirectory, 'styles.css'), 'utf8'),
+        readFile(join(outputDirectory, 'robots.txt'), 'utf8'),
+        readFile(join(outputDirectory, 'sitemap.xml'), 'utf8'),
+      ]);
     expect(html).toContain('name="q"');
     expect(html).toContain('Search moments');
     expect(client).toContain('textContent');
@@ -94,6 +115,21 @@ describe('atomic AI Moment Index build', () => {
       'This portfolio hub is a deployment shell, not an additional evidence product.',
     );
     expect(hub).not.toContain('not a fourth evidence product');
+    expect(robots).toBe(
+      'User-agent: *\nAllow: /\nSitemap: https://receipt-portfolio.example/sitemap.xml\n',
+    );
+    for (const product of [
+      'search-receipt',
+      'skill-ledger',
+      'video-moment-search',
+      'workflow-test-lab',
+    ]) {
+      expect(rootSitemap).toContain(
+        `<loc>https://receipt-portfolio.example/${product}/sitemap.xml</loc>`,
+      );
+    }
+    expect(rootSitemap).not.toContain('video-sitemap.xml');
+    expect(rootSitemap).not.toContain('?q=');
   });
 
   it('emits only evidence-admitted canonical discovery pages and exact-moment feeds', async () => {
@@ -149,6 +185,16 @@ describe('atomic AI Moment Index build', () => {
     expect(sitemap).toContain(
       '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/moments/moment-robots-control/</loc>',
     );
+    expect(sitemap).toContain(
+      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/videos/robots-under-control/</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://tylerkoster.github.io/receipt-portfolio/video-moment-search/creators/university-of-the-netherlands/</loc>',
+    );
+    expect(sitemap).not.toContain('?q=');
     expect(sitemapIndex).not.toContain('video-sitemap.xml');
     expect(feed).toContain(
       '<link rel="related" href="https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"/>',

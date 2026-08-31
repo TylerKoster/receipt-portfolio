@@ -47,6 +47,8 @@ import {
   normalizePublicBaseUrl,
   renderMethodology,
   renderPortfolioHub,
+  renderPortfolioRobots,
+  renderPortfolioSitemapIndex,
   renderReceiptDetail,
   renderRobots,
   renderSite,
@@ -476,6 +478,9 @@ async function writeSiteTree(
       };
     });
   const sourceBoundSkillDataModule = `export const SOURCE_BOUND_PUBLIC_SKILL_RECORDS = ${canonicalJson(sourceBoundSkillRecords).replaceAll('<', '\\u003c')};\n`;
+  const includedSites = includeVideoMomentSearch
+    ? [...SITE_DEFINITIONS, videoMomentSearchSite]
+    : SITE_DEFINITIONS;
 
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
@@ -484,13 +489,18 @@ async function writeSiteTree(
   );
   await writeFile(
     join(outputDirectory, 'index.html'),
-    renderPortfolioHub(
-      includeVideoMomentSearch
-        ? [...SITE_DEFINITIONS, videoMomentSearchSite]
-        : SITE_DEFINITIONS,
-      publicBaseUrl,
-    ),
+    renderPortfolioHub(includedSites, publicBaseUrl),
   );
+  await Promise.all([
+    writeFile(
+      join(outputDirectory, 'robots.txt'),
+      renderPortfolioRobots(publicBaseUrl),
+    ),
+    writeFile(
+      join(outputDirectory, 'sitemap.xml'),
+      renderPortfolioSitemapIndex(includedSites, publicBaseUrl),
+    ),
+  ]);
   for (const site of SITE_DEFINITIONS) {
     const directory = join(outputDirectory, site.siteId);
     const visible = receipts.filter(

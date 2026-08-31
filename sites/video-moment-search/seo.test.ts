@@ -89,11 +89,22 @@ function twoSourceCorpus(): VideoCorpus {
 }
 
 describe('video moment search SEO', () => {
-  it('indexes the substantive canonical moment without unsupported aggregate or rich-video URLs', () => {
+  it('indexes every evidence-safe canonical route without query or unsupported video discovery URLs', () => {
     const sitemap = renderSitemap(corpus, baseUrl);
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/video-moment-search/</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/video-moment-search/videos/robots-under-control/</loc>',
+    );
     expect(sitemap).toContain('/moments/moment-robots-control/');
-    expect(sitemap).not.toContain('/videos/robots-under-control/');
-    expect(sitemap).not.toContain('/creators/university-of-the-netherlands/');
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/video-moment-search/creators/university-of-the-netherlands/</loc>',
+    );
+    expect(sitemap).not.toContain('?q=');
+    expect(sitemap).not.toContain('video-sitemap.xml');
+    expect(sitemap).not.toContain('thumbnail');
+    expect(sitemap).not.toContain('player');
     expect(renderAtomFeed(corpus, baseUrl)).toContain('#t=132');
   });
 
@@ -154,7 +165,10 @@ describe('video moment search SEO', () => {
       isProjectOriginal: true,
     } as const;
     const xml = renderSitemap(syntheticCorpus, baseUrl, {
-      topics: [{ slug: 'robots-control', synthesis }],
+      topics: [
+        { slug: 'robots-control', synthesis },
+        { slug: 'missing-topic', synthesis },
+      ],
       guides: [
         {
           id: 'guide-accepted',
@@ -165,10 +179,21 @@ describe('video moment search SEO', () => {
           sourceMomentIds: syntheticCorpus.moments.map((moment) => moment.id),
           synthesis: guideSynthesis,
         },
+        {
+          id: 'guide-one-source',
+          slug: 'one-source-only',
+          title: 'One source only',
+          summary: 'This ineligible route must remain out of discovery.',
+          updatedAt: '2026-08-30T12:00:00.000Z',
+          sourceMomentIds: [syntheticCorpus.moments[0]!.id],
+          synthesis: guideSynthesis,
+        },
       ],
     });
     expect(xml).toContain('/topics/robots-control/');
     expect(xml).toContain('/guides/compare-annotations/');
+    expect(xml).not.toContain('/topics/missing-topic/');
+    expect(xml).not.toContain('/guides/one-source-only/');
   });
 
   it('fails closed instead of fabricating an update date for an empty feed', () => {

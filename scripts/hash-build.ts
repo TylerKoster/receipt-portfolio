@@ -13,6 +13,8 @@ const ROOT_SHELL_FILES = [
   'favicon.ico',
   'index.html',
   'portfolio.css',
+  'robots.txt',
+  'sitemap.xml',
 ] as const;
 const RECEIPT_SITE_FILES = [
   'index.html',

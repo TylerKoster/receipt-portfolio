@@ -262,10 +262,28 @@ export function renderSitemap(
 ): string {
   assertValidCorpus(corpus);
   const publicMoments = corpus.moments.filter(isPublicMoment);
+  const videosById = new Map(corpus.videos.map((video) => [video.id, video]));
+  const publicVideos = [
+    ...new Map(
+      publicMoments.map((moment) => {
+        const video = videosById.get(moment.videoId)!;
+        return [video.id, video] as const;
+      }),
+    ).values(),
+  ];
   const discovery = eligibleDiscoveryRoutes(corpus, origin, discoveryRoutes);
   const locations = [
+    siteRoot(origin),
+    ...publicVideos.map((video) =>
+      canonicalUrl(origin, `videos/${video.slug}/`),
+    ),
     ...publicMoments.map((moment) =>
       canonicalUrl(origin, `moments/${moment.id}/`),
+    ),
+    ...new Set(
+      publicVideos.map((video) =>
+        canonicalUrl(origin, `creators/${video.creatorId}/`),
+      ),
     ),
     ...discovery.topics.map((topic) =>
       canonicalUrl(origin, `topics/${topic.slug}/`),

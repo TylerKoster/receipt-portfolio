@@ -15,6 +15,7 @@ const EXPECTED_PATHS = [
   'favicon.ico',
   'index.html',
   'portfolio.css',
+  'robots.txt',
   'search-receipt/guides/is-google-search-down-or-my-site/index.html',
   'search-receipt/index.html',
   'search-receipt/investigation-worksheet.js',
@@ -28,6 +29,7 @@ const EXPECTED_PATHS = [
   'search-receipt/styles.css',
   'search-receipt/topics/example-topic/index.html',
   'search-receipt/worksheets/compare-google-search-status-with-site-evidence/index.html',
+  'sitemap.xml',
   'skill-ledger/index.html',
   'skill-ledger/inventory/index.html',
   'skill-ledger/methodology/index.html',
@@ -60,7 +62,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '3b024a5a6531c74835217d084fffdaf0a0bc5d62fd33abb2468a38303bc850d9';
+  '6692c73f1c8745e7b0447dfe944b79d0f1e2b95d8df6fc267e983aa49a06b808';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -147,6 +149,17 @@ describe('public build manifest', () => {
     },
   );
 
+  it.each(['robots.txt', 'sitemap.xml'])(
+    'rejects a missing root discovery file: %s',
+    async (path) => {
+      await rm(join(outputDirectory, path));
+
+      await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+        /incomplete public output/i,
+      );
+    },
+  );
+
   it('rejects a missing AI Moment Index artifact', async () => {
     await rm(join(outputDirectory, 'video-moment-search', 'search-index.json'));
 
@@ -169,11 +182,11 @@ describe('public build manifest', () => {
     );
   });
 
-  it('rejects an unexpected AI Moment Index artifact', async () => {
-    await writePublicFile(
-      'video-moment-search/receipts/unreviewed/index.html',
-      'unreviewed artifact',
-    );
+  it.each([
+    'video-moment-search/receipts/unreviewed/index.html',
+    'video-moment-search/video-sitemap.xml',
+  ])('rejects an unexpected AI Moment Index artifact: %s', async (path) => {
+    await writePublicFile(path, 'unreviewed artifact');
 
     await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
       /unexpected public output/i,

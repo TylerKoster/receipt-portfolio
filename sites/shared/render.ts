@@ -556,6 +556,24 @@ export function renderRobots(
   return `User-agent: *\nAllow: ${sitePath(site, '/', publicBaseUrl)}\nSitemap: ${canonicalUrl(site, '/sitemap.xml', publicBaseUrl)}\n`;
 }
 
+export function renderPortfolioRobots(
+  publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+): string {
+  const base = normalizePublicBaseUrl(publicBaseUrl);
+  return `User-agent: *\nAllow: ${publicBasePath(base)}\nSitemap: ${base}sitemap.xml\n`;
+}
+
+export function renderPortfolioSitemapIndex(
+  sites: readonly SiteDefinition[],
+  publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+): string {
+  const base = normalizePublicBaseUrl(publicBaseUrl);
+  const locations = sites
+    .map((site) => `${base}${site.siteId}/sitemap.xml`)
+    .toSorted(compareText);
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locations.map((location) => `  <sitemap><loc>${escapeXml(location)}</loc></sitemap>`).join('\n')}\n</sitemapindex>\n`;
+}
+
 export function renderPortfolioHub(
   sites: readonly SiteDefinition[],
   publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,

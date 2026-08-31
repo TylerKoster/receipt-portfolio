@@ -1,8 +1,9 @@
 # Receipt Portfolio
 
-Receipt Portfolio is a local static release candidate for three source-bound
-products that share one evidence engine. The public build uses authenticated
-controlled examples; scheduled dry-run manifests separately admit approved
+Receipt Portfolio is a local static release candidate for four distinct,
+source-bound products that share maintainable release infrastructure. The
+first three products are controlled evidence demonstrations built from
+authenticated fixtures; scheduled dry-run manifests separately admit approved
 official Search sources without publishing them:
 
 - **Search Receipt** records confirmed source changes for independent site
@@ -12,6 +13,10 @@ official Search sources without publishing them:
   their limits; it is not a universal benchmark or copied prompt directory.
 - **SkillLedger** presents non-executing metadata about repository-hosted skill
   packages; it does not install, run, trust, certify, or rank them.
+- **AI Moment Index** is a working rights-bounded search utility that returns
+  reviewed moments and routes each result to the stored integer timestamp in
+  its ordinary source URL. Its current corpus remains a narrow reviewed
+  example, not evidence of creator demand, nationwide coverage, or revenue.
 
 ## Local commands
 
@@ -77,11 +82,14 @@ fails. It does not create receipts or rebuild public output.
   rewriting them.
 - `dist/runtime/` contains compiler output and command implementations. It is
   not public site output.
-- `dist/sites/` contains a root portfolio hub plus each product's home,
-  methodology, source list, receipt-detail, topic, sitemap, robots, and
-  stylesheet surfaces. The hub is a deployment shell, not a fourth evidence
-  product. The build manifest hashes only this strict, nonempty public
-  inventory and still requires exactly three product directories.
+- `dist/sites/` contains the root portfolio hub and discovery files plus four
+  product directories. The first three products expose their controlled
+  receipt, methodology, source, topic, sitemap, robots, and stylesheet
+  surfaces. AI Moment Index exposes its search assets, evidence-safe canonical
+  video, moment, and creator pages, normal sitemap, and exact-moment Atom feed.
+  The hub is a deployment shell, not an additional evidence product. The build
+  manifest hashes only this strict, nonempty public inventory and requires all
+  four product directories plus root `robots.txt` and root `sitemap.xml`.
 - `artifacts/` contains internal run reports such as the live-source dry-run;
   those reports are not receipts and are not public site records.
 
@@ -93,15 +101,28 @@ receipts. `REVIEW_REQUIRED` and `REJECTED` records stay out of public output.
 Fetched material is treated as hostile data, never executed, and never rendered
 as source HTML.
 
+AI Moment Index admits only reviewed creator-supplied, creator-authorized,
+public-domain, or explicitly licensed metadata and timed-caption packages. The
+accepted boundary does not authorize hosting, embedding, or distributing media,
+and public availability is never inferred to be permission. Absent source
+fields stay absent: no video sitemap is emitted until reviewed evidence supplies
+a stable thumbnail and an authorized player or embed location.
+
 ## Release status
 
-The repository now contains a gated GitHub Pages production adapter with these
-planned paths:
+The repository contains a gated GitHub Pages production adapter for these four
+paths:
 
 - `https://tylerkoster.github.io/receipt-portfolio/search-receipt/`
 - `https://tylerkoster.github.io/receipt-portfolio/workflow-test-lab/`
 - `https://tylerkoster.github.io/receipt-portfolio/skill-ledger/`
+- `https://tylerkoster.github.io/receipt-portfolio/video-moment-search/`
 
-All three paths remain **pending hosted verification**. This task did not push
-the workflow, call GitHub Pages, configure a repository, or verify a public
-response. A local production-base build is not deployment evidence.
+The AI Moment Index route and its accepted v0.1.36 behaviors are released and
+were publicly verified: the fixed query `robots control` returns
+`moment-robots-control`, source navigation preserves the stored integer
+timestamp `#t=132`, canonical moment discovery and the normal sitemap/feed are
+available, and `video-sitemap.xml` is intentionally absent. This Task 6 branch
+only prepares the next atomic four-product build candidate; a local
+production-base build is not evidence that its new root discovery files have
+been deployed.
