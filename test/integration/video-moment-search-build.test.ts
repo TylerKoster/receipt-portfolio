@@ -109,6 +109,11 @@ describe('atomic AI Moment Index build', () => {
     expect(client).toContain("input.name = 'q'");
     expect(client).toContain('textContent');
     expect(client).toContain('navigator.clipboard.writeText');
+    expect(client).toContain(
+      "fetch('search-index.json', { credentials: 'omit' })",
+    );
+    expect(client).not.toContain("credentials: 'same-origin'");
+    expect(client).not.toContain("credentials: 'include'");
     expect(client).not.toContain('localStorage');
     expect(client).not.toContain('sessionStorage');
     expect(styles).toContain(':focus-visible');

@@ -465,7 +465,6 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     const entries = Array.from(selected.values());
     selectedList.replaceChildren(...entries.map((entry) => {
       const item = document.createElement('li');
-      item.dataset.momentId = entry.momentId;
       item.textContent = entry.videoTitle + ' · ' + format(entry.startSeconds) +
         ' · ' + entry.reviewEvidence.licenseIdentifier + ' · ' + entry.correctionState;
       return item;
@@ -592,7 +591,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   });
   input.name = 'q';
 
-  fetch('search-index.json', { credentials: 'same-origin' })
+  fetch('search-index.json', { credentials: 'omit' })
     .then((response) => {
       if (!response.ok) throw new Error('index load failed');
       return response.json();

@@ -256,6 +256,10 @@ interface ClientHarness {
   readonly handoffText: FakeHTMLElement;
   readonly initializationOrder: readonly string[];
   readonly input: FakeHTMLInputElement;
+  readonly indexRequests: readonly {
+    readonly input: string;
+    readonly options: unknown;
+  }[];
   readonly results: FakeHTMLElement;
   readonly serverResults: FakeHTMLElement;
   readonly status: FakeHTMLElement;
@@ -323,6 +327,7 @@ function executeClientPayload(): ClientHarness {
     resolveFetch = resolve;
     rejectFetch = reject;
   });
+  const indexRequests: { input: string; options: unknown }[] = [];
   const selectors = new Map<string, FakeHTMLElement>([
     ['[data-moment-search]', form],
     ['[data-moment-query]', input],
@@ -345,8 +350,9 @@ function executeClientPayload(): ClientHarness {
 
   runInNewContext(VIDEO_MOMENT_SEARCH_CLIENT, {
     document,
-    fetch: () => {
+    fetch: (input: string, options: unknown) => {
       initializationOrder.push('fetch-started');
+      indexRequests.push({ input, options });
       return fetchPromise;
     },
     HTMLElement: FakeHTMLElement,
@@ -374,6 +380,7 @@ function executeClientPayload(): ClientHarness {
     handoffText,
     initializationOrder,
     input,
+    indexRequests,
     results,
     serverResults,
     status,
@@ -1278,6 +1285,9 @@ describe('AI Moment Index public search surface', () => {
       'fetch-started',
     ]);
     expect(harness.input.name).toBe('q');
+    expect(harness.indexRequests).toEqual([
+      { input: 'search-index.json', options: { credentials: 'omit' } },
+    ]);
     await harness.resolveIndex(
       serializePublicSearchIndex(fixture, searchIndex),
     );
@@ -1321,9 +1331,10 @@ describe('AI Moment Index public search surface', () => {
     add?.click();
 
     expect(harness.handoffList.children).toHaveLength(1);
-    expect(harness.handoffList.children[0]?.dataset.momentId).toBe(
-      'moment-robots-control',
+    expect(harness.handoffList.children[0]?.textContent).toContain(
+      'How can we keep robots under control?',
     );
+    expect(harness.handoffList.children[0]?.dataset).toEqual({});
     expect(harness.copy.disabled).toBe(false);
     expect(harness.clear.disabled).toBe(false);
     expect(harness.handoffText.value).toContain(
