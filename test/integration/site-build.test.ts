@@ -556,6 +556,46 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('publishes and crosslinks the admitted Search Receipt decision aid', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const [home, decisionAid, sitemap] = await Promise.all([
+      readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8'),
+      readFile(
+        join(
+          outputDirectory,
+          'search-receipt',
+          'discover',
+          'choose-google-search-guide-or-worksheet',
+          'index.html',
+        ),
+        'utf8',
+      ),
+      readFile(join(outputDirectory, 'search-receipt', 'sitemap.xml'), 'utf8'),
+    ]);
+
+    expect(home).toContain(
+      'href="/search-receipt/discover/choose-google-search-guide-or-worksheet/"',
+    );
+    expect(decisionAid).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/search-receipt/discover/choose-google-search-guide-or-worksheet/">',
+    );
+    expect(decisionAid.match(/data-decision-aid-route/g)).toHaveLength(2);
+    expect(decisionAid).toContain(
+      'href="/search-receipt/guides/is-google-search-down-or-my-site/"',
+    );
+    expect(decisionAid).toContain(
+      'href="/search-receipt/worksheets/compare-google-search-status-with-site-evidence/"',
+    );
+    expect(decisionAid).not.toContain('<script type="module"');
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/search-receipt/discover/choose-google-search-guide-or-worksheet/</loc>',
+    );
+  });
+
   it('publishes the controlled SkillLedger inventory as a first-party interactive route', async () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -1294,6 +1334,34 @@ describe('static receipt site build', () => {
         ),
       ]);
       await Promise.all([
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-decision-aid-discovery.json',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-decision-aid-discovery.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-decision-aid-discovery.json',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-decision-aid-discovery.json',
+          ),
+        ),
         realFileSystem.copyFile(
           join(projectRoot, 'sites', 'search-receipt', 'search-interface.js'),
           join(firstRuntime, 'sites', 'search-receipt', 'search-interface.js'),

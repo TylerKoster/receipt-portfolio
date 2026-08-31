@@ -32,6 +32,10 @@ import {
 } from '../packages/video-moment-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
 import {
+  renderSearchReceiptDecisionAidDiscovery,
+  type SourceBoundDecisionAidDiscovery,
+} from '../sites/search-receipt/render-decision-aid-discovery.js';
+import {
   renderSearchReceiptEvergreenGuide,
   type SourceBoundEvergreenGuide,
 } from '../sites/search-receipt/render-evergreen-guide.js';
@@ -39,6 +43,7 @@ import {
   renderSearchReceiptInvestigationWorksheet,
   type SourceBoundInvestigationWorksheet,
 } from '../sites/search-receipt/render-investigation-worksheet.js';
+import { validateSourceBoundDecisionAidDiscovery } from '../sites/search-receipt/source-bound-decision-aid-discovery.js';
 import { validateSourceBoundEvergreenGuide } from '../sites/search-receipt/source-bound-evergreen-guide.js';
 import { validateSourceBoundInvestigationWorksheet } from '../sites/search-receipt/source-bound-investigation-worksheet.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
@@ -351,11 +356,21 @@ async function writeSiteTree(
   includeVideoMomentSearch: boolean,
 ): Promise<void> {
   const [
+    searchDecisionAid,
     searchGuide,
     searchWorksheet,
     searchStatusManifest,
     searchCentralManifest,
   ] = await Promise.all([
+    readFile(
+      join(
+        projectRoot(),
+        'sites',
+        'search-receipt',
+        'source-bound-decision-aid-discovery.json',
+      ),
+      'utf8',
+    ).then((content) => JSON.parse(content) as SourceBoundDecisionAidDiscovery),
     readFile(
       join(
         projectRoot(),
@@ -422,6 +437,18 @@ async function writeSiteTree(
       `Search Receipt investigation worksheet is not admitted: ${worksheetValidation.diagnostics.join(', ')}`,
     );
   }
+  const decisionAidValidation = validateSourceBoundDecisionAidDiscovery(
+    searchDecisionAid,
+    {
+      [searchStatusManifest.sourceId]: searchStatusManifest,
+    },
+  );
+  if (!decisionAidValidation.ok) {
+    throw new Error(
+      `Search Receipt decision aid is not admitted: ${decisionAidValidation.diagnostics.join(', ')}`,
+    );
+  }
+  const decisionAidPath = `${searchDecisionAid.metadata.canonicalSlugProposal}/`;
   const guidePath = `${searchGuide.metadata.canonicalSlugProposal}/`;
   const worksheetPath = `${searchWorksheet.metadata.canonicalSlugProposal}/`;
   const sourceBoundSkillRecords: SourceBoundPublicSkillLedgerRecord[] = receipts
@@ -523,6 +550,15 @@ async function writeSiteTree(
       await mkdir(
         join(
           directory,
+          ...searchDecisionAid.metadata.canonicalSlugProposal
+            .split('/')
+            .filter((segment) => segment !== ''),
+        ),
+        { recursive: true },
+      );
+      await mkdir(
+        join(
+          directory,
           ...searchGuide.metadata.canonicalSlugProposal
             .split('/')
             .filter((segment) => segment !== ''),
@@ -560,6 +596,20 @@ async function writeSiteTree(
             'investigation-worksheet.js',
           ),
           join(directory, 'investigation-worksheet.js'),
+        ),
+        writeFile(
+          join(
+            directory,
+            ...searchDecisionAid.metadata.canonicalSlugProposal
+              .split('/')
+              .filter((segment) => segment !== ''),
+            'index.html',
+          ),
+          renderSearchReceiptDecisionAidDiscovery(
+            site,
+            searchDecisionAid,
+            publicBaseUrl,
+          ),
         ),
         writeFile(
           join(
@@ -626,6 +676,12 @@ async function writeSiteTree(
         publicBaseUrl,
         site.siteId === 'search-receipt'
           ? {
+              featuredDecisionAid: {
+                path: decisionAidPath,
+                title: searchDecisionAid.metadata.title,
+                description: searchDecisionAid.metadata.description,
+                label: 'Choose the right resource',
+              },
               featuredGuide: {
                 path: guidePath,
                 title: searchGuide.metadata.title,
@@ -666,7 +722,7 @@ async function writeSiteTree(
         visible,
         publicBaseUrl,
         site.siteId === 'search-receipt'
-          ? [guidePath, worksheetPath]
+          ? [decisionAidPath, guidePath, worksheetPath]
           : site.siteId === 'skill-ledger'
             ? ['/inventory/']
             : [],
