@@ -246,6 +246,11 @@ function isAdmittedPublicSkillRecord(record) {
 }
 
 export function createPublicSkillLedgerFilters(overrides = {}) {
+  const evidenceClass =
+    overrides.evidenceClass === 'source-bound-observation' ||
+    overrides.evidenceClass === 'controlled-only'
+      ? overrides.evidenceClass
+      : '';
   const dependencyState =
     overrides.dependencyState === 'none' ||
     overrides.dependencyState === 'declared'
@@ -260,6 +265,7 @@ export function createPublicSkillLedgerFilters(overrides = {}) {
   return {
     query: String(overrides.query ?? '').trim(),
     declaredLicense: String(overrides.declaredLicense ?? '').trim(),
+    evidenceClass,
     dependencyState,
     staticSignalPresence,
   };
@@ -279,6 +285,9 @@ export function filterPublicSkillLedgerRecords(records, filters) {
     const matchesLicense =
       normalizedFilters.declaredLicense === '' ||
       record.declaredMetadata.license === normalizedFilters.declaredLicense;
+    const matchesEvidenceClass =
+      normalizedFilters.evidenceClass === '' ||
+      record.evidenceClass === normalizedFilters.evidenceClass;
     const dependencyState =
       record.evidenceClass === 'controlled-only'
         ? record.declaredMetadata.dependencies.length === 0
@@ -301,6 +310,7 @@ export function filterPublicSkillLedgerRecords(records, filters) {
     return (
       matchesQuery &&
       matchesLicense &&
+      matchesEvidenceClass &&
       matchesDependencies &&
       matchesStaticSignals
     );
@@ -805,6 +815,18 @@ export function initializePublicSkillLedgerInventory(
     );
   }
 
+  const evidenceClass = documentOwner.createElement('select');
+  evidenceClass.setAttribute('data-skill-ledger-evidence-class-filter', '');
+  evidenceClass.append(
+    createOption(documentOwner, '', 'All evidence classes'),
+    createOption(
+      documentOwner,
+      'source-bound-observation',
+      'Source-bound observations only',
+    ),
+    createOption(documentOwner, 'controlled-only', 'Controlled examples only'),
+  );
+
   const dependency = documentOwner.createElement('select');
   dependency.setAttribute('data-skill-ledger-dependency-filter', '');
   dependency.append(
@@ -837,6 +859,12 @@ export function initializePublicSkillLedgerInventory(
       'Package or source query',
       query,
       'skill-ledger-query',
+    ),
+    createLabeledControl(
+      documentOwner,
+      'Evidence class',
+      evidenceClass,
+      'skill-ledger-evidence-class-filter',
     ),
     createLabeledControl(
       documentOwner,
@@ -944,6 +972,7 @@ export function initializePublicSkillLedgerInventory(
     filters = createPublicSkillLedgerFilters({
       query: query.value,
       declaredLicense: license.value,
+      evidenceClass: evidenceClass.value,
       dependencyState: dependency.value,
       staticSignalPresence: staticSignal.value,
     });
@@ -954,11 +983,13 @@ export function initializePublicSkillLedgerInventory(
     applyFilters();
   });
   query.addEventListener('input', applyFilters);
+  evidenceClass.addEventListener('change', applyFilters);
   license.addEventListener('change', applyFilters);
   dependency.addEventListener('change', applyFilters);
   staticSignal.addEventListener('change', applyFilters);
   reset.addEventListener('click', () => {
     query.value = '';
+    evidenceClass.value = '';
     license.value = '';
     dependency.value = '';
     staticSignal.value = '';

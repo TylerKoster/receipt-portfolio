@@ -63,15 +63,15 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'current-original-guides',
+        area: 'searchable-filterable-discovery',
         rank: 1,
-        experiment: 'source-bound-original-link-utility-v1',
+        experiment: 'source-bound-evidence-class-filter-v1',
         status: 'active',
-        metric: 'source-bound original-link rendering coverage',
+        metric: 'evidence-class filter completion coverage',
         target:
-          'Each strictly admitted source-bound observation renders exact immutable raw source and same-commit license evidence URL anchors that users can choose to follow; controlled examples render neither anchor.',
+          'Users can select all records, source-bound observations only, or controlled examples only; counts, empty recovery, reset, and exactly-two selection remain deterministic without a record crossing its selected evidence class.',
         stopRule:
-          'Anchors use supplied admitted URLs only and do not fetch, collect, publish instruction bodies, execute, verify currentness or provenance, or establish security, safety, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
+          'The in-memory filter does not fetch, collect, persist, publish instruction bodies, execute, verify currentness or provenance, or establish security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
       },
       {
         area: 'current-original-guides',
@@ -174,6 +174,12 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-source-bound-observation',
         boundary:
           'The released admitted observation validates designated source and hash fields only; it does not establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
+      },
+      {
+        experiment: 'source-bound-original-link-utility-v1',
+        status: 'completed-public-source-link-utility',
+        boundary:
+          'Released exact immutable source and same-commit license anchors use supplied admitted URLs only; they do not establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
       },
     ]);
     expect(ledger.rejectedCandidates).toEqual([

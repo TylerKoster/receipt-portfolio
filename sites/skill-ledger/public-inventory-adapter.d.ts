@@ -63,6 +63,7 @@ export type PublicSkillLedgerRecord =
 export interface PublicSkillLedgerFilters {
   readonly query: string;
   readonly declaredLicense: string;
+  readonly evidenceClass: '' | 'source-bound-observation' | 'controlled-only';
   readonly dependencyState: '' | 'none' | 'declared';
   readonly staticSignalPresence: '' | 'absent' | 'present';
 }
@@ -70,6 +71,7 @@ export interface PublicSkillLedgerFilters {
 export interface PublicSkillLedgerFilterOverrides {
   readonly query?: string;
   readonly declaredLicense?: string;
+  readonly evidenceClass?: string;
   readonly dependencyState?: string;
   readonly staticSignalPresence?: string;
 }

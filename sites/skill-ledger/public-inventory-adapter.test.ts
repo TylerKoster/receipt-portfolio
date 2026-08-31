@@ -196,6 +196,68 @@ describe('SkillLedger public inventory adapter', () => {
     ).toEqual(['receipt-b']);
   });
 
+  it('keeps source-bound observations and controlled examples inside their selected evidence class', () => {
+    const sourceBound: PublicSkillLedgerRecord = {
+      receiptId: 'd'.repeat(64),
+      evidenceClass: 'source-bound-observation',
+      source: {
+        sourceId: 'microsoft-skill-creator',
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/.github/skills/skill-creator/SKILL.md',
+        observedAt: '2026-08-31T04:32:41.239Z',
+        publisher: 'Microsoft',
+        repository: 'https://github.com/microsoft/skills',
+        commit: '7066b58141d8cc66f39356b2ee5bb64d428dcf17',
+        path: '.github/skills/skill-creator/SKILL.md',
+      },
+      hashes: {
+        manifestSha256: 'e'.repeat(64),
+        rawSha256: 'f'.repeat(64),
+        normalizedSha256: '1'.repeat(64),
+      },
+      declaredMetadata: {
+        packageId: 'skill-creator',
+        description: 'Guide for creating effective skills.',
+        license: 'MIT License',
+        contentsSha256: '2'.repeat(64),
+      },
+      inheritedLicense: {
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE',
+        sha256: '3'.repeat(64),
+      },
+      coverage: {
+        manifest: 'not-assessed',
+        dependencies: 'not-assessed',
+        staticSignals: 'not-assessed',
+        instructionBody: 'not-published-or-executed',
+      },
+      boundary:
+        'Declared metadata only; no safety, endorsement, or suitability conclusion.',
+    };
+    const mixedRecords = [sourceBound, ...records];
+
+    expect(
+      filterPublicSkillLedgerRecords(mixedRecords, {
+        evidenceClass: 'source-bound-observation',
+      }).map((record) => record.receiptId),
+    ).toEqual([sourceBound.receiptId]);
+    expect(
+      filterPublicSkillLedgerRecords(mixedRecords, {
+        evidenceClass: 'controlled-only',
+      }).map((record) => record.receiptId),
+    ).toEqual(['receipt-a', 'receipt-b', 'receipt-c']);
+    expect(
+      createPublicSkillLedgerInventoryState(mixedRecords, {
+        filters: { evidenceClass: 'source-bound-observation' },
+      }),
+    ).toMatchObject({
+      count: 1,
+      total: 4,
+      empty: false,
+      statusMessage: 'Showing 1 of 4 records.',
+      filters: { evidenceClass: 'source-bound-observation' },
+    });
+  });
+
   it('constructs deterministic loading, ready, empty, and error states', () => {
     expect(
       createPublicSkillLedgerInventoryState(records, { phase: 'loading' }),
@@ -390,6 +452,79 @@ describe('SkillLedger public inventory adapter', () => {
       root.querySelector('[data-skill-ledger-comparison]')?.textContent,
     ).toContain('Select exactly two controlled records to compare.');
     expect(root.querySelector('[data-skill-ledger-error]')?.hidden).toBe(true);
+  });
+
+  it('renders an evidence-class select that filters, recovers from empty, and resets deterministically', () => {
+    const document = new FakeDocument();
+    const root = document.createElement('section');
+    const sourceBound = {
+      receiptId: 'd'.repeat(64),
+      evidenceClass: 'source-bound-observation',
+      source: {
+        sourceId: 'microsoft-skill-creator',
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/.github/skills/skill-creator/SKILL.md',
+        observedAt: '2026-08-31T04:32:41.239Z',
+        publisher: 'Microsoft',
+        repository: 'https://github.com/microsoft/skills',
+        commit: '7066b58141d8cc66f39356b2ee5bb64d428dcf17',
+        path: '.github/skills/skill-creator/SKILL.md',
+      },
+      hashes: {
+        manifestSha256: 'e'.repeat(64),
+        rawSha256: 'f'.repeat(64),
+        normalizedSha256: '1'.repeat(64),
+      },
+      declaredMetadata: {
+        packageId: 'skill-creator',
+        description: 'Guide for creating effective skills.',
+        license: 'MIT License',
+        contentsSha256: '2'.repeat(64),
+      },
+      inheritedLicense: {
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE',
+        sha256: '3'.repeat(64),
+      },
+      coverage: {
+        manifest: 'not-assessed',
+        dependencies: 'not-assessed',
+        staticSignals: 'not-assessed',
+        instructionBody: 'not-published-or-executed',
+      },
+      boundary:
+        'Declared metadata only; no safety, endorsement, or suitability conclusion.',
+    } as const satisfies PublicSkillLedgerRecord;
+    initializePublicSkillLedgerInventory(
+      root as unknown as PublicSkillLedgerRoot,
+      [sourceBound, ...records],
+    );
+
+    const evidenceClass = root.querySelector(
+      '[data-skill-ledger-evidence-class-filter]',
+    );
+    const query = root.querySelector('[data-skill-ledger-query]');
+    if (!evidenceClass || !query) throw new Error('expected filter controls');
+    expect(evidenceClass.tagName).toBe('select');
+    expect(evidenceClass.attributes.get('aria-label')).toBeUndefined();
+
+    evidenceClass.value = 'source-bound-observation';
+    evidenceClass.dispatch('change');
+    expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(1);
+    expect(root.textContent).toContain('skill-creator');
+    expect(root.textContent).not.toContain('alpha-package');
+    expect(root.querySelector('[data-skill-ledger-status]')?.textContent).toBe(
+      'Showing 1 of 4 records.',
+    );
+
+    query.value = 'missing';
+    query.dispatch('input');
+    expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(false);
+    expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
+
+    root.querySelector('[data-skill-ledger-reset]')?.dispatch('click');
+    expect(evidenceClass.value).toBe('');
+    expect(query.value).toBe('');
+    expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(4);
+    expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(true);
   });
 
   it('exposes an error state without suppressing controlled records', () => {
