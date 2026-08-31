@@ -29,6 +29,7 @@ const REQUIRED_SITE_FILES: Readonly<
 > = {
   'search-receipt': [
     ...RECEIPT_SITE_FILES,
+    'checklists/record-before-escalating-google-search-change/index.html',
     'discover/choose-google-search-guide-or-worksheet/index.html',
     'guides/is-google-search-down-or-my-site/index.html',
     'investigation-worksheet.js',

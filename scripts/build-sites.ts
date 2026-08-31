@@ -43,9 +43,14 @@ import {
   renderSearchReceiptInvestigationWorksheet,
   type SourceBoundInvestigationWorksheet,
 } from '../sites/search-receipt/render-investigation-worksheet.js';
+import {
+  renderSearchReceiptInvestigationHandoff,
+  type SourceBoundInvestigationHandoff,
+} from '../sites/search-receipt/render-investigation-handoff.js';
 import { validateSourceBoundDecisionAidDiscovery } from '../sites/search-receipt/source-bound-decision-aid-discovery.js';
 import { validateSourceBoundEvergreenGuide } from '../sites/search-receipt/source-bound-evergreen-guide.js';
 import { validateSourceBoundInvestigationWorksheet } from '../sites/search-receipt/source-bound-investigation-worksheet.js';
+import { validateSourceBoundInvestigationHandoff } from '../sites/search-receipt/source-bound-investigation-handoff.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
   DEFAULT_PUBLIC_BASE_URL,
@@ -356,12 +361,22 @@ async function writeSiteTree(
   includeVideoMomentSearch: boolean,
 ): Promise<void> {
   const [
+    searchHandoff,
     searchDecisionAid,
     searchGuide,
     searchWorksheet,
     searchStatusManifest,
     searchCentralManifest,
   ] = await Promise.all([
+    readFile(
+      join(
+        projectRoot(),
+        'sites',
+        'search-receipt',
+        'source-bound-investigation-handoff.json',
+      ),
+      'utf8',
+    ).then((content) => JSON.parse(content) as SourceBoundInvestigationHandoff),
     readFile(
       join(
         projectRoot(),
@@ -437,6 +452,18 @@ async function writeSiteTree(
       `Search Receipt investigation worksheet is not admitted: ${worksheetValidation.diagnostics.join(', ')}`,
     );
   }
+  const handoffValidation = validateSourceBoundInvestigationHandoff(
+    searchHandoff,
+    {
+      [searchStatusManifest.sourceId]: searchStatusManifest,
+      [searchCentralManifest.sourceId]: searchCentralManifest,
+    },
+  );
+  if (!handoffValidation.ok) {
+    throw new Error(
+      `Search Receipt investigation handoff is not admitted: ${handoffValidation.diagnostics.join(', ')}`,
+    );
+  }
   const decisionAidValidation = validateSourceBoundDecisionAidDiscovery(
     searchDecisionAid,
     {
@@ -450,6 +477,7 @@ async function writeSiteTree(
   }
   const decisionAidPath = `${searchDecisionAid.metadata.canonicalSlugProposal}/`;
   const guidePath = `${searchGuide.metadata.canonicalSlugProposal}/`;
+  const handoffPath = `${searchHandoff.metadata.canonicalSlugProposal}/`;
   const worksheetPath = `${searchWorksheet.metadata.canonicalSlugProposal}/`;
   const sourceBoundSkillRecords: SourceBoundPublicSkillLedgerRecord[] = receipts
     .filter(
@@ -550,6 +578,15 @@ async function writeSiteTree(
       await mkdir(
         join(
           directory,
+          ...searchHandoff.metadata.canonicalSlugProposal
+            .split('/')
+            .filter((segment) => segment !== ''),
+        ),
+        { recursive: true },
+      );
+      await mkdir(
+        join(
+          directory,
           ...searchDecisionAid.metadata.canonicalSlugProposal
             .split('/')
             .filter((segment) => segment !== ''),
@@ -596,6 +633,20 @@ async function writeSiteTree(
             'investigation-worksheet.js',
           ),
           join(directory, 'investigation-worksheet.js'),
+        ),
+        writeFile(
+          join(
+            directory,
+            ...searchHandoff.metadata.canonicalSlugProposal
+              .split('/')
+              .filter((segment) => segment !== ''),
+            'index.html',
+          ),
+          renderSearchReceiptInvestigationHandoff(
+            site,
+            searchHandoff,
+            publicBaseUrl,
+          ),
         ),
         writeFile(
           join(
@@ -687,6 +738,12 @@ async function writeSiteTree(
                 title: searchGuide.metadata.title,
                 description: searchGuide.metadata.description,
               },
+              featuredChecklist: {
+                path: handoffPath,
+                title: searchHandoff.metadata.title,
+                description: searchHandoff.metadata.description,
+                label: 'Open the handoff checklist',
+              },
               featuredUtility: {
                 path: worksheetPath,
                 title: searchWorksheet.metadata.title,
@@ -722,7 +779,7 @@ async function writeSiteTree(
         visible,
         publicBaseUrl,
         site.siteId === 'search-receipt'
-          ? [decisionAidPath, guidePath, worksheetPath]
+          ? [decisionAidPath, guidePath, handoffPath, worksheetPath]
           : site.siteId === 'skill-ledger'
             ? ['/inventory/']
             : [],

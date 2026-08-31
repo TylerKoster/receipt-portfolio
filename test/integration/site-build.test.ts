@@ -596,6 +596,48 @@ describe('static receipt site build', () => {
     );
   });
 
+  it('publishes and crosslinks the admitted Search Receipt investigation handoff', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const [home, handoff, sitemap] = await Promise.all([
+      readFile(join(outputDirectory, 'search-receipt', 'index.html'), 'utf8'),
+      readFile(
+        join(
+          outputDirectory,
+          'search-receipt',
+          'checklists',
+          'record-before-escalating-google-search-change',
+          'index.html',
+        ),
+        'utf8',
+      ),
+      readFile(join(outputDirectory, 'search-receipt', 'sitemap.xml'), 'utf8'),
+    ]);
+
+    expect(home).toContain(
+      'href="/search-receipt/checklists/record-before-escalating-google-search-change/"',
+    );
+    expect(handoff).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/search-receipt/checklists/record-before-escalating-google-search-change/">',
+    );
+    expect(handoff).toContain('data-investigation-handoff');
+    expect(handoff.match(/<h3>Step [1-4]<\/h3>/g)).toHaveLength(4);
+    expect(handoff).toContain(
+      'href="https://status.search.google.com/incidents.json"',
+    );
+    expect(handoff).toContain(
+      'href="https://feeds.feedburner.com/blogspot/amDG"',
+    );
+    expect(handoff).not.toContain('<form');
+    expect(handoff).not.toContain('<script type="module"');
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/search-receipt/checklists/record-before-escalating-google-search-change/</loc>',
+    );
+  });
+
   it('publishes the controlled SkillLedger inventory as a first-party interactive route', async () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -1200,6 +1242,34 @@ describe('static receipt site build', () => {
         ),
       ]);
       await Promise.all([
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-handoff.json',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-handoff.json',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-handoff.json',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'search-receipt',
+            'source-bound-investigation-handoff.json',
+          ),
+        ),
         realFileSystem.copyFile(
           join(
             projectRoot,

@@ -334,6 +334,12 @@ export function renderSite(
       readonly title: string;
       readonly description: string;
     };
+    readonly featuredChecklist?: {
+      readonly path: string;
+      readonly title: string;
+      readonly description: string;
+      readonly label: string;
+    };
     readonly featuredUtility?: {
       readonly path: string;
       readonly title: string;
@@ -400,6 +406,10 @@ export function renderSite(
     options.featuredDecisionAid === undefined
       ? ''
       : `<section class="information-panel" aria-labelledby="featured-decision-aid-heading"><p class="eyebrow">Choose a resource</p><h2 id="featured-decision-aid-heading">${escapeHtml(options.featuredDecisionAid.title)}</h2><p>${escapeHtml(options.featuredDecisionAid.description)}</p><p><a class="primary-action" href="${escapeHtml(sitePath(site, options.featuredDecisionAid.path, publicBaseUrl))}">${escapeHtml(options.featuredDecisionAid.label)}</a></p></section>`;
+  const featuredChecklist =
+    options.featuredChecklist === undefined
+      ? ''
+      : `<section class="information-panel" aria-labelledby="featured-checklist-heading"><p class="eyebrow">Manual handoff checklist</p><h2 id="featured-checklist-heading">${escapeHtml(options.featuredChecklist.title)}</h2><p>${escapeHtml(options.featuredChecklist.description)}</p><p><a class="primary-action" href="${escapeHtml(sitePath(site, options.featuredChecklist.path, publicBaseUrl))}">${escapeHtml(options.featuredChecklist.label)}</a></p></section>`;
   const featuredUtility =
     options.featuredUtility === undefined
       ? ''
@@ -410,7 +420,7 @@ export function renderSite(
       path: '/',
       title: site.title,
       description: site.description,
-      body: `${startHere}${featuredDecisionAid}${featuredGuide}${featuredUtility}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
+      body: `${startHere}${featuredDecisionAid}${featuredGuide}${featuredChecklist}${featuredUtility}${searchControls}<section aria-labelledby="receipts-heading"><p class="eyebrow">Source-bound records</p><h2 id="receipts-heading">Accepted receipts and examples</h2><p>Facts, interpretation, unknowns, and correction status remain visibly separate.</p><div class="receipt-list">${cards}</div></section>
     <section class="information-panel" aria-labelledby="topics-heading"><h2 id="topics-heading">Topics</h2><ul>${topics}</ul></section>${offer}`,
       scriptPath: assetPolicy.scriptPath,
       stylePath: assetPolicy.stylePath,

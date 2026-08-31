@@ -16,6 +16,7 @@ const EXPECTED_PATHS = [
   'index.html',
   'portfolio.css',
   'robots.txt',
+  'search-receipt/checklists/record-before-escalating-google-search-change/index.html',
   'search-receipt/discover/choose-google-search-guide-or-worksheet/index.html',
   'search-receipt/guides/is-google-search-down-or-my-site/index.html',
   'search-receipt/index.html',
@@ -63,7 +64,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '4ea19ee92babaf0be7094c609105f75f473a2fa64ce5f88a6f95187196f12c4a';
+  '9b95a02eeb904cd19f4d2ed3c696f8f22f0ec054c0c62c3dcbb2b5de2567583b';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
@@ -149,6 +150,22 @@ describe('public build manifest', () => {
       );
     },
   );
+
+  it('rejects a missing Search Receipt investigation handoff route', async () => {
+    await rm(
+      join(
+        outputDirectory,
+        'search-receipt',
+        'checklists',
+        'record-before-escalating-google-search-change',
+        'index.html',
+      ),
+    );
+
+    await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
+      /incomplete public output/i,
+    );
+  });
 
   it.each(['robots.txt', 'sitemap.xml'])(
     'rejects a missing root discovery file: %s',
