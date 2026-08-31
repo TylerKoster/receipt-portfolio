@@ -9,6 +9,11 @@ const statusManifestPath = new URL(
   '../../manifests/search-receipt/google-search-status.json',
   import.meta.url,
 );
+const coordinatorReleaseEvidence = {
+  releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
+  tag: 'v0.1.45',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 
 function admittedManifests() {
   const status = JSON.parse(readFileSync(statusManifestPath, 'utf8'));
@@ -42,8 +47,33 @@ describe('Search Receipt source-bound decision-aid discovery contract', () => {
       }),
     ]);
     expect(discovery.publication).toMatchObject({
-      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      status: 'ROUTE_RELEASE_VERIFIED',
       route: '/discover/choose-google-search-guide-or-worksheet/',
+      coordinatorReleaseEvidence,
+    });
+  });
+
+  it('fails closed when release evidence is stale', async () => {
+    const { validateSourceBoundDecisionAidDiscovery } =
+      await import('./source-bound-decision-aid-discovery.js');
+    const discovery = JSON.parse(readFileSync(discoveryPath, 'utf8'));
+    const staleEvidence = structuredClone(discovery);
+    staleEvidence.publication.status = 'ROUTE_RELEASE_VERIFIED';
+    staleEvidence.publication.coordinatorReleaseEvidence = {
+      ...coordinatorReleaseEvidence,
+      releaseHead: 'stale-release-head',
+    };
+
+    expect(
+      validateSourceBoundDecisionAidDiscovery(
+        staleEvidence,
+        admittedManifests(),
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: expect.arrayContaining([
+        'COORDINATOR_RELEASE_EVIDENCE_INVALID',
+      ]),
     });
   });
 

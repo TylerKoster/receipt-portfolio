@@ -10,6 +10,10 @@ const worksheetPath = new URL(
   './source-bound-investigation-worksheet.json',
   import.meta.url,
 );
+const discoveryPath = new URL(
+  './source-bound-decision-aid-discovery.json',
+  import.meta.url,
+);
 
 const observationBlocker =
   'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
@@ -21,6 +25,11 @@ const coordinatorReleaseEvidence = {
 const worksheetCoordinatorReleaseEvidence = {
   releaseHead: '3f36ae7bc83ff4e16c1f7d3c2a0bfa75a80158da',
   tag: 'v0.1.39',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
+const discoveryCoordinatorReleaseEvidence = {
+  releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
+  tag: 'v0.1.45',
   provenance: 'Coordinator-provided accepted release evidence.',
 };
 
@@ -186,19 +195,66 @@ function assertWorksheetReleaseEvidenceMatchesLedger(
   );
 }
 
+function assertDiscoveryReleaseEvidenceMatchesLedger(
+  discovery: Record<string, unknown>,
+  ledger: Record<string, unknown>,
+) {
+  const publication = discovery.publication as Record<string, unknown>;
+  const discoveryReleaseEvidence = publication.coordinatorReleaseEvidence;
+  const experiments = ledger.experiments as Array<Record<string, unknown>>;
+  const rankTwelve = experiments.find((experiment) => experiment.rank === 12);
+
+  expect(discoveryReleaseEvidence).toEqual(discoveryCoordinatorReleaseEvidence);
+  expect(rankTwelve).toMatchObject({
+    id: 'source-bound-decision-aid-discovery-v1',
+    rank: 12,
+  });
+  expect(rankTwelve?.coordinatorReleaseEvidence).toEqual(
+    discoveryReleaseEvidence,
+  );
+}
+
 describe('Search Receipt product experiment ledger', () => {
-  it('records the ranked decision-aid route as integrated pending release rather than an outcome', () => {
+  it('records the verified decision-aid route without claiming an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.experiments[11]).toMatchObject({
       id: 'source-bound-decision-aid-discovery-v1',
       rank: 12,
-      status: 'ROUTE_INTEGRATED_PENDING_RELEASE',
+      status: 'ROUTE_RELEASE_VERIFIED',
       noDataBoundary:
         'Internal content/discoverability contract admission is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'The coordinator-owned shared static route adapter is integrated; release and public verification remain pending and cannot be inferred from this contract.',
+        'The coordinator-owned shared static route adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.',
+      coordinatorReleaseEvidence: discoveryCoordinatorReleaseEvidence,
+      nextSafeAction:
+        'Maintain admitted route bindings and decision boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.',
     });
+  });
+
+  it('keeps the discovery contract and rank-twelve ledger release evidence in one accepted contract', () => {
+    const discovery = JSON.parse(readFileSync(discoveryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    assertDiscoveryReleaseEvidenceMatchesLedger(discovery, ledger);
+  });
+
+  it('rejects a rank-twelve ledger release-evidence mutation', () => {
+    const discovery = JSON.parse(readFileSync(discoveryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankTwelve = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 12,
+    );
+
+    rankTwelve.coordinatorReleaseEvidence = {
+      ...discoveryCoordinatorReleaseEvidence,
+      releaseHead: 'stale-release-head',
+    };
+
+    expect(() =>
+      assertDiscoveryReleaseEvidenceMatchesLedger(discovery, mutatedLedger),
+    ).toThrow();
   });
 
   it('preserves synthetic usability evidence and records the shipped retrieval surface without claiming measurement', () => {

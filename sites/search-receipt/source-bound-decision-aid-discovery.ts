@@ -56,6 +56,11 @@ interface SourceBoundDecisionAidDiscoveryCandidate {
     readonly adapter?: string;
     readonly coordinatorDependency?: string;
     readonly route?: string;
+    readonly coordinatorReleaseEvidence?: {
+      readonly releaseHead?: string;
+      readonly tag?: string;
+      readonly provenance?: string;
+    };
   };
 }
 
@@ -66,6 +71,12 @@ const approvedSourceBindings: Readonly<Record<string, string>> = Object.freeze({
 const admittedRouteBindings: Readonly<Record<string, string>> = Object.freeze({
   guide: '/guides/is-google-search-down-or-my-site/',
   worksheet: '/worksheets/compare-google-search-status-with-site-evidence',
+});
+
+const acceptedCoordinatorReleaseEvidence = Object.freeze({
+  releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
+  tag: 'v0.1.45',
+  provenance: 'Coordinator-provided accepted release evidence.',
 });
 
 function nonEmptyString(value: unknown): value is string {
@@ -258,7 +269,7 @@ export function validateSourceBoundDecisionAidDiscovery(
   }
 
   if (
-    candidate.publication?.status !== 'ROUTE_INTEGRATED_PENDING_RELEASE' ||
+    candidate.publication?.status !== 'ROUTE_RELEASE_VERIFIED' ||
     candidate.publication?.adapter !==
       'coordinator-owned shared static route adapter' ||
     !nonEmptyString(candidate.publication?.coordinatorDependency) ||
@@ -266,6 +277,16 @@ export function validateSourceBoundDecisionAidDiscovery(
       '/discover/choose-google-search-guide-or-worksheet/'
   ) {
     diagnostics.push('PUBLIC_ROUTE_INTEGRATION_INVALID');
+  }
+  if (
+    candidate.publication?.coordinatorReleaseEvidence?.releaseHead !==
+      acceptedCoordinatorReleaseEvidence.releaseHead ||
+    candidate.publication?.coordinatorReleaseEvidence?.tag !==
+      acceptedCoordinatorReleaseEvidence.tag ||
+    candidate.publication?.coordinatorReleaseEvidence?.provenance !==
+      acceptedCoordinatorReleaseEvidence.provenance
+  ) {
+    diagnostics.push('COORDINATOR_RELEASE_EVIDENCE_INVALID');
   }
 
   return { ok: diagnostics.length === 0, diagnostics };

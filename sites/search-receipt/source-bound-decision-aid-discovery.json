@@ -65,9 +65,14 @@
   ],
   "correctionAndCurrentnessPolicy": "Check the official source directly at decision time and make a correction to any discovery copy that misstates an admitted route, source, or boundary; do not turn historical route facts into current incident evidence.",
   "publication": {
-    "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+    "status": "ROUTE_RELEASE_VERIFIED",
     "adapter": "coordinator-owned shared static route adapter",
-    "coordinatorDependency": "The coordinator-owned shared static route adapter is integrated; release and public verification remain pending and cannot be inferred from this contract.",
-    "route": "/discover/choose-google-search-guide-or-worksheet/"
+    "coordinatorDependency": "The coordinator-owned shared static route adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.",
+    "route": "/discover/choose-google-search-guide-or-worksheet/",
+    "coordinatorReleaseEvidence": {
+      "releaseHead": "05448aecc2a8e93dc3ab661fdfe1a86840c17da2",
+      "tag": "v0.1.45",
+      "provenance": "Coordinator-provided accepted release evidence."
+    }
   }
 }

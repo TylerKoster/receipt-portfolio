@@ -204,15 +204,20 @@
     {
       "id": "source-bound-decision-aid-discovery-v1",
       "rank": 12,
-      "status": "ROUTE_INTEGRATED_PENDING_RELEASE",
+      "status": "ROUTE_RELEASE_VERIFIED",
       "hypothesis": "A narrowly scoped, source-bound decision aid may help a visitor choose between the published guide and worksheet without stating a current incident, diagnosis, causal explanation, traffic outcome, demand, conversion, willingness to pay, revenue, or another commercial outcome.",
       "firstUserOutcome": "Choose the guide before dated own-site evidence exists or the worksheet after dated own-site evidence exists, while retaining an unknown conclusion about status or cause.",
       "metric": "Deterministic admission of every required decision-aid, route binding, source/currentness/no-causation/privacy boundary, FAQ, and integrated route state.",
       "target": "100% deterministic admission and route integration before release.",
       "stopRule": "Stop release preparation if an admitted route, decision boundary, privacy boundary, source binding, or integrated route state cannot be verified.",
       "noDataBoundary": "Internal content/discoverability contract admission is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
-      "coordinatorDependency": "The coordinator-owned shared static route adapter is integrated; release and public verification remain pending and cannot be inferred from this contract.",
-      "nextSafeAction": "Await coordinator release and public verification while keeping the two admitted choices and boundaries current; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another outcome."
+      "coordinatorDependency": "The coordinator-owned shared static route adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.",
+      "coordinatorReleaseEvidence": {
+        "releaseHead": "05448aecc2a8e93dc3ab661fdfe1a86840c17da2",
+        "tag": "v0.1.45",
+        "provenance": "Coordinator-provided accepted release evidence."
+      },
+      "nextSafeAction": "Maintain admitted route bindings and decision boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
     }
   ]
 }
