@@ -4,31 +4,31 @@
   "syntheticOnly": true,
   "experimentPortfolio": [
     {
-      "area": "searchable-filterable-discovery",
+      "area": "source-bound-comparison",
       "rank": 1,
-      "experiment": "source-bound-evidence-class-filter-v1",
+      "experiment": "source-bound-comparison-readiness-v1",
       "status": "active",
+      "metric": "source-bound comparison readiness notice coverage",
+      "target": "When source-bound observations only is active and fewer than two admitted source-bound observations are shown, the inventory states the exact shown count and that two admitted source-bound observations are needed for source-bound comparison.",
+      "stopRule": "The in-memory notice does not fetch, collect, persist, publish instruction bodies, execute, infer another source, verify currentness or provenance, or establish security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment."
+    },
+    {
+      "area": "searchable-filterable-discovery",
+      "rank": 2,
+      "experiment": "source-bound-evidence-class-filter-v1",
+      "status": "completed-public-evidence-class-filter",
       "metric": "evidence-class filter completion coverage",
       "target": "Users can select all records, source-bound observations only, or controlled examples only; counts, empty recovery, reset, and exactly-two selection remain deterministic without a record crossing its selected evidence class.",
       "stopRule": "The in-memory filter does not fetch, collect, persist, publish instruction bodies, execute, verify currentness or provenance, or establish security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment."
     },
     {
       "area": "current-original-guides",
-      "rank": 2,
+      "rank": 3,
       "experiment": "controlled-guide-draft-admission-contract",
       "status": "completed-internal",
       "metric": "controlled guide draft admission coverage",
       "target": "Each controlled guide draft requires nonempty guide/source bindings and a quality-gated source receipt.",
       "stopRule": "Guide draft admission does not establish currentness, original authorship, real provenance, safety, adoption, demand, suitability, or public UI readiness."
-    },
-    {
-      "area": "source-bound-comparison",
-      "rank": 3,
-      "experiment": "controlled-comparison-field-differences",
-      "status": "completed-internal",
-      "metric": "controlled comparison field-difference coverage",
-      "target": "Exactly two quality-gated controlled records produce deterministic source, hash, declared-metadata, and static-signal-presence differences.",
-      "stopRule": "Field differences do not establish real provenance, safety, adoption, demand, suitability, or public UI readiness."
     },
     {
       "area": "discoverability",
@@ -102,6 +102,11 @@
       "experiment": "source-bound-original-link-utility-v1",
       "status": "completed-public-source-link-utility",
       "boundary": "Released exact immutable source and same-commit license anchors use supplied admitted URLs only; they do not establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment."
+    },
+    {
+      "experiment": "source-bound-evidence-class-filter-v1",
+      "status": "completed-public-evidence-class-filter",
+      "boundary": "Released in-memory evidence-class filtering separates admitted source-bound observations and controlled examples without fetching, collecting, persisting, executing, or establishing currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment."
     }
   ],
   "rejectedCandidates": [

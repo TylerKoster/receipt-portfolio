@@ -350,6 +350,18 @@ export function createPublicSkillLedgerComparison(records, receiptIds) {
   return { kind: 'ready', records: selectedRecords };
 }
 
+function sourceBoundComparisonReadinessMessage(phase, filters, visibleRecords) {
+  if (
+    phase !== 'ready' ||
+    filters.evidenceClass !== 'source-bound-observation' ||
+    visibleRecords.length >= 2
+  ) {
+    return '';
+  }
+  const count = visibleRecords.length;
+  return `Showing ${count} source-bound ${count === 1 ? 'observation' : 'observations'}. Two admitted source-bound observations are needed for source-bound comparison.`;
+}
+
 export function createPublicSkillLedgerInventoryState(records, options = {}) {
   const phase =
     options.phase === 'loading' || options.phase === 'error'
@@ -383,6 +395,8 @@ export function createPublicSkillLedgerInventoryState(records, options = {}) {
     total: records.length,
     empty: phase === 'ready' && visibleRecords.length === 0,
     statusMessage,
+    sourceBoundComparisonReadinessMessage:
+      sourceBoundComparisonReadinessMessage(phase, filters, visibleRecords),
     errorMessage: phase === 'error' ? String(options.errorMessage ?? '') : '',
     comparison: createPublicSkillLedgerComparison(records, selectedReceiptIds),
   };
@@ -897,6 +911,17 @@ export function initializePublicSkillLedgerInventory(
   comparison.setAttribute('data-skill-ledger-comparison', '');
   comparison.setAttribute('aria-label', 'Selected record comparison');
   comparison.setAttribute('aria-live', 'polite');
+  const sourceBoundComparisonReadiness = createTextElement(
+    documentOwner,
+    'p',
+    '',
+    {
+      'data-skill-ledger-source-bound-comparison-readiness': '',
+      role: 'status',
+      'aria-live': 'polite',
+    },
+  );
+  sourceBoundComparisonReadiness.hidden = true;
   root.append(
     heading,
     boundary,
@@ -905,6 +930,7 @@ export function initializePublicSkillLedgerInventory(
     controls,
     empty,
     results,
+    sourceBoundComparisonReadiness,
     comparison,
   );
 
@@ -936,6 +962,10 @@ export function initializePublicSkillLedgerInventory(
     root.setAttribute('data-skill-ledger-state', state.phase);
     status.textContent = state.statusMessage;
     empty.hidden = !state.empty;
+    sourceBoundComparisonReadiness.textContent =
+      state.sourceBoundComparisonReadinessMessage;
+    sourceBoundComparisonReadiness.hidden =
+      state.sourceBoundComparisonReadinessMessage === '';
     results.textContent = '';
     for (const record of state.visibleRecords) {
       results.append(

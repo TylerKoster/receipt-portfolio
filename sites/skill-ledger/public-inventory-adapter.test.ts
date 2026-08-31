@@ -255,7 +255,19 @@ describe('SkillLedger public inventory adapter', () => {
       empty: false,
       statusMessage: 'Showing 1 of 4 records.',
       filters: { evidenceClass: 'source-bound-observation' },
+      sourceBoundComparisonReadinessMessage:
+        'Showing 1 source-bound observation. Two admitted source-bound observations are needed for source-bound comparison.',
     });
+    expect(
+      createPublicSkillLedgerInventoryState([sourceBound, sourceBound], {
+        filters: { evidenceClass: 'source-bound-observation' },
+      }).sourceBoundComparisonReadinessMessage,
+    ).toBe('');
+    expect(
+      createPublicSkillLedgerInventoryState(mixedRecords, {
+        filters: { evidenceClass: 'controlled-only' },
+      }).sourceBoundComparisonReadinessMessage,
+    ).toBe('');
   });
 
   it('constructs deterministic loading, ready, empty, and error states', () => {
@@ -514,20 +526,32 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.querySelector('[data-skill-ledger-status]')?.textContent).toBe(
       'Showing 1 of 4 records.',
     );
+    const readiness = root.querySelector(
+      '[data-skill-ledger-source-bound-comparison-readiness]',
+    );
+    expect(readiness?.hidden).toBe(false);
+    expect(readiness?.textContent).toBe(
+      'Showing 1 source-bound observation. Two admitted source-bound observations are needed for source-bound comparison.',
+    );
 
     query.value = 'missing';
     query.dispatch('input');
     expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(false);
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
+    expect(readiness?.textContent).toBe(
+      'Showing 0 source-bound observations. Two admitted source-bound observations are needed for source-bound comparison.',
+    );
 
     root.querySelector('[data-skill-ledger-reset]')?.dispatch('click');
     expect(evidenceClass.value).toBe('');
     expect(query.value).toBe('');
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(4);
     expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(true);
+    expect(readiness?.hidden).toBe(true);
 
     evidenceClass.value = 'controlled-only';
     evidenceClass.dispatch('change');
+    expect(readiness?.hidden).toBe(true);
     const controlledSelections = root.querySelectorAll(
       '[data-skill-ledger-record-select]',
     );

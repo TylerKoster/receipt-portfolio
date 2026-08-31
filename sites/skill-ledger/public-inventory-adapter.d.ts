@@ -102,6 +102,7 @@ export interface PublicSkillLedgerInventoryState {
   readonly total: number;
   readonly empty: boolean;
   readonly statusMessage: string;
+  readonly sourceBoundComparisonReadinessMessage: string;
   readonly errorMessage: string;
   readonly comparison: PublicSkillLedgerComparison;
 }
