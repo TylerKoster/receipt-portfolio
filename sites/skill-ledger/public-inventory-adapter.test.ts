@@ -525,6 +525,48 @@ describe('SkillLedger public inventory adapter', () => {
     expect(query.value).toBe('');
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(4);
     expect(root.querySelector('[data-skill-ledger-empty]')?.hidden).toBe(true);
+
+    evidenceClass.value = 'controlled-only';
+    evidenceClass.dispatch('change');
+    const controlledSelections = root.querySelectorAll(
+      '[data-skill-ledger-record-select]',
+    );
+    controlledSelections[0].checked = true;
+    controlledSelections[0].dispatch('change');
+    controlledSelections[1].checked = true;
+    controlledSelections[1].dispatch('change');
+    expect(
+      root.querySelector('[data-skill-ledger-comparison]')?.textContent,
+    ).toContain('Ready comparison: alpha-package and beta-package.');
+
+    evidenceClass.value = 'source-bound-observation';
+    evidenceClass.dispatch('change');
+    const sourceBoundSelections = root.querySelectorAll(
+      '[data-skill-ledger-record-select]',
+    );
+    expect(sourceBoundSelections).toHaveLength(1);
+    expect(sourceBoundSelections[0].checked).toBe(false);
+    expect(
+      root.querySelector('[data-skill-ledger-comparison]')?.textContent,
+    ).toContain('Select exactly two records to compare.');
+
+    sourceBoundSelections[0].checked = true;
+    sourceBoundSelections[0].dispatch('change');
+    evidenceClass.value = '';
+    evidenceClass.dispatch('change');
+    expect(
+      root.querySelectorAll('[data-skill-ledger-record-select]')[0].checked,
+    ).toBe(true);
+    evidenceClass.value = 'controlled-only';
+    evidenceClass.dispatch('change');
+    expect(
+      root
+        .querySelectorAll('[data-skill-ledger-record-select]')
+        .every((selection) => !selection.checked),
+    ).toBe(true);
+    expect(
+      root.querySelector('[data-skill-ledger-comparison]')?.textContent,
+    ).toContain('Select exactly two records to compare.');
   });
 
   it('exposes an error state without suppressing controlled records', () => {

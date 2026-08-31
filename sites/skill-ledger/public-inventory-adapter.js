@@ -969,13 +969,26 @@ export function initializePublicSkillLedgerInventory(
   };
 
   const applyFilters = () => {
-    filters = createPublicSkillLedgerFilters({
+    const nextFilters = createPublicSkillLedgerFilters({
       query: query.value,
       declaredLicense: license.value,
       evidenceClass: evidenceClass.value,
       dependencyState: dependency.value,
       staticSignalPresence: staticSignal.value,
     });
+    if (
+      nextFilters.evidenceClass !== '' &&
+      nextFilters.evidenceClass !== filters.evidenceClass
+    ) {
+      selectedReceiptIds = selectedReceiptIds.filter((receiptId) =>
+        sourceRecords.some(
+          (record) =>
+            record.receiptId === receiptId &&
+            record.evidenceClass === nextFilters.evidenceClass,
+        ),
+      );
+    }
+    filters = nextFilters;
     render();
   };
   controls.addEventListener('submit', (event) => {
