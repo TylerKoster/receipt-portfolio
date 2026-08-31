@@ -997,6 +997,24 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
+  it('renders topic synthesis from the shared admitted discovery record', () => {
+    const syntheticCorpus = twoSourceFixture();
+    const synthesis = {
+      text: 'Shared project-original synthesis supplied once through discovery routes.',
+      isProjectOriginal: true,
+    } as const;
+    const topic = renderTopicPage(
+      syntheticCorpus,
+      buildSearchIndex(syntheticCorpus),
+      'robots-control',
+      baseUrl,
+      undefined,
+      { topics: [{ slug: 'robots-control', synthesis }] },
+    );
+    expect(topic).toContain(synthesis.text);
+    expect(topic).toContain('<meta name="robots" content="index,follow">');
+  });
+
   it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {
     const harness = executeClientPayload();
     await harness.resolveIndex(

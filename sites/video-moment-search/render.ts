@@ -588,21 +588,27 @@ export function renderTopicPage(
     entry.topicSlugs.includes(topicSlug),
   );
   const discovery = eligibleDiscoveryRoutes(corpus, {
-    topics: [
-      ...(synthesis === undefined ? [] : [{ slug: topicSlug, synthesis }]),
-      ...(discoveryRoutes.topics ?? []).filter(
-        (topic) => topic.slug !== topicSlug,
-      ),
-    ],
+    topics:
+      synthesis === undefined
+        ? discoveryRoutes.topics
+        : [
+            { slug: topicSlug, synthesis },
+            ...(discoveryRoutes.topics ?? []).filter(
+              (topic) => topic.slug !== topicSlug,
+            ),
+          ],
     guides: discoveryRoutes.guides,
   });
-  if (!discovery.topics.some((topic) => topic.slug === topicSlug)) {
+  const admittedTopic = discovery.topics.find(
+    (topic) => topic.slug === topicSlug,
+  );
+  if (admittedTopic === undefined) {
     return null;
   }
   const topicName = topicSlug.replaceAll('-', ' ');
   const title = `${topicName} video moments | AI Moment Index`;
   const suffix = `topics/${encodeURIComponent(topicSlug)}/`;
-  const body = `<article><h2>${escapeHtml(title)}</h2><p>${escapeHtml(synthesis!.text)}</p>${renderEntries(entries, baseUrl, discovery)}</article>`;
+  const body = `<article><h2>${escapeHtml(title)}</h2><p>${escapeHtml(admittedTopic.synthesis.text)}</p>${renderEntries(entries, baseUrl, discovery)}</article>`;
   return filteredPage(
     title,
     `A project-original comparison of independently sourced, reviewed ${topicName} moments.`,
