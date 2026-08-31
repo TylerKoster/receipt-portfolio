@@ -929,25 +929,72 @@ describe('AI Moment Index public search surface', () => {
       text: 'Project-original comparison of two sources <script>alert(1)</script> with explicit evidence limits.',
       isProjectOriginal: true,
     } as const;
+    const guideRecord = {
+      id: 'guide-accepted',
+      slug: 'compare-annotations',
+      title: 'Compare source-bound annotations',
+      summary: 'A synthetic local-only guide entry.',
+      updatedAt: '2026-08-30T12:00:00.000Z',
+      sourceMomentIds: syntheticCorpus.moments.map((moment) => moment.id),
+      synthesis,
+    } as const;
+    const discovery = {
+      topics: [{ slug: 'robots-control', synthesis }],
+      guides: [guideRecord],
+    } as const;
     const topic = renderTopicPage(
       syntheticCorpus,
       syntheticIndex,
       'robots-control',
       baseUrl,
       synthesis,
+      discovery,
     );
     const guide = renderGuidePage(
       syntheticCorpus,
       syntheticIndex,
       baseUrl,
-      synthesis,
+      guideRecord,
+      discovery,
     );
+    const canonicalPages = [
+      renderVideoPage(
+        syntheticCorpus,
+        syntheticIndex,
+        'video-independent-source',
+        baseUrl,
+        discovery,
+      ),
+      renderMomentPage(
+        syntheticCorpus,
+        syntheticIndex,
+        'moment-independent-source',
+        baseUrl,
+        discovery,
+      ),
+      renderCreatorPage(
+        syntheticCorpus,
+        syntheticIndex,
+        'synthetic-creator',
+        baseUrl,
+        discovery,
+      ),
+    ];
     expect(topic).toContain('<meta name="robots" content="index,follow">');
     expect(topic).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(topic).not.toContain('<script>alert(1)</script>');
     expect(topic).toContain('/moments/moment-independent-source/');
+    expect(topic).toContain('/guides/compare-annotations/');
     expect(guide).toContain('<meta name="robots" content="index,follow">');
+    expect(guide).toContain(
+      '<link rel="canonical" href="https://receipt-portfolio.example/video-moment-search/guides/compare-annotations/">',
+    );
     expect(guide).toContain('/videos/independent-source/');
+    expect(guide).toContain('/topics/robots-control/');
+    for (const canonicalPage of canonicalPages) {
+      expect(canonicalPage).toContain('/topics/robots-control/');
+      expect(canonicalPage).toContain('/guides/compare-annotations/');
+    }
   });
 
   it('executes the shipped payload and renders the fixed query as an exact ordinary anchor', async () => {

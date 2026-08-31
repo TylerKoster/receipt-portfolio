@@ -144,14 +144,20 @@ describe('video moment search SEO', () => {
     );
   });
 
-  it('includes a stable thumbnail only when explicit media evidence supplies it', () => {
-    const xml = renderVideoSitemap(corpus, baseUrl, {
+  it('omits an arbitrary thumbnail URL that has no source-bound review evidence', () => {
+    const renderWithUnsupportedThumbnailInput =
+      renderVideoSitemap as unknown as (
+        corpus: VideoCorpus,
+        origin: string,
+        unsupported: unknown,
+      ) => string;
+    const xml = renderWithUnsupportedThumbnailInput(corpus, baseUrl, {
       'video-robots-under-control': {
         thumbnailUrl: 'https://images.example/synthetic-reviewed-thumbnail.jpg',
       },
     });
-    expect(xml).toContain(
-      '<video:thumbnail_loc>https://images.example/synthetic-reviewed-thumbnail.jpg</video:thumbnail_loc>',
+    expect(xml).not.toContain(
+      'https://images.example/synthetic-reviewed-thumbnail.jpg',
     );
     expect(xml).toContain('<video:player_loc>');
   });
@@ -207,6 +213,30 @@ describe('video moment search SEO', () => {
     expect(feed).not.toContain('invalid-date');
   });
 
+  it('lists eligible topic and guide canonicals in the normal sitemap', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const synthesis = {
+      text: 'This project-original comparison distinguishes the two independent source annotations and their evidence limits.',
+      isProjectOriginal: true,
+    } as const;
+    const xml = renderSitemap(syntheticCorpus, baseUrl, {
+      topics: [{ slug: 'robots-control', synthesis }],
+      guides: [
+        {
+          id: 'guide-accepted',
+          slug: 'compare-annotations',
+          title: 'Compare source-bound annotations',
+          summary: 'A synthetic local-only guide entry.',
+          updatedAt: '2026-08-30T12:00:00.000Z',
+          sourceMomentIds: syntheticCorpus.moments.map((moment) => moment.id),
+          synthesis,
+        },
+      ],
+    });
+    expect(xml).toContain('/topics/robots-control/');
+    expect(xml).toContain('/guides/compare-annotations/');
+  });
+
   it('fails closed instead of fabricating an update date for an empty feed', () => {
     const emptyCorpus: VideoCorpus = {
       corpusId: 'synthetic-empty-corpus',
@@ -248,6 +278,30 @@ describe('video moment search SEO', () => {
         text: 'Unattested synthesis is rejected.',
         isProjectOriginal: false,
       }),
+    ).toBe(false);
+  });
+
+  it('rejects two video records that resolve to the same source URL', () => {
+    const syntheticCorpus = twoSourceCorpus();
+    const sharedSource = syntheticCorpus.videos[0]!.sourceUrl;
+    const sameSourceCorpus: VideoCorpus = {
+      ...syntheticCorpus,
+      videos: syntheticCorpus.videos.map((candidate, index) =>
+        index === 1 ? { ...candidate, sourceUrl: sharedSource } : candidate,
+      ),
+      rights: syntheticCorpus.rights.map((grant, index) =>
+        index === 1 ? { ...grant, coveredSourceUrls: [sharedSource] } : grant,
+      ),
+    };
+    expect(
+      isDiscoveryPageEligible(
+        sameSourceCorpus,
+        sameSourceCorpus.moments.map((moment) => moment.id),
+        {
+          text: 'This attested synthesis must still fail because both records share one source URL.',
+          isProjectOriginal: true,
+        },
+      ),
     ).toBe(false);
   });
 

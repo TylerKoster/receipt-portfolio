@@ -53,8 +53,19 @@ export interface FeedGuide {
   readonly synthesis: OriginalSynthesis;
 }
 
-export interface VideoSitemapMediaEvidence {
-  readonly thumbnailUrl?: string;
+export interface TopicDiscoveryPage {
+  readonly slug: string;
+  readonly synthesis: OriginalSynthesis;
+}
+
+export interface DiscoveryRoutes {
+  readonly topics?: readonly TopicDiscoveryPage[];
+  readonly guides?: readonly FeedGuide[];
+}
+
+export interface EligibleDiscoveryRoutes {
+  readonly topics: readonly TopicDiscoveryPage[];
+  readonly guides: readonly FeedGuide[];
 }
 
 function siteRoot(origin: string): string {
@@ -91,25 +102,6 @@ function xml(value: string): string {
 
 function isoDuration(seconds: number): string {
   return `PT${seconds}S`;
-}
-
-function stableHttpsAssetUrl(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  try {
-    const url = new URL(value);
-    if (
-      url.protocol !== 'https:' ||
-      url.username !== '' ||
-      url.password !== '' ||
-      url.search !== '' ||
-      url.hash !== ''
-    ) {
-      return undefined;
-    }
-    return url.href;
-  } catch {
-    return undefined;
-  }
 }
 
 function formatSeconds(seconds: number): string {
@@ -234,10 +226,16 @@ export function isDiscoveryPageEligible(
   const moments = corpus.moments.filter(
     (moment) => requestedIds.has(moment.id) && isPublicMoment(moment),
   );
+  const videosById = new Map(corpus.videos.map((video) => [video.id, video]));
+  const sourceUrls = new Set(
+    moments.map(
+      (moment) => new URL(videosById.get(moment.videoId)!.sourceUrl).href,
+    ),
+  );
   if (
     moments.length !== requestedIds.size ||
     requestedIds.size < 2 ||
-    new Set(moments.map((moment) => moment.videoId)).size < 2
+    sourceUrls.size < 2
   ) {
     return false;
   }
@@ -248,7 +246,48 @@ export function isDiscoveryPageEligible(
   );
 }
 
-export function renderSitemap(corpus: VideoCorpus, origin: string): string {
+export function eligibleDiscoveryRoutes(
+  corpus: VideoCorpus,
+  routes: DiscoveryRoutes = {},
+): EligibleDiscoveryRoutes {
+  const topics = (routes.topics ?? [])
+    .filter(
+      (topic) =>
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(topic.slug) &&
+        isDiscoveryPageEligible(
+          corpus,
+          corpus.moments
+            .filter((moment) => moment.topicSlugs.includes(topic.slug))
+            .map((moment) => moment.id),
+          topic.synthesis,
+        ),
+    )
+    .filter(
+      (topic, index, candidates) =>
+        candidates.findIndex((candidate) => candidate.slug === topic.slug) ===
+        index,
+    )
+    .toSorted((left, right) => left.slug.localeCompare(right.slug));
+  const guides = (routes.guides ?? [])
+    .filter(
+      (guide) =>
+        hasCompleteFeedMetadata(guide) &&
+        isDiscoveryPageEligible(corpus, guide.sourceMomentIds, guide.synthesis),
+    )
+    .filter(
+      (guide, index, candidates) =>
+        candidates.findIndex((candidate) => candidate.slug === guide.slug) ===
+        index,
+    )
+    .toSorted((left, right) => left.slug.localeCompare(right.slug));
+  return { topics, guides };
+}
+
+export function renderSitemap(
+  corpus: VideoCorpus,
+  origin: string,
+  discoveryRoutes: DiscoveryRoutes = {},
+): string {
   assertValidCorpus(corpus);
   const publicMoments = corpus.moments.filter(isPublicMoment);
   const videoIds = new Set(publicMoments.map((moment) => moment.videoId));
@@ -257,6 +296,7 @@ export function renderSitemap(corpus: VideoCorpus, origin: string): string {
       .filter((video) => videoIds.has(video.id))
       .map((video) => video.creatorId),
   );
+  const discovery = eligibleDiscoveryRoutes(corpus, discoveryRoutes);
   const locations = [
     ...corpus.videos
       .filter((video) => videoIds.has(video.id))
@@ -267,6 +307,12 @@ export function renderSitemap(corpus: VideoCorpus, origin: string): string {
     ...[...creatorIds].map((creatorId) =>
       canonicalUrl(origin, `creators/${creatorId}/`),
     ),
+    ...discovery.topics.map((topic) =>
+      canonicalUrl(origin, `topics/${topic.slug}/`),
+    ),
+    ...discovery.guides.map((guide) =>
+      canonicalUrl(origin, `guides/${guide.slug}/`),
+    ),
   ].sort();
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locations.map((location) => `  <url><loc>${xml(location)}</loc></url>`).join('\n')}\n</urlset>\n`;
 }
@@ -274,7 +320,6 @@ export function renderSitemap(corpus: VideoCorpus, origin: string): string {
 export function renderVideoSitemap(
   corpus: VideoCorpus,
   origin: string,
-  mediaEvidence: Readonly<Record<string, VideoSitemapMediaEvidence>> = {},
 ): string {
   assertValidCorpus(corpus);
   const urls = corpus.videos.flatMap((video) => {
@@ -287,15 +332,8 @@ export function renderVideoSitemap(
       );
     if (moments.length === 0) return [];
     const first = moments[0]!;
-    const thumbnailUrl = stableHttpsAssetUrl(
-      mediaEvidence[video.id]?.thumbnailUrl,
-    );
-    const thumbnail =
-      thumbnailUrl === undefined
-        ? ''
-        : `\n      <video:thumbnail_loc>${xml(thumbnailUrl)}</video:thumbnail_loc>`;
     return [
-      `  <url>\n    <loc>${xml(canonicalUrl(origin, `videos/${video.slug}/`))}</loc>\n    <video:video>\n      <video:title>${xml(video.title)}</video:title>\n      <video:description>${xml(first.excerpt)}</video:description>${thumbnail}\n      <video:player_loc>${xml(buildTimestampUrl(video, first.startSeconds))}</video:player_loc>\n      <video:duration>${video.durationSeconds}</video:duration>\n    </video:video>\n  </url>`,
+      `  <url>\n    <loc>${xml(canonicalUrl(origin, `videos/${video.slug}/`))}</loc>\n    <video:video>\n      <video:title>${xml(video.title)}</video:title>\n      <video:description>${xml(first.excerpt)}</video:description>\n      <video:player_loc>${xml(buildTimestampUrl(video, first.startSeconds))}</video:player_loc>\n      <video:duration>${video.durationSeconds}</video:duration>\n    </video:video>\n  </url>`,
     ];
   });
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${urls.join('\n')}\n</urlset>\n`;
@@ -317,11 +355,7 @@ export function renderAtomFeed(
   const videos = new Map(corpus.videos.map((video) => [video.id, video]));
   const grants = new Map(corpus.rights.map((grant) => [grant.id, grant]));
   const moments = corpus.moments.filter(isPublicMoment);
-  const eligibleGuides = guides.filter(
-    (guide) =>
-      hasCompleteFeedMetadata(guide) &&
-      isDiscoveryPageEligible(corpus, guide.sourceMomentIds, guide.synthesis),
-  );
+  const eligibleGuides = eligibleDiscoveryRoutes(corpus, { guides }).guides;
   const updates = [
     ...moments.map(
       (moment) => grants.get(moment.rightsGrantId)!.permissionVerifiedAt,
