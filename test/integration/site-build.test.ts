@@ -17,7 +17,12 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canonicalJson,
+  createReceipt,
+  evaluatePublication,
+  manifestSha256,
+  sha256,
   type Receipt,
+  validateManifest,
 } from '../../packages/evidence-core/src/index.js';
 import {
   buildSites,
@@ -29,6 +34,16 @@ import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { searchReceiptSite } from '../../sites/search-receipt/index.js';
 import { escapeHtml, renderSite } from '../../sites/shared/render.js';
 import { skillLedgerSite } from '../../sites/skill-ledger/index.js';
+import {
+  MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION,
+  admitMicrosoftSkillCreatorObservation,
+  type MicrosoftSkillCreatorObservation,
+} from '../../sites/skill-ledger/microsoft-skill-creator-source-observation.js';
+import {
+  CONTROLLED_PUBLIC_SKILL_RECORDS,
+  filterPublicSkillLedgerRecords,
+  type PublicSkillLedgerRecord,
+} from '../../sites/skill-ledger/public-inventory-adapter.js';
 import { workflowTestLabSite } from '../../sites/workflow-test-lab/index.js';
 
 vi.mock('node:fs/promises', async () => {
@@ -118,6 +133,118 @@ async function collectAcceptedFixtures(): Promise<void> {
     undefined,
     'skill-inventory-v1.json',
     { evidenceDirectory: testEvidenceDirectory },
+  );
+  const observedAt = '2026-08-31T04:32:41.239Z';
+  const observation: MicrosoftSkillCreatorObservation = {
+    observedAt,
+    source: {
+      repository: MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.repository,
+      commit: MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.commit,
+      path: MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.path,
+      rawUrl: MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.rawUrl,
+      publisher: MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.publisher,
+    },
+    inheritedLicense: {
+      ...MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.inheritedLicense,
+    },
+    raw: { ...MICROSOFT_SKILL_CREATOR_SOURCE_DESIGNATION.raw },
+    declaredMetadata: {
+      name: 'skill-creator',
+      description:
+        'Guide for creating effective skills for AI coding agents working with Azure SDKs and Microsoft Foundry services. Use when creating new skills or updating existing skills.',
+    },
+  };
+  const manifest = validateManifest(
+    JSON.parse(
+      await readFile(
+        join(
+          projectRoot,
+          'manifests',
+          'skill-ledger',
+          'microsoft-skill-creator.json',
+        ),
+        'utf8',
+      ),
+    ),
+  );
+  const publicFacts = admitMicrosoftSkillCreatorObservation(observation);
+  const rawBytes = Buffer.from(canonicalJson(observation), 'utf8');
+  const normalizedBytes = Buffer.from(canonicalJson(publicFacts), 'utf8');
+  const rawSha256 = sha256(rawBytes);
+  const normalizedSha256 = sha256(normalizedBytes);
+  const gateInputs = {
+    manifestValid: true,
+    enabled: true,
+    publicationMode: 'auto-facts-only' as const,
+    evidenceClass: 'live-source' as const,
+    rawSha256,
+    normalizedSha256,
+    ambiguous: false,
+    diffRatio: 0,
+  };
+  const policy = evaluatePublication(gateInputs);
+  const receipt = createReceipt({
+    siteId: 'skill-ledger',
+    sourceId: manifest.sourceId,
+    observedAt,
+    sourceUrl: manifest.endpoint,
+    manifestSha256: manifestSha256(manifest),
+    rawSha256,
+    normalizedSha256,
+    rawObjectPath: `objects/raw/${rawSha256}.bin`,
+    normalizedObjectPath: `objects/normalized/${normalizedSha256}.json`,
+    sequence: 1,
+    topicSlug: 'skill-creator',
+    provenance: {
+      evidenceClass: 'live-source',
+      publicationMode: manifest.publicationMode,
+      publisherName: manifest.publisherName,
+      sourceClass: manifest.sourceClass,
+      extractionSelector: manifest.extractionSelector,
+      extractionContractId: manifest.extractionContractId,
+      normalizerId: manifest.normalizerId,
+      diffStrategyId: manifest.diffStrategyId,
+      schemaId: manifest.schemaId,
+    },
+    publicFacts,
+    interpretation: 'Controlled integration evidence.',
+    unknowns: ['This integration fixture is not a live source observation.'],
+    correction: { kind: 'original' },
+    gateInputs,
+    policy: {
+      decision: policy.decision,
+      reasonCodes: [...policy.reasonCodes],
+    },
+  });
+  const files = [
+    [join(testEvidenceDirectory, receipt.payload.rawObjectPath), rawBytes],
+    [
+      join(testEvidenceDirectory, receipt.payload.normalizedObjectPath),
+      normalizedBytes,
+    ],
+    [
+      join(
+        testEvidenceDirectory,
+        'manifests',
+        `${receipt.payload.manifestSha256}.json`,
+      ),
+      Buffer.from(canonicalJson(manifest), 'utf8'),
+    ],
+    [
+      join(
+        testEvidenceDirectory,
+        'receipts',
+        'skill-ledger',
+        `${receipt.id}.json`,
+      ),
+      Buffer.from(canonicalJson(receipt), 'utf8'),
+    ],
+  ] as const;
+  await Promise.all(
+    files.map(async ([path, bytes]) => {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, bytes);
+    }),
   );
 }
 
@@ -435,29 +562,45 @@ describe('static receipt site build', () => {
       outputDirectory,
     });
 
-    const [portfolio, home, inventory, emittedAdapter, sourceAdapter, sitemap] =
-      await Promise.all([
-        readFile(join(outputDirectory, 'index.html'), 'utf8'),
-        readFile(join(outputDirectory, 'skill-ledger', 'index.html'), 'utf8'),
-        readFile(
-          join(outputDirectory, 'skill-ledger', 'inventory', 'index.html'),
-          'utf8',
+    const [
+      portfolio,
+      home,
+      inventory,
+      emittedAdapter,
+      sourceAdapter,
+      sourceData,
+      bootstrap,
+      sitemap,
+    ] = await Promise.all([
+      readFile(join(outputDirectory, 'index.html'), 'utf8'),
+      readFile(join(outputDirectory, 'skill-ledger', 'index.html'), 'utf8'),
+      readFile(
+        join(outputDirectory, 'skill-ledger', 'inventory', 'index.html'),
+        'utf8',
+      ),
+      readFile(
+        join(outputDirectory, 'skill-ledger', 'public-inventory-adapter.js'),
+        'utf8',
+      ),
+      readFile(
+        join(
+          projectRoot,
+          'sites',
+          'skill-ledger',
+          'public-inventory-adapter.js',
         ),
-        readFile(
-          join(outputDirectory, 'skill-ledger', 'public-inventory-adapter.js'),
-          'utf8',
-        ),
-        readFile(
-          join(
-            projectRoot,
-            'sites',
-            'skill-ledger',
-            'public-inventory-adapter.js',
-          ),
-          'utf8',
-        ),
-        readFile(join(outputDirectory, 'skill-ledger', 'sitemap.xml'), 'utf8'),
-      ]);
+        'utf8',
+      ),
+      readFile(
+        join(outputDirectory, 'skill-ledger', 'public-inventory-data.js'),
+        'utf8',
+      ),
+      readFile(
+        join(outputDirectory, 'skill-ledger', 'public-inventory-bootstrap.js'),
+        'utf8',
+      ),
+      readFile(join(outputDirectory, 'skill-ledger', 'sitemap.xml'), 'utf8'),
+    ]);
 
     expect(emittedAdapter).toBe(sourceAdapter);
     expect(inventory).toContain(
@@ -465,8 +608,34 @@ describe('static receipt site build', () => {
     );
     expect(inventory).toContain('data-skill-ledger-public-inventory');
     expect(inventory).toContain(
-      '<script type="module" src="/skill-ledger/public-inventory-adapter.js"></script>',
+      '<script type="module" src="/skill-ledger/public-inventory-bootstrap.js"></script>',
     );
+    expect(sourceData).toContain('microsoft-skill-creator');
+    expect(sourceData).toContain('7066b58141d8cc66f39356b2ee5bb64d428dcf17');
+    expect(sourceData).toContain('source-bound-observation');
+    expect(sourceData).not.toContain('##');
+    expect(bootstrap).toContain('SOURCE_BOUND_PUBLIC_SKILL_RECORDS');
+    const emittedRecords = JSON.parse(
+      sourceData
+        .replace('export const SOURCE_BOUND_PUBLIC_SKILL_RECORDS = ', '')
+        .replace(/;\s*$/u, ''),
+    ) as PublicSkillLedgerRecord[];
+    expect(emittedRecords).toHaveLength(1);
+    expect(emittedRecords[0]).toMatchObject({
+      evidenceClass: 'source-bound-observation',
+      source: { publisher: 'Microsoft' },
+      declaredMetadata: { packageId: 'skill-creator' },
+    });
+    const completeInventory = [
+      ...emittedRecords,
+      ...CONTROLLED_PUBLIC_SKILL_RECORDS,
+    ];
+    expect(completeInventory).toHaveLength(3);
+    expect(
+      filterPublicSkillLedgerRecords(completeInventory, {
+        query: 'skill-creator',
+      }).map((record) => record.receiptId),
+    ).toEqual([emittedRecords[0]?.receiptId]);
     expect(inventory).toContain("script-src 'self'");
     expect(home).toContain('href="/skill-ledger/inventory/"');
     expect(home).toContain('Open the interactive inventory');
@@ -1077,6 +1246,34 @@ describe('static receipt site build', () => {
             'sites',
             'skill-ledger',
             'public-inventory-adapter.js',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'skill-ledger',
+            'public-inventory-bootstrap.js',
+          ),
+          join(
+            firstRuntime,
+            'sites',
+            'skill-ledger',
+            'public-inventory-bootstrap.js',
+          ),
+        ),
+        realFileSystem.copyFile(
+          join(
+            projectRoot,
+            'sites',
+            'skill-ledger',
+            'public-inventory-bootstrap.js',
+          ),
+          join(
+            secondRuntime,
+            'sites',
+            'skill-ledger',
+            'public-inventory-bootstrap.js',
           ),
         ),
       ]);

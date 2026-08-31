@@ -58,6 +58,7 @@ import {
   renderSkillLedgerPublicInventory,
   skillLedgerSite,
 } from '../sites/skill-ledger/index.js';
+import type { SourceBoundPublicSkillLedgerRecord } from '../sites/skill-ledger/public-inventory-adapter.js';
 import { videoMomentSearchSite } from '../sites/video-moment-search/index.js';
 import { VIDEO_MOMENT_SEARCH_CLIENT } from '../sites/video-moment-search/search-client.js';
 import {
@@ -421,6 +422,60 @@ async function writeSiteTree(
   }
   const guidePath = `${searchGuide.metadata.canonicalSlugProposal}/`;
   const worksheetPath = `${searchWorksheet.metadata.canonicalSlugProposal}/`;
+  const sourceBoundSkillRecords: SourceBoundPublicSkillLedgerRecord[] = receipts
+    .filter(
+      (receipt) =>
+        receipt.payload.siteId === 'skill-ledger' &&
+        receipt.payload.policy.decision === 'PASS' &&
+        receipt.payload.publicFacts.kind === 'skill-source-metadata' &&
+        receipt.payload.provenance.evidenceClass === 'live-source' &&
+        receipt.payload.provenance.extractionContractId ===
+          'skill-declared-metadata-v1' &&
+        receipt.payload.provenance.schemaId ===
+          'skill-source-metadata-public-v1',
+    )
+    .map((receipt) => {
+      const facts = receipt.payload.publicFacts;
+      if (facts.kind !== 'skill-source-metadata') {
+        throw new Error('Skill source facts changed during build mapping');
+      }
+      return {
+        receiptId: receipt.id,
+        evidenceClass: 'source-bound-observation',
+        source: {
+          sourceId: receipt.payload.sourceId,
+          url: receipt.payload.sourceUrl,
+          observedAt: receipt.payload.observedAt,
+          publisher: receipt.payload.provenance.publisherName,
+          repository: facts.sourceRepository,
+          commit: facts.sourceCommit,
+          path: facts.sourcePath,
+        },
+        hashes: {
+          manifestSha256: receipt.payload.manifestSha256,
+          rawSha256: receipt.payload.rawSha256,
+          normalizedSha256: receipt.payload.normalizedSha256,
+        },
+        declaredMetadata: {
+          packageId: facts.packageId,
+          description: facts.description,
+          license: facts.declaredLicense,
+          contentsSha256: facts.contentsSha256,
+        },
+        inheritedLicense: {
+          url: facts.inheritedLicenseUrl,
+          sha256: facts.inheritedLicenseSha256,
+        },
+        coverage: {
+          manifest: 'not-assessed',
+          dependencies: 'not-assessed',
+          staticSignals: 'not-assessed',
+          instructionBody: 'not-published-or-executed',
+        },
+        boundary: facts.boundary,
+      };
+    });
+  const sourceBoundSkillDataModule = `export const SOURCE_BOUND_PUBLIC_SKILL_RECORDS = ${canonicalJson(sourceBoundSkillRecords).replaceAll('<', '\\u003c')};\n`;
 
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
@@ -534,6 +589,19 @@ async function writeSiteTree(
           ),
           join(directory, 'public-inventory-adapter.js'),
         ),
+        copyFile(
+          join(
+            projectRoot(),
+            'sites',
+            'skill-ledger',
+            'public-inventory-bootstrap.js',
+          ),
+          join(directory, 'public-inventory-bootstrap.js'),
+        ),
+        writeFile(
+          join(directory, 'public-inventory-data.js'),
+          sourceBoundSkillDataModule,
+        ),
         writeFile(
           join(directory, 'inventory', 'index.html'),
           renderSkillLedgerPublicInventory(publicBaseUrl),
@@ -564,9 +632,9 @@ async function writeSiteTree(
             ? {
                 featuredUtility: {
                   path: '/inventory/',
-                  title: 'Filter and compare controlled skill records',
+                  title: 'Filter and compare source-bound skill metadata',
                   description:
-                    'Use an enterable, in-page inventory to screen declared metadata and compare two source-bound controlled examples.',
+                    'Search one immutable Microsoft source observation alongside clearly labeled controlled examples, without installing or executing a skill.',
                   label: 'Open the interactive inventory',
                 },
               }

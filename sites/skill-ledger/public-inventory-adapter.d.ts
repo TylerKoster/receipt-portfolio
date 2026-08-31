@@ -1,4 +1,4 @@
-export interface PublicSkillLedgerRecord {
+export interface ControlledPublicSkillLedgerRecord {
   readonly receiptId: string;
   readonly evidenceClass: 'controlled-only';
   readonly source: {
@@ -21,6 +21,45 @@ export interface PublicSkillLedgerRecord {
   readonly staticSignals: readonly string[];
 }
 
+export interface SourceBoundPublicSkillLedgerRecord {
+  readonly receiptId: string;
+  readonly evidenceClass: 'source-bound-observation';
+  readonly source: {
+    readonly sourceId: string;
+    readonly url: string;
+    readonly observedAt: string;
+    readonly publisher: string;
+    readonly repository: string;
+    readonly commit: string;
+    readonly path: string;
+  };
+  readonly hashes: {
+    readonly manifestSha256: string;
+    readonly rawSha256: string;
+    readonly normalizedSha256: string;
+  };
+  readonly declaredMetadata: {
+    readonly packageId: string;
+    readonly description: string;
+    readonly license: string;
+    readonly contentsSha256: string;
+  };
+  readonly inheritedLicense: {
+    readonly url: string;
+    readonly sha256: string;
+  };
+  readonly coverage: {
+    readonly manifest: 'not-assessed';
+    readonly dependencies: 'not-assessed';
+    readonly staticSignals: 'not-assessed';
+    readonly instructionBody: 'not-published-or-executed';
+  };
+  readonly boundary: string;
+}
+
+export type PublicSkillLedgerRecord =
+  ControlledPublicSkillLedgerRecord | SourceBoundPublicSkillLedgerRecord;
+
 export interface PublicSkillLedgerFilters {
   readonly query: string;
   readonly declaredLicense: string;
@@ -42,7 +81,7 @@ export type PublicSkillLedgerComparison =
     }>
   | Readonly<{
       kind: 'not-ready';
-      reason: 'Select exactly two controlled records to compare.';
+      reason: string;
     }>;
 
 export interface PublicSkillLedgerInventoryOptions {

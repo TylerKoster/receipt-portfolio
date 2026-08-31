@@ -78,10 +78,26 @@ const SkillFactsSchema = z
     staticRiskFlags: z.array(z.string().min(1)),
   })
   .strict();
+const SkillSourceMetadataFactsSchema = z
+  .object({
+    kind: z.literal('skill-source-metadata'),
+    packageId: z.string().min(1),
+    description: z.string().min(1),
+    declaredLicense: z.string().min(1),
+    contentsSha256: SHA256,
+    sourceRepository: z.string().url(),
+    sourceCommit: z.string().regex(/^[a-f0-9]{40}$/),
+    sourcePath: z.string().min(1),
+    inheritedLicenseUrl: z.string().url(),
+    inheritedLicenseSha256: SHA256,
+    boundary: z.string().min(1),
+  })
+  .strict();
 const PublicFactsSchema = z.discriminatedUnion('kind', [
   SearchFactsSchema,
   WorkflowFactsSchema,
   SkillFactsSchema,
+  SkillSourceMetadataFactsSchema,
 ]);
 
 const CorrectionSchema = z.discriminatedUnion('kind', [
@@ -157,15 +173,45 @@ export const ReceiptPayloadSchema = z
           'sequence one must have no predecessor and later sequences must have one',
       });
     }
-    const expectedFactKind = {
-      'search-receipt': 'search-status',
-      'workflow-test-lab': 'workflow-experiment',
-      'skill-ledger': 'skill-inventory',
-    } as const;
-    if (payload.publicFacts.kind !== expectedFactKind[payload.siteId]) {
+    const factKindMatches =
+      (payload.siteId === 'search-receipt' &&
+        payload.publicFacts.kind === 'search-status') ||
+      (payload.siteId === 'workflow-test-lab' &&
+        payload.publicFacts.kind === 'workflow-experiment') ||
+      (payload.siteId === 'skill-ledger' &&
+        (payload.publicFacts.kind === 'skill-inventory' ||
+          payload.publicFacts.kind === 'skill-source-metadata'));
+    if (!factKindMatches) {
       context.addIssue({
         code: 'custom',
         message: 'public fact schema does not match receipt site',
+      });
+    }
+    if (
+      payload.publicFacts.kind === 'skill-source-metadata' &&
+      (payload.provenance.evidenceClass !== 'live-source' ||
+        payload.provenance.publicationMode !== 'auto-facts-only' ||
+        payload.provenance.sourceClass !== 'official-primary' ||
+        payload.provenance.extractionContractId !==
+          'skill-declared-metadata-v1' ||
+        payload.provenance.normalizerId !== 'skill-source-observation-v1' ||
+        payload.provenance.diffStrategyId !== 'source-record-v1' ||
+        payload.provenance.schemaId !== 'skill-source-metadata-public-v1')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'source-bound skill metadata requires exact live-source provenance',
+      });
+    }
+    if (
+      payload.publicFacts.kind === 'skill-inventory' &&
+      payload.provenance.schemaId !== 'skill-inventory-public-v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'controlled skill inventory facts require inventory provenance',
       });
     }
     const controlled =

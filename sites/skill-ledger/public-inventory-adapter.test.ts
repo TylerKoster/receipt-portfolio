@@ -9,6 +9,7 @@ import {
   filterPublicSkillLedgerRecords,
   initializePublicSkillLedgerInventory,
   updatePublicSkillLedgerSelection,
+  type ControlledPublicSkillLedgerRecord,
   type PublicSkillLedgerRecord,
   type PublicSkillLedgerRoot,
 } from './public-inventory-adapter.js';
@@ -121,7 +122,7 @@ function controlledRecord(
   license: string,
   dependencies: readonly string[],
   staticSignals: readonly string[],
-): PublicSkillLedgerRecord {
+): ControlledPublicSkillLedgerRecord {
   const character =
     receiptId === 'receipt-a' ? 'a' : receiptId === 'receipt-b' ? 'b' : 'c';
   return {
@@ -256,7 +257,7 @@ describe('SkillLedger public inventory adapter', () => {
     ).toEqual({
       selectedReceiptIds: ['receipt-a', 'receipt-b'],
       errorMessage:
-        'Select no more than two controlled records. The existing pair was kept.',
+        'Select no more than two records. The existing pair was kept.',
     });
   });
 
@@ -303,7 +304,7 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.textContent).toContain('Static-signal presence');
     expect(root.textContent).toContain(PUBLIC_SKILL_LEDGER_BOUNDARY);
     expect(root.textContent).toContain(
-      'No safety, runtime behavior, adoption, currentness, provenance, suitability, ranking, or recommendation conclusion is established.',
+      'No safety, runtime behavior, adoption, currentness, provenance, suitability, ranking, endorsement, or recommendation conclusion is established.',
     );
     const status = root.querySelector('[data-skill-ledger-status]');
     expect(status?.attributes.get('role')).toBe('status');
@@ -362,7 +363,7 @@ describe('SkillLedger public inventory adapter', () => {
     selections[2].dispatch('change');
     expect(selections[2].checked).toBe(false);
     expect(root.querySelector('[data-skill-ledger-error]')?.textContent).toBe(
-      'Select no more than two controlled records. The existing pair was kept.',
+      'Select no more than two records. The existing pair was kept.',
     );
     expect(
       root.querySelector('[data-skill-ledger-comparison]')?.textContent,
@@ -420,7 +421,7 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
     expect(root.textContent).not.toContain('alpha-package');
     expect(root.querySelector('[data-skill-ledger-error]')?.textContent).toBe(
-      'Supplied records failed controlled-only validation and were not shown.',
+      'Supplied records failed strict validation and were not shown.',
     );
   });
 
@@ -475,8 +476,100 @@ describe('SkillLedger public inventory adapter', () => {
     expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(0);
     expect(root.querySelector('[data-skill-ledger-error]')?.hidden).toBe(false);
     expect(root.querySelector('[data-skill-ledger-error]')?.textContent).toBe(
-      'Supplied records failed controlled-only validation and were not shown.',
+      'Supplied records failed strict validation and were not shown.',
     );
+  });
+
+  it('searches and labels one strictly source-bound observation beside controlled examples', () => {
+    const document = new FakeDocument();
+    const root = document.createElement('section');
+    const sourceBound = {
+      receiptId: 'd'.repeat(64),
+      evidenceClass: 'source-bound-observation',
+      source: {
+        sourceId: 'microsoft-skill-creator',
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/.github/skills/skill-creator/SKILL.md',
+        observedAt: '2026-08-31T04:32:41.239Z',
+        publisher: 'Microsoft',
+        repository: 'https://github.com/microsoft/skills',
+        commit: '7066b58141d8cc66f39356b2ee5bb64d428dcf17',
+        path: '.github/skills/skill-creator/SKILL.md',
+      },
+      hashes: {
+        manifestSha256: 'e'.repeat(64),
+        rawSha256: 'f'.repeat(64),
+        normalizedSha256: '1'.repeat(64),
+      },
+      declaredMetadata: {
+        packageId: 'skill-creator',
+        description: 'Guide for creating effective skills.',
+        license: 'MIT License',
+        contentsSha256: '2'.repeat(64),
+      },
+      inheritedLicense: {
+        url: 'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE',
+        sha256: '3'.repeat(64),
+      },
+      coverage: {
+        manifest: 'not-assessed',
+        dependencies: 'not-assessed',
+        staticSignals: 'not-assessed',
+        instructionBody: 'not-published-or-executed',
+      },
+      boundary:
+        'Declared metadata only; no safety, endorsement, or suitability conclusion.',
+    } as const satisfies PublicSkillLedgerRecord;
+
+    initializePublicSkillLedgerInventory(
+      root as unknown as PublicSkillLedgerRoot,
+      [sourceBound, records[0]],
+    );
+    expect(root.attributes.get('data-skill-ledger-state')).toBe('ready');
+    expect(root.textContent).toContain('Source-bound observation');
+    expect(root.textContent).toContain('Publisher named by sourceMicrosoft');
+    expect(root.textContent).toContain('Declared description');
+    expect(root.textContent).toContain('Declared dependenciesNot assessed');
+    expect(root.textContent).toContain(sourceBound.boundary);
+
+    const query = root.querySelector('[data-skill-ledger-query]');
+    if (!query) throw new Error('expected query control');
+    query.value = 'Microsoft';
+    query.dispatch('input');
+    expect(root.querySelectorAll('[data-skill-ledger-record]')).toHaveLength(1);
+    expect(root.textContent).toContain('skill-creator');
+    expect(root.textContent).not.toContain('controlled-alpha');
+    expect(
+      createPublicSkillLedgerInventoryState([sourceBound, records[0]], {
+        phase: 'error',
+        errorMessage: 'Filtering is unavailable.',
+      }).statusMessage,
+    ).toBe('Inventory controls are unavailable; all records remain visible.');
+
+    const comparisonRoot = document.createElement('section');
+    initializePublicSkillLedgerInventory(
+      comparisonRoot as unknown as PublicSkillLedgerRoot,
+      [sourceBound, records[0]],
+    );
+    const selectors = comparisonRoot.querySelectorAll(
+      '[data-skill-ledger-record-select]',
+    );
+    if (!selectors[0] || !selectors[1]) {
+      throw new Error('expected comparison selectors');
+    }
+    selectors[0].checked = true;
+    selectors[0].dispatch('change');
+    selectors[1].checked = true;
+    selectors[1].dispatch('change');
+    expect(comparisonRoot.textContent).toContain(
+      'Record typeDifferent — Left: Source-bound observation; Right: Controlled example',
+    );
+    expect(comparisonRoot.textContent).toContain(
+      `Evidence scopeDifferent — Left: ${sourceBound.boundary}; Right: Fictional controlled example; no real-source evidence`,
+    );
+    expect(comparisonRoot.textContent).toContain(
+      'Publisher named by sourceDifferent — Left: Microsoft; Right: Not applicable — fictional example',
+    );
+    expect(comparisonRoot.textContent).not.toContain('undefined');
   });
 
   it('contains no network, persistence, navigation, telemetry, or HTML-string sinks', async () => {

@@ -32,6 +32,8 @@ const EXPECTED_PATHS = [
   'skill-ledger/inventory/index.html',
   'skill-ledger/methodology/index.html',
   'skill-ledger/public-inventory-adapter.js',
+  'skill-ledger/public-inventory-bootstrap.js',
+  'skill-ledger/public-inventory-data.js',
   `skill-ledger/receipts/${'b'.repeat(64)}/index.html`,
   'skill-ledger/robots.txt',
   'skill-ledger/sitemap.xml',
@@ -58,7 +60,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '4c32549be8b04d552adf1c7514a51a18a14f881e2baf58ea3588e0cd0f0a7ee1';
+  '3b024a5a6531c74835217d084fffdaf0a0bc5d62fd33abb2468a38303bc850d9';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

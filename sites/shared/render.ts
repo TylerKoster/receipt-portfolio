@@ -168,6 +168,19 @@ function facts(factRecord: ReceiptPublicFacts): readonly [string, string][] {
             : factRecord.staticRiskFlags.join(', '),
         ],
       ];
+    case 'skill-source-metadata':
+      return [
+        ['Declared name', factRecord.packageId],
+        ['Declared description', factRecord.description],
+        ['Repository-inherited license', factRecord.declaredLicense],
+        ['Source repository', factRecord.sourceRepository],
+        ['Immutable source commit', factRecord.sourceCommit],
+        ['Source path', factRecord.sourcePath],
+        ['Source content SHA-256', factRecord.contentsSha256],
+        ['License reference', factRecord.inheritedLicenseUrl],
+        ['License content SHA-256', factRecord.inheritedLicenseSha256],
+        ['Evidence boundary', factRecord.boundary],
+      ];
   }
 }
 

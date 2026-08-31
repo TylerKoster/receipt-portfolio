@@ -165,6 +165,62 @@ describe('canonical evidence bytes', () => {
 });
 
 describe('append-only receipts', () => {
+  it('admits source-bound skill metadata only for SkillLedger', () => {
+    const skillInput: ReceiptInput = {
+      ...receiptInput,
+      siteId: 'skill-ledger',
+      sourceId: 'microsoft-skill-creator',
+      topicSlug: 'skill-creator',
+      provenance: {
+        evidenceClass: 'live-source',
+        publicationMode: 'auto-facts-only',
+        publisherName: 'Microsoft',
+        sourceClass: 'official-primary',
+        extractionSelector: 'yaml-frontmatter.name,description',
+        extractionContractId: 'skill-declared-metadata-v1',
+        normalizerId: 'skill-source-observation-v1',
+        diffStrategyId: 'source-record-v1',
+        schemaId: 'skill-source-metadata-public-v1',
+      },
+      publicFacts: {
+        kind: 'skill-source-metadata',
+        packageId: 'skill-creator',
+        description: 'Declared description.',
+        declaredLicense: 'MIT License',
+        contentsSha256: digest('4'),
+        sourceRepository: 'https://github.com/microsoft/skills',
+        sourceCommit: '7066b58141d8cc66f39356b2ee5bb64d428dcf17',
+        sourcePath: '.github/skills/skill-creator/SKILL.md',
+        inheritedLicenseUrl:
+          'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE',
+        inheritedLicenseSha256: digest('5'),
+        boundary:
+          'Declared metadata only; instruction content was not retained.',
+      },
+    };
+
+    const receipt = createReceipt(skillInput);
+    expect(verifyReceipt(receipt)).toEqual(receipt);
+    expect(() =>
+      verifyReceipt(createReceipt({ ...skillInput, siteId: 'search-receipt' })),
+    ).toThrow(/public fact schema/i);
+    expect(() =>
+      verifyReceipt(
+        createReceipt({
+          ...skillInput,
+          provenance: {
+            ...skillInput.provenance,
+            evidenceClass: 'controlled-example',
+          },
+          gateInputs: {
+            ...skillInput.gateInputs,
+            evidenceClass: 'controlled-example',
+          },
+        }),
+      ),
+    ).toThrow(/exact live-source provenance/i);
+  });
+
   it('creates a deterministic ID from canonical payload bytes', () => {
     const receipt = createReceipt(receiptInput);
 

@@ -27,16 +27,16 @@ describe('SkillLedger site copy', () => {
       '<link rel="canonical" href="https://tylerkoster.github.io/receipt-portfolio/skill-ledger/inventory/">',
     );
     expect(html.match(/data-skill-ledger-public-inventory/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Source-bound skill inventory"');
     expect(html).toContain(
-      'aria-label="Controlled source-bound skill inventory"',
+      'One observation tied to a specific microsoft/skills path and commit, plus fictional controlled examples.',
     );
-    expect(html).toContain('The records are controlled examples.');
     expect(html).toContain(
       '<noscript><p>Interactive filtering requires JavaScript. Reload after enabling it, or use the static receipt pages.</p></noscript>',
     );
     expect(html).toContain('>Inventory</a>');
     expect(html).toContain(
-      '<script type="module" src="/receipt-portfolio/skill-ledger/public-inventory-adapter.js"></script>',
+      '<script type="module" src="/receipt-portfolio/skill-ledger/public-inventory-bootstrap.js"></script>',
     );
     expect(html).toContain("script-src 'self'");
     expect(html).toContain("base-uri 'none'");

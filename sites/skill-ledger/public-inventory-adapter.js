@@ -1,10 +1,10 @@
-/* global document, URL */
+/* global URL */
 
 export const PUBLIC_SKILL_LEDGER_BOUNDARY =
-  'Controlled-only source-bound records support metadata screening. No safety, runtime behavior, adoption, currentness, provenance, suitability, ranking, or recommendation conclusion is established.';
+  'Source-bound observations and controlled examples support declared-metadata screening only. No safety, runtime behavior, adoption, currentness, provenance, suitability, ranking, endorsement, or recommendation conclusion is established.';
 
 export const PUBLIC_SKILL_LEDGER_SELECTION_ERROR =
-  'Select no more than two controlled records. The existing pair was kept.';
+  'Select no more than two records. The existing pair was kept.';
 
 export const CONTROLLED_PUBLIC_SKILL_RECORDS = Object.freeze([
   Object.freeze({
@@ -71,6 +71,16 @@ function isObject(value) {
   return value !== null && typeof value === 'object';
 }
 
+function hasExactFields(value, fields) {
+  if (!isObject(value) || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const expected = [...fields].sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((field, index) => field === expected[index])
+  );
+}
+
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim() !== '';
 }
@@ -127,6 +137,97 @@ function isControlledPublicSkillRecord(record) {
   );
 }
 
+function isSourceBoundPublicSkillRecord(record) {
+  if (
+    !hasExactFields(record, [
+      'receiptId',
+      'evidenceClass',
+      'source',
+      'hashes',
+      'declaredMetadata',
+      'inheritedLicense',
+      'coverage',
+      'boundary',
+    ]) ||
+    record.evidenceClass !== 'source-bound-observation' ||
+    !isSha256(record.receiptId) ||
+    !hasExactFields(record.source, [
+      'sourceId',
+      'url',
+      'observedAt',
+      'publisher',
+      'repository',
+      'commit',
+      'path',
+    ]) ||
+    !hasExactFields(record.hashes, [
+      'manifestSha256',
+      'rawSha256',
+      'normalizedSha256',
+    ]) ||
+    !hasExactFields(record.declaredMetadata, [
+      'packageId',
+      'description',
+      'license',
+      'contentsSha256',
+    ]) ||
+    !hasExactFields(record.inheritedLicense, ['url', 'sha256']) ||
+    !hasExactFields(record.coverage, [
+      'manifest',
+      'dependencies',
+      'staticSignals',
+      'instructionBody',
+    ])
+  ) {
+    return false;
+  }
+  let rawUrl;
+  let repositoryUrl;
+  let licenseUrl;
+  try {
+    rawUrl = new URL(record.source.url);
+    repositoryUrl = new URL(record.source.repository);
+    licenseUrl = new URL(record.inheritedLicense.url);
+  } catch {
+    return false;
+  }
+  return (
+    record.source.sourceId === 'microsoft-skill-creator' &&
+    record.source.publisher === 'Microsoft' &&
+    record.source.repository === 'https://github.com/microsoft/skills' &&
+    /^[a-f0-9]{40}$/u.test(record.source.commit) &&
+    record.source.path === '.github/skills/skill-creator/SKILL.md' &&
+    rawUrl.protocol === 'https:' &&
+    rawUrl.hostname === 'raw.githubusercontent.com' &&
+    rawUrl.pathname.includes(`/${record.source.commit}/`) &&
+    rawUrl.pathname.endsWith(`/${record.source.path}`) &&
+    repositoryUrl.protocol === 'https:' &&
+    licenseUrl.protocol === 'https:' &&
+    licenseUrl.hostname === 'raw.githubusercontent.com' &&
+    licenseUrl.pathname.includes(`/${record.source.commit}/`) &&
+    licenseUrl.pathname.endsWith('/LICENSE') &&
+    isStrictObservedTimestamp(record.source.observedAt) &&
+    Object.values(record.hashes).every(isSha256) &&
+    isNonEmptyString(record.declaredMetadata.packageId) &&
+    isNonEmptyString(record.declaredMetadata.description) &&
+    isNonEmptyString(record.declaredMetadata.license) &&
+    isSha256(record.declaredMetadata.contentsSha256) &&
+    isSha256(record.inheritedLicense.sha256) &&
+    record.coverage.manifest === 'not-assessed' &&
+    record.coverage.dependencies === 'not-assessed' &&
+    record.coverage.staticSignals === 'not-assessed' &&
+    record.coverage.instructionBody === 'not-published-or-executed' &&
+    isNonEmptyString(record.boundary)
+  );
+}
+
+function isAdmittedPublicSkillRecord(record) {
+  return (
+    isControlledPublicSkillRecord(record) ||
+    isSourceBoundPublicSkillRecord(record)
+  );
+}
+
 export function createPublicSkillLedgerFilters(overrides = {}) {
   const dependencyState =
     overrides.dependencyState === 'none' ||
@@ -155,19 +256,27 @@ export function filterPublicSkillLedgerRecords(records, filters) {
 
   return records.filter((record) => {
     const searchable = normalized(
-      `${record.declaredMetadata.packageId} ${record.source.sourceId} ${record.source.url}`,
+      `${record.declaredMetadata.packageId} ${record.declaredMetadata.description ?? ''} ${record.source.sourceId} ${record.source.url} ${record.source.publisher ?? ''}`,
     );
     const matchesQuery = queryTerms.every((term) => searchable.includes(term));
     const matchesLicense =
       normalizedFilters.declaredLicense === '' ||
       record.declaredMetadata.license === normalizedFilters.declaredLicense;
     const dependencyState =
-      record.declaredMetadata.dependencies.length === 0 ? 'none' : 'declared';
+      record.evidenceClass === 'controlled-only'
+        ? record.declaredMetadata.dependencies.length === 0
+          ? 'none'
+          : 'declared'
+        : 'not-assessed';
     const matchesDependencies =
       normalizedFilters.dependencyState === '' ||
       dependencyState === normalizedFilters.dependencyState;
     const staticSignalPresence =
-      record.staticSignals.length === 0 ? 'absent' : 'present';
+      record.evidenceClass === 'controlled-only'
+        ? record.staticSignals.length === 0
+          ? 'absent'
+          : 'present'
+        : 'not-assessed';
     const matchesStaticSignals =
       normalizedFilters.staticSignalPresence === '' ||
       staticSignalPresence === normalizedFilters.staticSignalPresence;
@@ -181,15 +290,21 @@ export function filterPublicSkillLedgerRecords(records, filters) {
   });
 }
 
-function countMessage(count, total) {
-  return `Showing ${count} of ${total} controlled ${total === 1 ? 'record' : 'records'}.`;
+function recordsAreControlledOnly(records) {
+  return records.every((record) => record.evidenceClass === 'controlled-only');
+}
+
+function countMessage(count, records) {
+  const qualifier = recordsAreControlledOnly(records) ? 'controlled ' : '';
+  return `Showing ${count} of ${records.length} ${qualifier}${records.length === 1 ? 'record' : 'records'}.`;
 }
 
 export function createPublicSkillLedgerComparison(records, receiptIds) {
+  const qualifier = recordsAreControlledOnly(records) ? 'controlled ' : '';
   if (receiptIds.length !== 2 || new Set(receiptIds).size !== 2) {
     return {
       kind: 'not-ready',
-      reason: 'Select exactly two controlled records to compare.',
+      reason: `Select exactly two ${qualifier}records to compare.`,
     };
   }
 
@@ -201,7 +316,7 @@ export function createPublicSkillLedgerComparison(records, receiptIds) {
   if (selectedRecords.length !== 2) {
     return {
       kind: 'not-ready',
-      reason: 'Select exactly two controlled records to compare.',
+      reason: `Select exactly two ${qualifier}records to compare.`,
     };
   }
 
@@ -223,10 +338,14 @@ export function createPublicSkillLedgerInventoryState(records, options = {}) {
         : filterPublicSkillLedgerRecords(records, filters);
   const statusMessage =
     phase === 'loading'
-      ? 'Loading controlled source-bound records.'
+      ? recordsAreControlledOnly(records)
+        ? 'Loading controlled source-bound records.'
+        : 'Loading source-bound observations and controlled examples.'
       : phase === 'error'
-        ? 'Inventory controls are unavailable; all controlled records remain visible.'
-        : countMessage(visibleRecords.length, records.length);
+        ? recordsAreControlledOnly(records)
+          ? 'Inventory controls are unavailable; all controlled records remain visible.'
+          : 'Inventory controls are unavailable; all records remain visible.'
+        : countMessage(visibleRecords.length, records);
 
   return {
     phase,
@@ -305,15 +424,33 @@ function appendDetail(documentOwner, list, label, value) {
 }
 
 function dependencyText(record) {
+  if (record.evidenceClass === 'source-bound-observation') {
+    return 'Not assessed';
+  }
   return record.declaredMetadata.dependencies.length === 0
     ? 'none declared'
     : record.declaredMetadata.dependencies.join(', ');
 }
 
 function staticSignalText(record) {
+  if (record.evidenceClass === 'source-bound-observation') {
+    return 'Not assessed';
+  }
   return record.staticSignals.length === 0
     ? 'absent in controlled static signals'
     : `present: ${record.staticSignals.join(', ')}`;
+}
+
+function comparisonEvidenceScopeText(record) {
+  return record.evidenceClass === 'source-bound-observation'
+    ? record.boundary
+    : 'Fictional controlled example; no real-source evidence';
+}
+
+function comparisonPublisherText(record) {
+  return record.evidenceClass === 'source-bound-observation'
+    ? record.source.publisher
+    : 'Not applicable — fictional example';
 }
 
 function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
@@ -348,6 +485,14 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
   const details = documentOwner.createElement('dl');
   appendDetail(documentOwner, details, 'Receipt ID', record.receiptId);
   appendDetail(documentOwner, details, 'Evidence class', record.evidenceClass);
+  appendDetail(
+    documentOwner,
+    details,
+    'Record type',
+    record.evidenceClass === 'source-bound-observation'
+      ? 'Source-bound observation'
+      : 'Controlled example',
+  );
   appendDetail(documentOwner, details, 'Source ID', record.source.sourceId);
   appendDetail(documentOwner, details, 'Source URL', record.source.url);
   appendDetail(
@@ -356,6 +501,27 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
     'Observed timestamp',
     record.source.observedAt,
   );
+  if (record.evidenceClass === 'source-bound-observation') {
+    appendDetail(
+      documentOwner,
+      details,
+      'Publisher named by source',
+      record.source.publisher,
+    );
+    appendDetail(
+      documentOwner,
+      details,
+      'Immutable source commit',
+      record.source.commit,
+    );
+    appendDetail(documentOwner, details, 'Source path', record.source.path);
+    appendDetail(
+      documentOwner,
+      details,
+      'Declared description',
+      record.declaredMetadata.description,
+    );
+  }
   appendDetail(
     documentOwner,
     details,
@@ -385,7 +551,11 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
     documentOwner,
     details,
     'Declared manifest',
-    record.declaredMetadata.manifestPresent ? 'present' : 'not present',
+    record.evidenceClass === 'source-bound-observation'
+      ? 'Not assessed'
+      : record.declaredMetadata.manifestPresent
+        ? 'present'
+        : 'not present',
   );
   appendDetail(
     documentOwner,
@@ -399,6 +569,21 @@ function renderRecord(documentOwner, record, selectedReceiptIds, onSelection) {
     'Static-signal presence',
     staticSignalText(record),
   );
+  if (record.evidenceClass === 'source-bound-observation') {
+    appendDetail(
+      documentOwner,
+      details,
+      'License evidence URL',
+      record.inheritedLicense.url,
+    );
+    appendDetail(
+      documentOwner,
+      details,
+      'License SHA-256',
+      record.inheritedLicense.sha256,
+    );
+    appendDetail(documentOwner, details, 'Evidence boundary', record.boundary);
+  }
   article.append(details);
   return article;
 }
@@ -422,6 +607,25 @@ function renderComparison(documentOwner, comparisonRoot, comparison) {
   );
   const details = documentOwner.createElement('dl');
   const comparisonRows = [
+    [
+      'Record type',
+      left.evidenceClass === 'source-bound-observation'
+        ? 'Source-bound observation'
+        : 'Controlled example',
+      right.evidenceClass === 'source-bound-observation'
+        ? 'Source-bound observation'
+        : 'Controlled example',
+    ],
+    [
+      'Evidence scope',
+      comparisonEvidenceScopeText(left),
+      comparisonEvidenceScopeText(right),
+    ],
+    [
+      'Publisher named by source',
+      comparisonPublisherText(left),
+      comparisonPublisherText(right),
+    ],
     ['Source ID', left.source.sourceId, right.source.sourceId],
     ['Source URL', left.source.url, right.source.url],
     ['Observed timestamp', left.source.observedAt, right.source.observedAt],
@@ -475,9 +679,10 @@ export function initializePublicSkillLedgerInventory(
 
   const recordsAreControlled =
     Array.isArray(records) &&
-    records.every(isControlledPublicSkillRecord) &&
+    records.every(isAdmittedPublicSkillRecord) &&
     new Set(records.map((record) => record.receiptId)).size === records.length;
   const sourceRecords = recordsAreControlled ? [...records] : [];
+  const controlledOnly = recordsAreControlledOnly(sourceRecords);
   root.textContent = '';
   root.setAttribute('data-skill-ledger-public-inventory', '');
   root.setAttribute('data-skill-ledger-state', 'loading');
@@ -485,7 +690,11 @@ export function initializePublicSkillLedgerInventory(
   const heading = createTextElement(
     documentOwner,
     'h2',
-    'Controlled source-bound skill inventory',
+    sourceRecords.some(
+      (record) => record.evidenceClass === 'source-bound-observation',
+    )
+      ? 'Source-bound skill inventory'
+      : 'Controlled source-bound skill inventory',
   );
   const boundary = createTextElement(
     documentOwner,
@@ -496,7 +705,9 @@ export function initializePublicSkillLedgerInventory(
   const status = createTextElement(
     documentOwner,
     'p',
-    'Loading controlled source-bound records.',
+    controlledOnly
+      ? 'Loading controlled source-bound records.'
+      : 'Loading source-bound observations and controlled examples.',
     {
       'data-skill-ledger-status': '',
       role: 'status',
@@ -511,14 +722,19 @@ export function initializePublicSkillLedgerInventory(
   const empty = createTextElement(
     documentOwner,
     'p',
-    'No controlled records match these in-memory filters. Clear filters to restore all records.',
+    controlledOnly
+      ? 'No controlled records match these in-memory filters. Clear filters to restore all records.'
+      : 'No records match these in-memory filters. Clear filters to restore all records.',
     { 'data-skill-ledger-empty': '' },
   );
   empty.hidden = true;
 
   const controls = documentOwner.createElement('form');
   controls.setAttribute('data-skill-ledger-controls', '');
-  controls.setAttribute('aria-label', 'Filter controlled skill records');
+  controls.setAttribute(
+    'aria-label',
+    controlledOnly ? 'Filter controlled skill records' : 'Filter skill records',
+  );
   const query = documentOwner.createElement('input');
   query.setAttribute('data-skill-ledger-query', '');
   query.setAttribute('type', 'search');
@@ -595,7 +811,10 @@ export function initializePublicSkillLedgerInventory(
 
   const results = documentOwner.createElement('div');
   results.setAttribute('data-skill-ledger-results', '');
-  results.setAttribute('aria-label', 'Controlled source-bound records');
+  results.setAttribute(
+    'aria-label',
+    controlledOnly ? 'Controlled source-bound records' : 'Skill records',
+  );
   const comparison = documentOwner.createElement('section');
   comparison.setAttribute('data-skill-ledger-comparison', '');
   comparison.setAttribute('aria-label', 'Selected record comparison');
@@ -703,16 +922,11 @@ export function initializePublicSkillLedgerInventory(
   if (!recordsAreControlled) {
     render(
       'error',
-      'Supplied records failed controlled-only validation and were not shown.',
+      'Supplied records failed strict validation and were not shown.',
     );
   } else {
     render();
   }
   root.setAttribute('data-skill-ledger-bound', 'true');
   return true;
-}
-
-if (typeof document !== 'undefined') {
-  const root = document.querySelector('[data-skill-ledger-public-inventory]');
-  if (root) initializePublicSkillLedgerInventory(root);
 }

@@ -30,7 +30,7 @@ jobs:
         run: npm run check
       - name: Run full test suite
         run: npm test -- --run
-      - name: Collect deterministic controlled examples
+      - name: Collect controlled and pinned-source evidence
         run: npm run evidence -- collect-fixtures
       - name: Verify exact nonempty evidence inventory
         run: npm run evidence -- verify --all

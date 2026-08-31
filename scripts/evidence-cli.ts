@@ -43,6 +43,11 @@ import {
   type ReceiptPublicFacts,
   type SourceManifest,
 } from '../packages/evidence-core/src/index.js';
+import {
+  admitMicrosoftSkillCreatorObservation,
+  createMicrosoftSkillCreatorObservationFromFetches,
+  type MicrosoftSkillCreatorPublicFacts,
+} from '../sites/skill-ledger/microsoft-skill-creator-source-observation.js';
 
 const USAGE =
   'Usage: evidence <collect-fixtures|verify --all> | evidence test-mutation | evidence dry-run-live [--output <artifacts/*.json>]';
@@ -228,6 +233,29 @@ async function loadManifest(
   return manifest;
 }
 
+async function loadMicrosoftSkillCreatorManifest(): Promise<SourceManifest> {
+  const manifest = validateManifest(
+    JSON.parse(
+      await readFile(
+        join(
+          projectRoot(),
+          'manifests',
+          'skill-ledger',
+          'microsoft-skill-creator.json',
+        ),
+        'utf8',
+      ),
+    ),
+  );
+  if (
+    manifest.siteId !== 'skill-ledger' ||
+    manifest.extractionContractId !== 'skill-declared-metadata-v1'
+  ) {
+    throw new Error('Microsoft skill source manifest is not admitted');
+  }
+  return manifest;
+}
+
 function fixturePath(
   siteId: SourceManifest['siteId'],
   fixtureName: string,
@@ -312,7 +340,17 @@ async function ensureRealDirectoryPath(path: string): Promise<string> {
       stats = await lstat(current);
     } catch (error) {
       if (!missingPath(error)) throw error;
-      await mkdir(current);
+      try {
+        await mkdir(current);
+      } catch (mkdirError) {
+        if (!(
+          mkdirError instanceof Error &&
+          'code' in mkdirError &&
+          mkdirError.code === 'EEXIST'
+        )) {
+          throw mkdirError;
+        }
+      }
       stats = await lstat(current);
     }
     if (stats.isSymbolicLink() || !stats.isDirectory()) {
@@ -367,6 +405,71 @@ async function persistReceipt(
     'RECEIPT_COLLISION',
   );
   return path;
+}
+
+const EVIDENCE_LOCK_WAIT_MS = 25;
+const EVIDENCE_LOCK_TIMEOUT_MS = 10_000;
+const EVIDENCE_LOCK_STALE_MS = 60_000;
+
+export async function withEvidenceSourceLock<T>(
+  evidenceDirectory: string,
+  sourceId: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  const lockDirectory = await ensureRealDirectoryPath(
+    join(evidenceDirectory, '.locks'),
+  );
+  const lockPath = join(lockDirectory, `${sourceId}.lock`);
+  const token = randomUUID();
+  const deadline = Date.now() + EVIDENCE_LOCK_TIMEOUT_MS;
+
+  while (true) {
+    try {
+      await writeFile(lockPath, token, { flag: 'wx' });
+      break;
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'EEXIST'
+      )) {
+        throw error;
+      }
+      const stats = await lstat(lockPath);
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        throw new Error('Evidence source lock must be a regular file');
+      }
+      if (Date.now() - stats.mtimeMs > EVIDENCE_LOCK_STALE_MS) {
+        await unlink(lockPath);
+        continue;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`Evidence source lock timed out: ${sourceId}`);
+      }
+      await new Promise((resolveDelay) =>
+        setTimeout(resolveDelay, EVIDENCE_LOCK_WAIT_MS),
+      );
+    }
+  }
+
+  let result: T | undefined;
+  let actionError: unknown;
+  try {
+    result = await action();
+  } catch (error) {
+    actionError = error;
+  }
+  let releaseError: unknown;
+  try {
+    if ((await readFile(lockPath, 'utf8')) === token) {
+      await unlink(lockPath);
+    }
+  } catch (error) {
+    if (!missingPath(error)) releaseError = error;
+  }
+  if (actionError !== undefined) throw actionError;
+  if (releaseError !== undefined) throw releaseError;
+  return result as T;
 }
 
 function fixturePresentation(siteId: SourceManifest['siteId']): {
@@ -562,6 +665,136 @@ export async function collectFixturePair(
   );
 
   return { receipt, path };
+}
+
+export async function collectMicrosoftSkillCreatorObservation(options: {
+  evidenceDirectory: string;
+  fetchSource?: (manifest: SourceManifest) => Promise<RawFetch>;
+}): Promise<{ receipt: Receipt; path: string }> {
+  const manifest = await loadMicrosoftSkillCreatorManifest();
+  const companion = manifest.companionSources?.[0];
+  if (companion === undefined) {
+    throw new Error('Microsoft skill source companion is missing');
+  }
+  return withEvidenceSourceLock(
+    options.evidenceDirectory,
+    manifest.sourceId,
+    async () => {
+      const existingReceiptPaths = await receiptFiles(
+        join(options.evidenceDirectory, 'receipts'),
+      );
+      const verifiedReceipts =
+        existingReceiptPaths.length === 0
+          ? []
+          : await loadVerifiedReceipts(options.evidenceDirectory);
+      const fetchSource = options.fetchSource ?? fetchAllowedSource;
+      const companionManifest = {
+        ...manifest,
+        sourceId: `${manifest.sourceId}-license`,
+        endpoint: companion.endpoint,
+        allowedHosts: companion.allowedHosts,
+        allowedMediaTypes: companion.allowedMediaTypes,
+        maxBytes: companion.maxBytes,
+        expectedBytes: companion.expectedBytes,
+        expectedSha256: companion.expectedSha256,
+        companionSources: undefined,
+      } as SourceManifest;
+      const [sourceFetch, licenseFetch] = await Promise.all([
+        fetchSource(manifest),
+        fetchSource(companionManifest),
+      ]);
+      const observation = createMicrosoftSkillCreatorObservationFromFetches(
+        sourceFetch,
+        licenseFetch,
+      );
+      const publicFacts = admitMicrosoftSkillCreatorObservation(observation);
+      const rawBytes = new TextEncoder().encode(canonicalJson(observation));
+      const normalizedBytes = new TextEncoder().encode(
+        canonicalJson(publicFacts),
+      );
+      const rawSha256 = sha256(rawBytes);
+      const normalizedSha256 = sha256(normalizedBytes);
+      const timestamp = observation.observedAt;
+      const gateInputs = {
+        manifestValid: true,
+        enabled: manifest.enabled,
+        publicationMode: manifest.publicationMode,
+        evidenceClass: 'live-source' as const,
+        rawSha256,
+        normalizedSha256,
+        ambiguous: false,
+        diffRatio: 0,
+      };
+      const policy = evaluatePublication(gateInputs);
+      const existingSourceReceipts = verifiedReceipts
+        .filter(
+          (existing) =>
+            existing.payload.siteId === 'skill-ledger' &&
+            existing.payload.sourceId === manifest.sourceId,
+        )
+        .sort((left, right) => left.payload.sequence - right.payload.sequence);
+      for (const [index, existing] of existingSourceReceipts.entries()) {
+        const expectedPredecessor =
+          index === 0 ? undefined : existingSourceReceipts[index - 1]?.id;
+        if (
+          existing.payload.sequence !== index + 1 ||
+          existing.payload.predecessorReceiptId !== expectedPredecessor
+        ) {
+          throw new Error(
+            'Microsoft skill source receipt history is branched or out of sequence',
+          );
+        }
+      }
+      const predecessor = existingSourceReceipts.at(-1);
+      const receipt = createReceipt({
+        siteId: 'skill-ledger',
+        sourceId: manifest.sourceId,
+        observedAt: timestamp,
+        sourceUrl: manifest.endpoint,
+        manifestSha256: manifestSha256(manifest),
+        rawSha256,
+        normalizedSha256,
+        rawObjectPath: `objects/raw/${rawSha256}.bin`,
+        normalizedObjectPath: `objects/normalized/${normalizedSha256}.json`,
+        sequence: (predecessor?.payload.sequence ?? 0) + 1,
+        ...(predecessor === undefined
+          ? {}
+          : { predecessorReceiptId: predecessor.id }),
+        topicSlug: 'skill-creator',
+        provenance: {
+          evidenceClass: 'live-source',
+          publicationMode: manifest.publicationMode,
+          publisherName: manifest.publisherName,
+          sourceClass: manifest.sourceClass,
+          extractionSelector: manifest.extractionSelector,
+          extractionContractId: manifest.extractionContractId,
+          normalizerId: manifest.normalizerId,
+          diffStrategyId: manifest.diffStrategyId,
+          schemaId: manifest.schemaId,
+        },
+        publicFacts,
+        interpretation:
+          'This source-bound observation reports only the declared name and description from one immutable repository path and its same-commit inherited license evidence.',
+        unknowns: [
+          'The instruction body was not retained, published, installed, imported, or executed.',
+          'Currentness, provenance, security, safety, runtime behavior, adoption, endorsement, and suitability remain unknown.',
+        ],
+        correction: { kind: 'original' },
+        gateInputs,
+        policy: {
+          decision: policy.decision,
+          reasonCodes: [...policy.reasonCodes],
+        },
+      });
+      const path = await persistFixtureEvidence(
+        receipt,
+        { rawBytes, normalizedBytes },
+        manifest,
+        options.evidenceDirectory,
+      );
+      return { receipt, path };
+    },
+  );
 }
 
 const SITE_IDS = [
@@ -959,6 +1192,32 @@ async function verifyEvidenceTreeInternal(
       receipt.payload.normalizedSha256,
       receipt.payload.publicFacts,
     );
+    if (manifest.extractionContractId === 'skill-declared-metadata-v1') {
+      const observationBytes = await readFile(
+        join(evidenceDirectory, receipt.payload.rawObjectPath),
+      );
+      let admittedFacts: MicrosoftSkillCreatorPublicFacts;
+      try {
+        admittedFacts = admitMicrosoftSkillCreatorObservation(
+          JSON.parse(observationBytes.toString('utf8')),
+        );
+      } catch (error) {
+        throw new EvidenceIntegrityError(
+          'OBJECT_INTEGRITY_MISMATCH',
+          'Microsoft skill source observation is not admitted',
+          { cause: error },
+        );
+      }
+      if (
+        canonicalJson(admittedFacts) !==
+        canonicalJson(receipt.payload.publicFacts)
+      ) {
+        throw new EvidenceIntegrityError(
+          'OBJECT_INTEGRITY_MISMATCH',
+          'Microsoft skill source observation does not match public facts',
+        );
+      }
+    }
     receiptById.set(receipt.id, receipt);
     receipts.push(receipt);
   }
@@ -1219,6 +1478,7 @@ async function collectDefaultFixtures(
     'skill-inventory-v1.json',
     { evidenceDirectory },
   );
+  await collectMicrosoftSkillCreatorObservation({ evidenceDirectory });
 }
 
 interface DryRunSuccess {
@@ -1705,7 +1965,6 @@ export async function runCli(
     arguments_[1] === '--all'
   ) {
     await verifyEvidenceTree(evidenceDirectory, {
-      expectedReceiptCount: 4,
       expectedSiteIds: [...SITE_IDS],
     });
     return 0;

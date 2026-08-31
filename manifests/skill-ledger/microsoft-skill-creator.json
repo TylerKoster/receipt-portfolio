@@ -1,0 +1,35 @@
+{
+  "siteId": "skill-ledger",
+  "sourceId": "microsoft-skill-creator",
+  "kind": "text",
+  "endpoint": "https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/.github/skills/skill-creator/SKILL.md",
+  "allowedHosts": ["raw.githubusercontent.com"],
+  "allowedMediaTypes": ["text/plain"],
+  "maxBytes": 70000,
+  "timeoutMs": 10000,
+  "expectedBytes": 68147,
+  "expectedSha256": "15ce951aec071c813150e6794628664725c164223108792e15bd3db18e959da0",
+  "companionSources": [
+    {
+      "role": "inherited-license",
+      "endpoint": "https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE",
+      "allowedHosts": ["raw.githubusercontent.com"],
+      "allowedMediaTypes": ["text/plain"],
+      "maxBytes": 2000,
+      "expectedBytes": 1140,
+      "expectedSha256": "d9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb"
+    }
+  ],
+  "publisherName": "Microsoft",
+  "sourceClass": "official-primary",
+  "extractionSelector": "yaml-frontmatter.name,description",
+  "extractionContractId": "skill-declared-metadata-v1",
+  "cadence": "weekly",
+  "noiseExclusions": ["instruction-body", "scripts", "references", "assets"],
+  "normalizerId": "skill-source-observation-v1",
+  "diffStrategyId": "source-record-v1",
+  "schemaId": "skill-source-metadata-public-v1",
+  "publicationMode": "auto-facts-only",
+  "licenseNote": "MIT license inherited from the same immutable repository commit.",
+  "enabled": true
+}

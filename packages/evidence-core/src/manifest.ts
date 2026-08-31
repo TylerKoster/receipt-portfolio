@@ -12,13 +12,28 @@ const MediaTypeSchema = z.enum([
   'application/rss+xml',
   'application/xml',
   'text/xml',
+  'text/plain',
 ]);
+
+const SHA256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+
+const CompanionSourceSchema = z
+  .object({
+    role: z.literal('inherited-license'),
+    endpoint: z.string().url(),
+    allowedHosts: z.array(z.string().min(1)).min(1),
+    allowedMediaTypes: z.array(MediaTypeSchema).min(1),
+    maxBytes: z.number().int().positive().max(MAX_RESPONSE_BYTES),
+    expectedBytes: z.number().int().positive().max(MAX_RESPONSE_BYTES),
+    expectedSha256: SHA256Schema,
+  })
+  .strict();
 
 export const SourceManifestSchema = z
   .object({
     siteId: z.enum(['search-receipt', 'workflow-test-lab', 'skill-ledger']),
     sourceId: z.string().regex(/^[a-z0-9-]+$/),
-    kind: z.enum(['rss', 'json', 'fixture', 'archive-fixture']),
+    kind: z.enum(['rss', 'json', 'fixture', 'archive-fixture', 'text']),
     endpoint: z
       .string()
       .url()
@@ -38,6 +53,14 @@ export const SourceManifestSchema = z
     allowedMediaTypes: z.array(MediaTypeSchema).min(1),
     maxBytes: z.number().int().positive().max(MAX_RESPONSE_BYTES),
     timeoutMs: z.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS),
+    expectedBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_RESPONSE_BYTES)
+      .optional(),
+    expectedSha256: SHA256Schema.optional(),
+    companionSources: z.array(CompanionSourceSchema).max(1).optional(),
     publisherName: z.string().min(1),
     sourceClass: z.enum(['official-primary', 'project-original-fixture']),
     extractionSelector: z.string().min(1),
@@ -46,6 +69,7 @@ export const SourceManifestSchema = z
       'search-feed-items-v1',
       'workflow-experiment-v1',
       'skill-inventory-v1',
+      'skill-declared-metadata-v1',
     ]),
     cadence: z.enum(['hourly', 'daily', 'weekly', 'fixture-only']),
     noiseExclusions: z.array(z.string().min(1)),
@@ -54,18 +78,21 @@ export const SourceManifestSchema = z
       'search-feed-v1',
       'workflow-fixture-v1',
       'archive-fixture-v1',
+      'skill-source-observation-v1',
     ]),
     diffStrategyId: z.enum([
       'event-list-v1',
       'feed-item-v1',
       'fixture-record-v1',
       'inventory-v1',
+      'source-record-v1',
     ]),
     schemaId: z.enum([
       'search-status-public-v1',
       'search-feed-public-v1',
       'workflow-experiment-public-v1',
       'skill-inventory-public-v1',
+      'skill-source-metadata-public-v1',
     ]),
     publicationMode: z.enum([
       'auto-facts-only',
@@ -168,6 +195,13 @@ export const SourceManifestSchema = z
                 'inventory-v1',
                 'skill-inventory-public-v1',
               ],
+              [
+                'text',
+                'skill-declared-metadata-v1',
+                'skill-source-observation-v1',
+                'source-record-v1',
+                'skill-source-metadata-public-v1',
+              ],
             ];
     if (
       !compatible.some(
@@ -196,13 +230,98 @@ export const SourceManifestSchema = z
       manifest.allowedMediaTypes.some((mediaType) =>
         manifest.kind === 'rss'
           ? !feedMediaTypes.has(mediaType)
-          : mediaType !== 'application/json',
+          : manifest.kind === 'text'
+            ? mediaType !== 'text/plain'
+            : mediaType !== 'application/json',
       )
     ) {
       context.addIssue({
         code: 'custom',
         path: ['allowedMediaTypes'],
         message: 'allowedMediaTypes are incompatible with source kind',
+      });
+    }
+
+    const liveSkillSource =
+      manifest.siteId === 'skill-ledger' && manifest.kind === 'text';
+    if (liveSkillSource) {
+      const companion = manifest.companionSources?.[0];
+      const sourceUrl = new URL(manifest.endpoint);
+      const sourceCommit = sourceUrl.pathname.match(
+        /^\/microsoft\/skills\/([a-f0-9]{40})\//,
+      )?.[1];
+      let companionCommit: string | undefined;
+      if (companion !== undefined) {
+        const companionUrl = new URL(companion.endpoint);
+        companionCommit = companionUrl.pathname.match(
+          /^\/microsoft\/skills\/([a-f0-9]{40})\//,
+        )?.[1];
+        if (
+          companionUrl.protocol !== 'https:' ||
+          companionUrl.username !== '' ||
+          companionUrl.password !== '' ||
+          companionUrl.search !== '' ||
+          companionUrl.hash !== '' ||
+          !companion.allowedHosts.includes(companionUrl.hostname) ||
+          companion.allowedMediaTypes.length !== 1 ||
+          companion.allowedMediaTypes[0] !== 'text/plain'
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path: ['companionSources'],
+            message: 'Skill source companion is not safely allowlisted',
+          });
+        }
+      }
+      if (
+        manifest.expectedBytes === undefined ||
+        manifest.expectedSha256 === undefined ||
+        manifest.companionSources?.length !== 1 ||
+        sourceUrl.hostname !== 'raw.githubusercontent.com' ||
+        sourceUrl.search !== '' ||
+        sourceUrl.hash !== '' ||
+        sourceCommit === undefined ||
+        companionCommit !== sourceCommit
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Live SkillLedger text source requires one same-commit allowlisted companion and exact expected bytes and hashes',
+        });
+      }
+      if (
+        manifest.sourceId !== 'microsoft-skill-creator' ||
+        manifest.endpoint !==
+          'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/.github/skills/skill-creator/SKILL.md' ||
+        manifest.publisherName !== 'Microsoft' ||
+        manifest.expectedBytes !== 68_147 ||
+        manifest.expectedSha256 !==
+          '15ce951aec071c813150e6794628664725c164223108792e15bd3db18e959da0' ||
+        manifest.allowedHosts.length !== 1 ||
+        manifest.allowedHosts[0] !== 'raw.githubusercontent.com' ||
+        companion?.endpoint !==
+          'https://raw.githubusercontent.com/microsoft/skills/7066b58141d8cc66f39356b2ee5bb64d428dcf17/LICENSE' ||
+        companion.expectedBytes !== 1_140 ||
+        companion.expectedSha256 !==
+          'd9a1b1e30d633d5732ea18e3cba9538d293ebc53e1a9e4e96ab739e0c5c4f1cb' ||
+        companion.allowedHosts.length !== 1 ||
+        companion.allowedHosts[0] !== 'raw.githubusercontent.com'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Live SkillLedger source must match the exact designated Microsoft source and license tuple',
+        });
+      }
+    } else if (
+      manifest.expectedBytes !== undefined ||
+      manifest.expectedSha256 !== undefined ||
+      manifest.companionSources !== undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Expected source bytes and companion configuration are limited to the live SkillLedger text source',
       });
     }
   });

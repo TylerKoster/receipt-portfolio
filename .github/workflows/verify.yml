@@ -38,7 +38,7 @@ jobs:
         run: npm test -- --run
       - name: Run integration suite
         run: npm run test:integration
-      - name: Collect deterministic controlled examples
+      - name: Collect controlled and pinned-source evidence
         run: npm run evidence -- collect-fixtures
       - name: Verify exact nonempty evidence inventory
         run: npm run evidence -- verify --all

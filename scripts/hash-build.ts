@@ -37,6 +37,8 @@ const REQUIRED_SITE_FILES: Readonly<
     ...RECEIPT_SITE_FILES,
     'inventory/index.html',
     'public-inventory-adapter.js',
+    'public-inventory-bootstrap.js',
+    'public-inventory-data.js',
   ],
   'video-moment-search': [
     'feed.xml',
