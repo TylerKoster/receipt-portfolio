@@ -134,12 +134,41 @@ function sourceLink(
 function facts(factRecord: ReceiptPublicFacts): readonly [string, string][] {
   switch (factRecord.kind) {
     case 'search-status':
+      if ('incidents' in factRecord) {
+        return [
+          ['HTTP status', String(factRecord.responseStatus)],
+          ['Media type', factRecord.mediaType],
+          ['Response bytes', String(factRecord.byteCount)],
+          ['Incident count', String(factRecord.incidents.length)],
+          [
+            'Incident IDs',
+            factRecord.incidents.length === 0
+              ? 'None listed'
+              : factRecord.incidents
+                  .map((incident) => incident.incidentId)
+                  .join(', '),
+          ],
+        ];
+      }
       return [
         ['Event ID', factRecord.eventId],
         ['Service', factRecord.service],
         ['Status', factRecord.status],
         ['Started at', factRecord.startedAt],
         ['Source summary', factRecord.summary],
+      ];
+    case 'search-feed':
+      return [
+        ['HTTP status', String(factRecord.responseStatus)],
+        ['Media type', factRecord.mediaType],
+        ['Response bytes', String(factRecord.byteCount)],
+        ['Feed entry count', String(factRecord.entries.length)],
+        [
+          'Entry IDs',
+          factRecord.entries.length === 0
+            ? 'None listed'
+            : factRecord.entries.map((entry) => entry.entryId).join(', '),
+        ],
       ];
     case 'workflow-experiment':
       return [

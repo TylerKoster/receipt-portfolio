@@ -48,9 +48,10 @@ import {
   createMicrosoftSkillCreatorObservationFromFetches,
   type MicrosoftSkillCreatorPublicFacts,
 } from '../sites/skill-ledger/microsoft-skill-creator-source-observation.js';
+import { normalizeSearchFetch } from './search-evidence-normalizer.js';
 
 const USAGE =
-  'Usage: evidence <collect-fixtures|verify --all> | evidence test-mutation | evidence dry-run-live [--output <artifacts/*.json>]';
+  'Usage: evidence <collect-fixtures|verify --all> | evidence collect-search <google-search-status|google-search-central-blog|--all> | evidence test-mutation | evidence dry-run-live [--output <artifacts/*.json>]';
 const DEFAULT_DRY_RUN_OUTPUT = 'artifacts/dry-run-live-report.json';
 
 type NormalizedRecord = { readonly [key: string]: JsonValue };
@@ -252,6 +253,50 @@ async function loadMicrosoftSkillCreatorManifest(): Promise<SourceManifest> {
     manifest.extractionContractId !== 'skill-declared-metadata-v1'
   ) {
     throw new Error('Microsoft skill source manifest is not admitted');
+  }
+  return manifest;
+}
+
+export const SEARCH_SOURCE_IDS = [
+  'google-search-status',
+  'google-search-central-blog',
+] as const;
+
+export type SearchSourceId = (typeof SEARCH_SOURCE_IDS)[number];
+
+function isSearchSourceId(value: string): value is SearchSourceId {
+  return SEARCH_SOURCE_IDS.includes(value as SearchSourceId);
+}
+
+async function loadSearchManifest(
+  sourceId: SearchSourceId,
+): Promise<SourceManifest> {
+  const manifest = validateManifest(
+    JSON.parse(
+      await readFile(
+        join(projectRoot(), 'manifests', 'search-receipt', `${sourceId}.json`),
+        'utf8',
+      ),
+    ),
+  );
+  const expectedEndpoint =
+    sourceId === 'google-search-status'
+      ? 'https://status.search.google.com/incidents.json'
+      : 'https://feeds.feedburner.com/blogspot/amDG';
+  const expectedContract =
+    sourceId === 'google-search-status'
+      ? 'search-status-events-v1'
+      : 'search-feed-items-v1';
+  if (
+    manifest.siteId !== 'search-receipt' ||
+    manifest.sourceId !== sourceId ||
+    manifest.endpoint !== expectedEndpoint ||
+    manifest.extractionContractId !== expectedContract ||
+    manifest.publicationMode !== 'auto-facts-only' ||
+    manifest.sourceClass !== 'official-primary' ||
+    !manifest.enabled
+  ) {
+    throw new Error(`SEARCH_SOURCE_NOT_ADMITTED: ${sourceId}`);
   }
   return manifest;
 }
@@ -793,6 +838,195 @@ export async function collectMicrosoftSkillCreatorObservation(options: {
         options.evidenceDirectory,
       );
       return { receipt, path };
+    },
+  );
+}
+
+export interface CollectSearchSourceOptions {
+  readonly evidenceDirectory: string;
+  readonly fetchSource?: (manifest: SourceManifest) => Promise<RawFetch>;
+}
+
+export interface SearchCollectionResult {
+  readonly receipt: Receipt;
+  readonly path: string;
+  readonly fetch: RawFetch;
+  readonly idempotent: boolean;
+}
+
+function searchPresentation(sourceId: SearchSourceId): {
+  readonly topicSlug: string;
+  readonly interpretation: string;
+  readonly unknowns: readonly string[];
+} {
+  return sourceId === 'google-search-status'
+    ? {
+        topicSlug: 'search-status',
+        interpretation:
+          'This observation records the incident facts exposed by the official Google Search Status response. It does not establish cause or impact for any individual website.',
+        unknowns: [
+          'Traffic, ranking, indexing, and site-specific effects are not established by this source alone.',
+          'A listed incident does not establish that every site or query was affected.',
+        ],
+      }
+    : {
+        topicSlug: 'search-guidance',
+        interpretation:
+          'This observation records only entry identifiers, titles, links, and timestamps exposed by the official Google Search Central feed.',
+        unknowns: [
+          'The linked article bodies were not fetched, copied, interpreted, or endorsed.',
+          'No claim is made about how any guidance applies to a specific website.',
+        ],
+      };
+}
+
+function sourceHistory(
+  receipts: readonly Receipt[],
+  sourceId: SearchSourceId,
+): Receipt[] {
+  const history = receipts
+    .filter(
+      (receipt) =>
+        receipt.payload.siteId === 'search-receipt' &&
+        receipt.payload.sourceId === sourceId,
+    )
+    .sort((left, right) => left.payload.sequence - right.payload.sequence);
+  for (const [index, receipt] of history.entries()) {
+    const expectedPredecessor =
+      index === 0 ? undefined : history[index - 1]?.id;
+    if (
+      receipt.payload.sequence !== index + 1 ||
+      receipt.payload.predecessorReceiptId !== expectedPredecessor
+    ) {
+      throw new Error(
+        `Search source receipt history is branched or out of sequence: ${sourceId}`,
+      );
+    }
+  }
+  return history;
+}
+
+async function existingVerifiedReceipts(
+  evidenceDirectory: string,
+): Promise<Receipt[]> {
+  const paths = await receiptFiles(join(evidenceDirectory, 'receipts'));
+  return paths.length === 0 ? [] : loadVerifiedReceipts(evidenceDirectory);
+}
+
+export async function collectSearchSource(
+  sourceIdInput: SearchSourceId,
+  options: CollectSearchSourceOptions,
+): Promise<SearchCollectionResult> {
+  if (!isSearchSourceId(sourceIdInput)) {
+    throw new Error(`SEARCH_SOURCE_NOT_ADMITTED: ${String(sourceIdInput)}`);
+  }
+  const sourceId = sourceIdInput;
+  const manifest = await loadSearchManifest(sourceId);
+
+  // Existing evidence is authenticated before network access. A corrupt tree
+  // cannot be hidden by appending another otherwise-valid receipt.
+  await existingVerifiedReceipts(options.evidenceDirectory);
+  const fetched = await (options.fetchSource ?? fetchAllowedSource)(manifest);
+  const publicFacts = normalizeSearchFetch(manifest, fetched);
+  const normalizedBytes = new TextEncoder().encode(canonicalJson(publicFacts));
+  const normalizedSha256 = sha256(normalizedBytes);
+
+  return withEvidenceSourceLock(
+    options.evidenceDirectory,
+    manifest.sourceId,
+    async () => {
+      const verifiedReceipts = await existingVerifiedReceipts(
+        options.evidenceDirectory,
+      );
+      const history = sourceHistory(verifiedReceipts, sourceId);
+      const manifestDigest = manifestSha256(manifest);
+      const existing = history.find(
+        (receipt) =>
+          receipt.payload.manifestSha256 === manifestDigest &&
+          receipt.payload.rawSha256 === fetched.rawSha256 &&
+          receipt.payload.normalizedSha256 === normalizedSha256,
+      );
+      if (existing !== undefined) {
+        return {
+          receipt: existing,
+          path: join(
+            options.evidenceDirectory,
+            'receipts',
+            existing.payload.siteId,
+            `${existing.id}.json`,
+          ),
+          fetch: fetched,
+          idempotent: true,
+        };
+      }
+
+      const predecessor = history.at(-1);
+      const gateInputs = {
+        manifestValid: true,
+        enabled: manifest.enabled,
+        publicationMode: manifest.publicationMode,
+        evidenceClass: 'live-source' as const,
+        rawSha256: fetched.rawSha256,
+        normalizedSha256,
+        ambiguous: false,
+        diffRatio: diffRatio(
+          predecessor?.payload.publicFacts as NormalizedRecord | undefined,
+          publicFacts as NormalizedRecord,
+        ),
+      };
+      const policy = evaluatePublication(gateInputs);
+      if (policy.decision !== 'PASS') {
+        throw new Error(
+          `SEARCH_COLLECTION_POLICY_${policy.decision}: ${policy.reasonCodes.join(',')}`,
+        );
+      }
+      const presentation = searchPresentation(sourceId);
+      const receipt = verifyReceipt(
+        createReceipt({
+          siteId: 'search-receipt',
+          sourceId,
+          observedAt: fetched.observedAt,
+          sourceUrl: manifest.endpoint,
+          manifestSha256: manifestDigest,
+          rawSha256: fetched.rawSha256,
+          normalizedSha256,
+          rawObjectPath: `objects/raw/${fetched.rawSha256}.bin`,
+          normalizedObjectPath: `objects/normalized/${normalizedSha256}.json`,
+          sequence: (predecessor?.payload.sequence ?? 0) + 1,
+          ...(predecessor === undefined
+            ? {}
+            : { predecessorReceiptId: predecessor.id }),
+          topicSlug: presentation.topicSlug,
+          provenance: {
+            evidenceClass: 'live-source',
+            publicationMode: manifest.publicationMode,
+            publisherName: manifest.publisherName,
+            sourceClass: manifest.sourceClass,
+            extractionSelector: manifest.extractionSelector,
+            extractionContractId: manifest.extractionContractId,
+            normalizerId: manifest.normalizerId,
+            diffStrategyId: manifest.diffStrategyId,
+            schemaId: manifest.schemaId,
+          },
+          publicFacts,
+          interpretation: presentation.interpretation,
+          unknowns: [...presentation.unknowns],
+          correction: { kind: 'original' },
+          gateInputs,
+          policy: {
+            decision: policy.decision,
+            reasonCodes: [...policy.reasonCodes],
+          },
+        }),
+      );
+      const path = await persistFixtureEvidence(
+        receipt,
+        { rawBytes: fetched.bytes, normalizedBytes },
+        manifest,
+        options.evidenceDirectory,
+      );
+      await verifyEvidenceTree(options.evidenceDirectory);
+      return { receipt, path, fetch: fetched, idempotent: false };
     },
   );
 }
@@ -1956,6 +2190,43 @@ export async function runCli(
 
   if (arguments_.length === 1 && arguments_[0] === 'collect-fixtures') {
     await collectDefaultFixtures(evidenceDirectory);
+    return 0;
+  }
+
+  if (
+    arguments_.length === 2 &&
+    arguments_[0] === 'collect-search' &&
+    (arguments_[1] === '--all' || isSearchSourceId(arguments_[1] ?? ''))
+  ) {
+    const requested =
+      arguments_[1] === '--all'
+        ? SEARCH_SOURCE_IDS
+        : [arguments_[1] as SearchSourceId];
+    for (const sourceId of requested) {
+      const result = await collectSearchSource(sourceId, {
+        evidenceDirectory,
+        ...(dependencies.fetchSource === undefined
+          ? {}
+          : { fetchSource: dependencies.fetchSource }),
+      });
+      console.log(
+        canonicalJson({
+          sourceId,
+          sourceUrl: result.fetch.sourceUrl,
+          observedAt: result.fetch.observedAt,
+          responseStatus: result.fetch.status,
+          mediaType: result.fetch.mediaType,
+          byteCount: result.fetch.byteCount,
+          rawSha256: result.fetch.rawSha256,
+          manifestSha256: result.receipt.payload.manifestSha256,
+          normalizedSha256: result.receipt.payload.normalizedSha256,
+          receiptId: result.receipt.id,
+          sequence: result.receipt.payload.sequence,
+          idempotent: result.idempotent,
+          policy: result.receipt.payload.policy.decision,
+        }),
+      );
+    }
     return 0;
   }
 

@@ -5,6 +5,17 @@ import { EVIDENCE_SCHEMA_VERSION } from './schema-version.js';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SHA256 = z.string().regex(SHA256_PATTERN);
+const CanonicalTimestamp = z.string().refine((value) => {
+  try {
+    return new Date(value).toISOString() === value;
+  } catch {
+    return false;
+  }
+}, 'timestamp must be canonical ISO');
+const HttpsUrl = z
+  .string()
+  .url()
+  .refine((value) => new URL(value).protocol === 'https:');
 const SiteId = z.enum(['search-receipt', 'workflow-test-lab', 'skill-ledger']);
 const PublicationMode = z.enum([
   'auto-facts-only',
@@ -57,6 +68,53 @@ const SearchFactsSchema = z
     summary: z.string().min(1),
   })
   .strict();
+const SearchStatusCollectionFactsSchema = z
+  .object({
+    kind: z.literal('search-status'),
+    responseStatus: z.number().int().min(200).max(299),
+    mediaType: z.literal('application/json'),
+    byteCount: z.number().int().nonnegative(),
+    incidents: z.array(
+      z
+        .object({
+          incidentId: z.string().min(1),
+          service: z.string().min(1),
+          startedAt: CanonicalTimestamp,
+          endedAt: CanonicalTimestamp.nullable(),
+          updatedAt: CanonicalTimestamp,
+          impact: z.string().min(1),
+          severity: z.string().min(1),
+          summary: z.string().min(1),
+          url: HttpsUrl,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+const SearchFeedFactsSchema = z
+  .object({
+    kind: z.literal('search-feed'),
+    responseStatus: z.number().int().min(200).max(299),
+    mediaType: z.enum([
+      'application/atom+xml',
+      'application/rss+xml',
+      'application/xml',
+      'text/xml',
+    ]),
+    byteCount: z.number().int().nonnegative(),
+    entries: z.array(
+      z
+        .object({
+          entryId: z.string().min(1),
+          title: z.string().min(1),
+          url: HttpsUrl,
+          publishedAt: CanonicalTimestamp,
+          updatedAt: CanonicalTimestamp,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 const WorkflowFactsSchema = z
   .object({
     kind: z.literal('workflow-experiment'),
@@ -93,8 +151,10 @@ const SkillSourceMetadataFactsSchema = z
     boundary: z.string().min(1),
   })
   .strict();
-const PublicFactsSchema = z.discriminatedUnion('kind', [
+const PublicFactsSchema = z.union([
   SearchFactsSchema,
+  SearchStatusCollectionFactsSchema,
+  SearchFeedFactsSchema,
   WorkflowFactsSchema,
   SkillFactsSchema,
   SkillSourceMetadataFactsSchema,
@@ -175,7 +235,8 @@ export const ReceiptPayloadSchema = z
     }
     const factKindMatches =
       (payload.siteId === 'search-receipt' &&
-        payload.publicFacts.kind === 'search-status') ||
+        (payload.publicFacts.kind === 'search-status' ||
+          payload.publicFacts.kind === 'search-feed')) ||
       (payload.siteId === 'workflow-test-lab' &&
         payload.publicFacts.kind === 'workflow-experiment') ||
       (payload.siteId === 'skill-ledger' &&
@@ -185,6 +246,39 @@ export const ReceiptPayloadSchema = z
       context.addIssue({
         code: 'custom',
         message: 'public fact schema does not match receipt site',
+      });
+    }
+    const aggregateStatus =
+      payload.publicFacts.kind === 'search-status' &&
+      'incidents' in payload.publicFacts;
+    if (
+      aggregateStatus &&
+      (payload.provenance.evidenceClass !== 'live-source' ||
+        payload.provenance.publicationMode !== 'auto-facts-only' ||
+        payload.provenance.sourceClass !== 'official-primary' ||
+        payload.provenance.extractionContractId !== 'search-status-events-v1' ||
+        payload.provenance.normalizerId !== 'status-json-v1' ||
+        payload.provenance.diffStrategyId !== 'event-list-v1' ||
+        payload.provenance.schemaId !== 'search-status-public-v1')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'aggregate Search status facts require exact live provenance',
+      });
+    }
+    if (
+      payload.publicFacts.kind === 'search-feed' &&
+      (payload.provenance.evidenceClass !== 'live-source' ||
+        payload.provenance.publicationMode !== 'auto-facts-only' ||
+        payload.provenance.sourceClass !== 'official-primary' ||
+        payload.provenance.extractionContractId !== 'search-feed-items-v1' ||
+        payload.provenance.normalizerId !== 'search-feed-v1' ||
+        payload.provenance.diffStrategyId !== 'feed-item-v1' ||
+        payload.provenance.schemaId !== 'search-feed-public-v1')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Search feed facts require exact live provenance',
       });
     }
     if (
