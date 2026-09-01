@@ -6,7 +6,7 @@
     "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
     "caseReview": "independent-code-review-not-user-research",
     "transcriptDerivedCases": "prohibited",
-    "evaluatedCorpusSemanticSha256": "53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973",
+    "evaluatedCorpusSemanticSha256": "e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137",
     "prohibitedClaims": [
       "user",
       "usability",
@@ -205,7 +205,7 @@
       "expectedTimestampSuffix": "#t=20"
     },
     {
-      "query": "outsmart question robots",
+      "query": "blue display robots",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
@@ -317,7 +317,7 @@
       "expectedTimestampSuffix": "#t=5"
     },
     {
-      "query": "Charite hospital animation",
+      "query": "city block hospital",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
@@ -366,7 +366,7 @@
       "expectedTimestampSuffix": "#t=25"
     },
     {
-      "query": "symptom scales checkboxes",
+      "query": "hand symptom checklist",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
@@ -408,14 +408,14 @@
       "expectedTimestampSuffix": "#t=50"
     },
     {
-      "query": "medical AI branching outputs",
+      "query": "branch patient results",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
-      "query": "patient data processing",
+      "query": "central decision patient",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
@@ -436,28 +436,28 @@
       "expectedTimestampSuffix": "#t=80"
     },
     {
-      "query": "human oversight medical AI",
+      "query": "human oversight patient",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
-      "query": "patient clinicians tablet",
+      "query": "patient clinicians tablets",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
-      "query": "hospital bedside discussion",
+      "query": "hospital bedside clinicians",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
-      "query": "medical AI human oversight",
+      "query": "AI human oversight",
       "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,

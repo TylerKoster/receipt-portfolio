@@ -421,8 +421,7 @@
       "topicSlugs": [
         "robots-outsmart-humans",
         "human-oversight",
-        "robot-intelligence",
-        "outsmart-question-robots"
+        "robot-intelligence"
       ],
       "state": "active",
       "rightsGrantId": "rights-commons-will-robots-outsmart-us"
@@ -465,8 +464,7 @@
         "medical-ai",
         "hospital-ai",
         "healthcare-ai",
-        "medical-artificial-intelligence",
-        "charite-hospital-animation"
+        "medical-artificial-intelligence"
       ],
       "state": "active",
       "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
@@ -480,8 +478,7 @@
       "topicSlugs": [
         "clinical-symptom-inputs",
         "medical-ai-data",
-        "patient-assessment",
-        "symptom-scales-checkboxes"
+        "patient-assessment"
       ],
       "state": "active",
       "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
@@ -495,9 +492,7 @@
       "topicSlugs": [
         "medical-ai-decision-paths",
         "patient-specific-results",
-        "explainable-ai",
-        "medical-ai-branching-outputs",
-        "patient-data-processing"
+        "explainable-ai"
       ],
       "state": "active",
       "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
@@ -511,10 +506,7 @@
       "topicSlugs": [
         "clinician-patient-communication",
         "doctor-patient-relationship",
-        "human-oversight",
-        "medical-ai-human-oversight",
-        "patient-clinicians-tablet",
-        "hospital-bedside-discussion"
+        "human-oversight"
       ],
       "state": "active",
       "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"

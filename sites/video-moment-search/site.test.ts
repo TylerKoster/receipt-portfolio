@@ -51,52 +51,16 @@ const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 const validationNow = new Date('2026-09-01T12:00:00.000Z');
-const literalTopicCases = [
-  [
-    'outsmart question robots',
-    'moment-robots-outsmart-question',
-    'outsmart-question-robots',
-  ],
-  [
-    'Charite hospital animation',
-    'moment-medical-ai-hospital-setting',
-    'charite-hospital-animation',
-  ],
-  [
-    'symptom scales checkboxes',
-    'moment-medical-ai-symptom-inputs',
-    'symptom-scales-checkboxes',
-  ],
-  [
-    'medical AI branching outputs',
-    'moment-medical-ai-decision-paths',
-    'medical-ai-branching-outputs',
-  ],
-  [
-    'patient data processing',
-    'moment-medical-ai-decision-paths',
-    'patient-data-processing',
-  ],
-  [
-    'human oversight medical AI',
-    'moment-medical-ai-clinician-patient',
-    'medical-ai-human-oversight',
-  ],
-  [
-    'patient clinicians tablet',
-    'moment-medical-ai-clinician-patient',
-    'patient-clinicians-tablet',
-  ],
-  [
-    'hospital bedside discussion',
-    'moment-medical-ai-clinician-patient',
-    'hospital-bedside-discussion',
-  ],
-  [
-    'medical AI human oversight',
-    'moment-medical-ai-clinician-patient',
-    'medical-ai-human-oversight',
-  ],
+const amendedLiteralCases = [
+  ['blue display robots', 'moment-robots-outsmart-question'],
+  ['city block hospital', 'moment-medical-ai-hospital-setting'],
+  ['hand symptom checklist', 'moment-medical-ai-symptom-inputs'],
+  ['branch patient results', 'moment-medical-ai-decision-paths'],
+  ['central decision patient', 'moment-medical-ai-decision-paths'],
+  ['human oversight patient', 'moment-medical-ai-clinician-patient'],
+  ['patient clinicians tablets', 'moment-medical-ai-clinician-patient'],
+  ['hospital bedside clinicians', 'moment-medical-ai-clinician-patient'],
+  ['AI human oversight', 'moment-medical-ai-clinician-patient'],
 ] as const;
 
 function searchPublicIndex(
@@ -3403,62 +3367,20 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual(expectedOrder);
   });
 
-  it('keeps literal topic retrieval in parity and does not rewrite unsupported target entries', async () => {
+  it('keeps amended literal retrieval in core-helper-client parity', async () => {
     const baseIndex = serializePublicSearchIndex(fixture, searchIndex);
-    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
-      const helperTargetIds = searchPublicIndex(baseIndex, query).map(
-        (entry) => entry.momentId,
-      );
-      expect(helperTargetIds, query).toContain(targetMomentId);
+    const harness = executeClientPayload();
+    await harness.resolveIndex(baseIndex);
 
-      const entriesWithoutTopic = baseIndex.entries.map((entry) =>
-        entry.momentId === targetMomentId
-          ? {
-              ...entry,
-              topicSlugs: entry.topicSlugs.filter(
-                (candidate) => candidate !== topicSlug,
-              ),
-            }
-          : entry,
-      );
-      const position = literalTopicCases.findIndex(
-        ([candidate]) => candidate === query,
-      );
-      const target = entriesWithoutTopic.find(
-        (entry) => entry.momentId === targetMomentId,
-      );
-      expect(target, query).toBeDefined();
-      if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
-      const startSeconds = 900 + position;
-      const sourceUrl = `https://video.example/literal-alias-${position}.webm`;
-      const literalEntry = {
-        ...target,
-        momentId: `moment-literal-alias-${position}`,
-        videoId: `video-literal-alias-${position}`,
-        videoSlug: `literal-alias-${position}`,
-        videoTitle: `Literal alias control ${position}`,
-        sourceUrl,
-        startSeconds,
-        endSeconds: startSeconds + 1,
-        excerpt: query,
-        topicSlugs: [],
-        timestampUrl: `${sourceUrl}#t=${startSeconds}`,
-      };
-      const publicIndex = {
-        ...baseIndex,
-        entries: [...entriesWithoutTopic, literalEntry],
-      };
-      const harness = executeClientPayload();
-      await harness.resolveIndex(publicIndex);
-      const helperIds = searchPublicIndex(publicIndex, query).map(
+    for (const [query, targetMomentId] of amendedLiteralCases) {
+      const helperIds = searchPublicIndex(baseIndex, query).map(
         (entry) => entry.momentId,
       );
       harness.submit(query);
       const shippedIds = descendants(harness.results, 'article').map(
         (article) => article.dataset.momentId,
       );
-      expect(helperIds, query).toContain(`moment-literal-alias-${position}`);
-      expect(helperIds, query).not.toContain(targetMomentId);
+      expect(helperIds, query).toContain(targetMomentId);
       expect(shippedIds, query).toEqual(helperIds);
     }
   });

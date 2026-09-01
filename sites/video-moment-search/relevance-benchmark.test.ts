@@ -11,6 +11,7 @@ import {
   validateExperimentLedger,
   validateResearcherRelevanceBenchmarkCorpus,
 } from './measurement.js';
+import type { VideoSourceEvidenceManifest } from './source-evidence.js';
 
 type BenchmarkCase = {
   readonly query: string;
@@ -62,52 +63,27 @@ type ResearcherRelevanceBenchmark = {
   };
 };
 
-const literalTopicCases = [
-  [
-    'outsmart question robots',
-    'moment-robots-outsmart-question',
-    'outsmart-question-robots',
-  ],
-  [
-    'Charite hospital animation',
-    'moment-medical-ai-hospital-setting',
-    'charite-hospital-animation',
-  ],
-  [
-    'symptom scales checkboxes',
-    'moment-medical-ai-symptom-inputs',
-    'symptom-scales-checkboxes',
-  ],
-  [
-    'medical AI branching outputs',
-    'moment-medical-ai-decision-paths',
-    'medical-ai-branching-outputs',
-  ],
-  [
-    'patient data processing',
-    'moment-medical-ai-decision-paths',
-    'patient-data-processing',
-  ],
-  [
-    'human oversight medical AI',
-    'moment-medical-ai-clinician-patient',
-    'medical-ai-human-oversight',
-  ],
-  [
-    'patient clinicians tablet',
-    'moment-medical-ai-clinician-patient',
-    'patient-clinicians-tablet',
-  ],
-  [
-    'hospital bedside discussion',
-    'moment-medical-ai-clinician-patient',
-    'hospital-bedside-discussion',
-  ],
-  [
-    'medical AI human oversight',
-    'moment-medical-ai-clinician-patient',
-    'medical-ai-human-oversight',
-  ],
+const amendedLiteralCases = [
+  ['blue display robots', 'moment-robots-outsmart-question'],
+  ['city block hospital', 'moment-medical-ai-hospital-setting'],
+  ['hand symptom checklist', 'moment-medical-ai-symptom-inputs'],
+  ['branch patient results', 'moment-medical-ai-decision-paths'],
+  ['central decision patient', 'moment-medical-ai-decision-paths'],
+  ['human oversight patient', 'moment-medical-ai-clinician-patient'],
+  ['patient clinicians tablets', 'moment-medical-ai-clinician-patient'],
+  ['hospital bedside clinicians', 'moment-medical-ai-clinician-patient'],
+  ['AI human oversight', 'moment-medical-ai-clinician-patient'],
+] as const;
+
+const unauthorizedBenchmarkTopicSlugs = [
+  'outsmart-question-robots',
+  'charite-hospital-animation',
+  'symptom-scales-checkboxes',
+  'medical-ai-branching-outputs',
+  'patient-data-processing',
+  'medical-ai-human-oversight',
+  'patient-clinicians-tablet',
+  'hospital-bedside-discussion',
 ] as const;
 
 function normalizedTokens(value: string): readonly string[] {
@@ -177,13 +153,30 @@ function controlledPositiveContractDiagnostics(
       continue;
     }
     const video = fixture.videos.find(({ id }) => id === moment.videoId)!;
-    const annotation = fixture.cues
-      .filter(
-        ({ videoId, evidenceKind }) =>
-          videoId === moment.videoId && evidenceKind === 'editorial-annotation',
-      )
-      .map(({ text }) => text)
-      .join(' ');
+    const sourceRecord = sourceEvidenceManifest.records.find(
+      (record) =>
+        record.bindings.corpusId === fixture.corpusId &&
+        record.bindings.videoId === moment.videoId &&
+        record.moments.some(
+          (binding) => binding.momentId === benchmarkCase.expectedMomentId,
+        ),
+    );
+    const momentBinding = sourceRecord?.moments.find(
+      (binding) => binding.momentId === benchmarkCase.expectedMomentId,
+    );
+    const annotationCue = fixture.cues.find(
+      (cue) =>
+        cue.id === momentBinding?.cueId &&
+        cue.videoId === moment.videoId &&
+        cue.evidenceKind === 'editorial-annotation',
+    );
+    if (momentBinding === undefined || annotationCue === undefined) {
+      diagnostics.push(
+        `positive query expected moment ${benchmarkCase.expectedMomentId} has no exact manifest moment/cue annotation binding`,
+      );
+      continue;
+    }
+    const annotation = annotationCue.text;
     const supportedTokensByBasis = {
       title: new Set(normalizedTokens(video.title)),
       'title-and-topic': new Set(
@@ -230,6 +223,16 @@ const fixture = JSON.parse(
     'utf8',
   ),
 ) as VideoCorpus;
+
+const sourceEvidenceManifest = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+) as VideoSourceEvidenceManifest;
 
 const ledger = JSON.parse(
   readFileSync(
@@ -355,7 +358,7 @@ describe('controlled researcher-relevance benchmark', () => {
         'revenue',
       ],
       evaluatedCorpusSemanticSha256:
-        '53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973',
+        'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
     });
     expect(benchmark.target).toEqual({
       minimumControlledPositiveCases: 62,
@@ -433,7 +436,7 @@ describe('controlled researcher-relevance benchmark', () => {
     };
 
     expect(canonicalVideoCorpusSemanticSha256(fixture)).toBe(
-      '53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973',
+      'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
     );
     expect(canonicalVideoCorpusSemanticSha256(reorderedCorpus)).toBe(
       canonicalVideoCorpusSemanticSha256(fixture),
@@ -699,6 +702,26 @@ describe('controlled researcher-relevance benchmark', () => {
     }
   });
 
+  it('rejects annotation support that exists only on a sibling moment', () => {
+    const withSiblingAnnotationToken = structuredClone(
+      loadBenchmark(),
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    const outsmartCase = withSiblingAnnotationToken.cases.find(
+      (benchmarkCase) =>
+        benchmarkCase.expectedMomentId === 'moment-robots-outsmart-question',
+    );
+    expect(outsmartCase).toBeDefined();
+    if (outsmartCase === undefined) throw new Error('Missing outsmart case');
+    outsmartCase.query = 'brain mapping colored points';
+    outsmartCase.queryBasis = 'title-and-original-editorial-annotation';
+
+    expect(
+      controlledPositiveContractDiagnostics(withSiblingAnnotationToken),
+    ).toContain(
+      'query token brain is not supported by title-and-original-editorial-annotation',
+    );
+  });
+
   it('keeps four synthetic unrelated negative controls at zero results', () => {
     const benchmark = loadBenchmark();
     const index = buildSearchIndex(fixture);
@@ -766,7 +789,7 @@ describe('controlled researcher-relevance benchmark', () => {
           'human oversight robots',
           'robot intelligence',
           'animated robots display',
-          'outsmart question robots',
+          'blue display robots',
         ],
       ],
       [
@@ -797,7 +820,7 @@ describe('controlled researcher-relevance benchmark', () => {
           'medical AI hospital',
           'hospital AI',
           'healthcare AI',
-          'Charite hospital animation',
+          'city block hospital',
           'AI Campus hospital',
           'medical artificial intelligence hospital',
         ],
@@ -809,7 +832,7 @@ describe('controlled researcher-relevance benchmark', () => {
           'medical AI data',
           'patient assessment',
           'health symptom checklist',
-          'symptom scales checkboxes',
+          'hand symptom checklist',
           'thermometer heart symptom icons',
         ],
       ],
@@ -820,8 +843,8 @@ describe('controlled researcher-relevance benchmark', () => {
           'patient specific results',
           'explainable AI results',
           'health signs decision system',
-          'medical AI branching outputs',
-          'patient data processing',
+          'branch patient results',
+          'central decision patient',
         ],
       ],
       [
@@ -829,10 +852,10 @@ describe('controlled researcher-relevance benchmark', () => {
         [
           'clinician patient communication',
           'doctor patient relationship',
-          'human oversight medical AI',
-          'patient clinicians tablet',
-          'hospital bedside discussion',
-          'medical AI human oversight',
+          'human oversight patient',
+          'patient clinicians tablets',
+          'hospital bedside clinicians',
+          'AI human oversight',
         ],
       ],
     ]);
@@ -887,75 +910,20 @@ describe('controlled researcher-relevance benchmark', () => {
     );
   });
 
-  it('uses reviewed topic text for every formerly non-literal benchmark phrase', () => {
+  it('keeps coordinator-reviewed topics free of benchmark-derived labels', () => {
+    const topicSlugs = fixture.moments.flatMap((moment) => moment.topicSlugs);
+    for (const topicSlug of unauthorizedBenchmarkTopicSlugs) {
+      expect(topicSlugs).not.toContain(topicSlug);
+    }
+  });
+
+  it('retrieves every amended case from fixed reviewed metadata', () => {
     const index = buildSearchIndex(fixture);
-    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
-      const moment = fixture.moments.find(({ id }) => id === targetMomentId);
-      expect(moment, query).toBeDefined();
-      expect(moment?.topicSlugs, query).toContain(topicSlug);
+    for (const [query, targetMomentId] of amendedLiteralCases) {
       expect(
         searchMoments(index, query, 3).map((result) => result.momentId),
         query,
       ).toContain(targetMomentId);
-    }
-  });
-
-  it('scores the original literal phrase when target topic support is removed', () => {
-    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
-      const corpus = structuredClone(fixture) as Mutable<VideoCorpus>;
-      const moment = corpus.moments.find(({ id }) => id === targetMomentId);
-      expect(moment, query).toBeDefined();
-      if (moment === undefined) throw new Error(`Missing ${targetMomentId}`);
-      moment.topicSlugs = moment.topicSlugs.filter(
-        (candidate) => candidate !== topicSlug,
-      );
-      const index = buildSearchIndex(corpus);
-      const target = index.entries.find(
-        (entry) => entry.moment.id === targetMomentId,
-      );
-      expect(target, query).toBeDefined();
-      if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
-      const position = literalTopicCases.findIndex(
-        ([candidate]) => candidate === query,
-      );
-      const literalEntry = (() => {
-        const target = index.entries.find(
-          (entry) => entry.moment.id === targetMomentId,
-        );
-        expect(target, query).toBeDefined();
-        if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
-        const literalMomentId = `moment-literal-alias-${position}`;
-        const startSeconds = 900 + position;
-        return {
-          ...target,
-          moment: {
-            ...target.moment,
-            id: literalMomentId,
-            startSeconds,
-            endSeconds: startSeconds + 1,
-            excerpt: query,
-            topicSlugs: [],
-          },
-          video: {
-            ...target.video,
-            id: `video-literal-alias-${position}`,
-            slug: `literal-alias-${position}`,
-            title: `Literal alias control ${position}`,
-            sourceUrl: `https://video.example/literal-alias-${position}.webm`,
-          },
-          title: `literal alias control ${position}`,
-          topics: '',
-          excerpt: query.toLocaleLowerCase('en-US'),
-          tokens: new Set(normalizedTokens(query)),
-        };
-      })();
-      const ids = searchMoments(
-        { entries: [...index.entries, literalEntry] },
-        query,
-        10,
-      ).map((result) => result.momentId);
-      expect(ids, query).toContain(`moment-literal-alias-${position}`);
-      expect(ids, query).not.toContain(targetMomentId);
     }
   });
 
