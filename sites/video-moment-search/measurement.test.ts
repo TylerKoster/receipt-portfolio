@@ -417,13 +417,13 @@ describe('privacy-preserving measurement contract', () => {
       'last-known-good original three moments',
     );
     expect(normalizedLaneContract).toContain(
-      'current explicitly authorized candidate contains ten moments',
+      'accepted rights-reviewed proof corpus contains ten moments',
     );
     expect(normalizedLaneContract).toContain(
       '3 established plus 7 authorized additions',
     );
     expect(normalizedLaneContract).toContain(
-      'does not download or scrape media or transcripts',
+      'never scrapes unauthorized transcripts, downloads audiovisual media without explicit authority, infers rights, or performs an unplanned admission',
     );
     expect(normalizedLaneContract).not.toContain(
       'No lane work admits another moment',
