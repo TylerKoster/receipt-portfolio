@@ -546,7 +546,17 @@ function nonNamespaceAttributes(
   );
 }
 
-function exactSearchBlogUrl(value: unknown, name: string): string {
+const SEARCH_BLOG_CHANNEL_URL =
+  'https://developers.google.com/search/blog/' as const;
+
+function exactSearchBlogChannelUrl(value: unknown, name: string): string {
+  if (value !== SEARCH_BLOG_CHANNEL_URL) {
+    return notAdmitted(`${name} is not admitted`);
+  }
+  return SEARCH_BLOG_CHANNEL_URL;
+}
+
+function exactSearchBlogPostUrl(value: unknown, name: string): string {
   if (typeof value !== 'string' || value !== value.trim()) {
     return notAdmitted(`${name} must be a canonical URL string`);
   }
@@ -583,7 +593,7 @@ function entryUrl(entry: XmlNode, name: string): string {
     ) ?? links[0];
   const href = selected?.attributes.href;
   if (href === undefined) return notAdmitted(`${name} is missing`);
-  return exactSearchBlogUrl(href, name);
+  return exactSearchBlogPostUrl(href, name);
 }
 
 function atomEntries(feed: XmlNode) {
@@ -680,9 +690,7 @@ function rssEntries(root: XmlNode) {
   }
   exactLeafText(channel, 'title', 'RSS channel title');
   const channelLink = exactLeafText(channel, 'link', 'RSS channel link', true);
-  if (channelLink !== 'https://developers.google.com/search/blog') {
-    return notAdmitted('RSS channel link is not admitted');
-  }
+  exactSearchBlogChannelUrl(channelLink, 'RSS channel link');
   exactLeafText(channel, 'description', 'RSS channel description');
   const items = channel.children.filter(
     (node) => node.name === 'item' && node.namespaceUri === '',
@@ -720,7 +728,7 @@ function rssEntries(root: XmlNode) {
         true,
       ),
       title,
-      url: exactSearchBlogUrl(link, `item[${index}].link`),
+      url: exactSearchBlogPostUrl(link, `item[${index}].link`),
       publishedAt,
       updatedAt: publishedAt,
     };

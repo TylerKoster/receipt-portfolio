@@ -56,7 +56,7 @@ const FEED_BYTES = Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Google Search Central Blog</title>
-    <link>https://developers.google.com/search/blog</link>
+    <link>https://developers.google.com/search/blog/</link>
     <description>Official Search Central articles.</description>
     <item><title>Second &amp; newer</title><link>https://developers.google.com/search/blog/second</link><description><![CDATA[<p>Untrusted article body.</p>]]></description><pubDate>Mon, 31 Aug 2026 17:00:00 +0000</pubDate><guid isPermaLink="false">tag:google.com,2026:second</guid></item>
     <item><title>First</title><link>https://developers.google.com/search/blog/first</link><description><![CDATA[This body is not a published fact.]]></description><pubDate>Sun, 30 Aug 2026 10:00:00 GMT</pubDate><guid isPermaLink="false">tag:google.com,2026:first</guid></item>
@@ -279,6 +279,67 @@ describe('bounded Search Receipt live collection', () => {
     const serializedFacts = canonicalJson(result.receipt.payload.publicFacts);
     expect(serializedFacts).not.toContain('Untrusted article body');
     expect(serializedFacts).not.toContain('not a published fact');
+  });
+
+  it.each([
+    'https://developers.google.com/search/blog',
+    'https://developers.google.com:443/search/blog/',
+    'https://user@developers.google.com/search/blog/',
+    'https://developers.google.com/search/blog/?view=1',
+    'https://developers.google.com/search/blog/#latest',
+    ' https://developers.google.com/search/blog/',
+    'https://developers.google.com/search/%62log/',
+  ])(
+    'rejects the noncanonical RSS channel link %s without writing evidence',
+    async (channelLink) => {
+      const bytes = Buffer.from(
+        FEED_BYTES.toString('utf8').replace(
+          'https://developers.google.com/search/blog/</link>',
+          `${channelLink}</link>`,
+        ),
+      );
+      const evidenceDirectory = await newEvidenceDirectory(
+        'search-rss-channel-link-',
+      );
+      await expect(
+        collectSearchSource('google-search-central-blog', {
+          evidenceDirectory,
+          fetchSource: async (manifest) => ({
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          }),
+        }),
+      ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED: RSS channel link/);
+      await expectNoEvidenceWrites(evidenceDirectory);
+    },
+  );
+
+  it('rejects the channel root as an RSS item link without writing evidence', async () => {
+    const bytes = Buffer.from(
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com/search/blog/</link>',
+      ),
+    );
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-rss-root-item-link-',
+    );
+    await expect(
+      collectSearchSource('google-search-central-blog', {
+        evidenceDirectory,
+        fetchSource: async (manifest) => ({
+          ...rawFetch(manifest),
+          byteCount: bytes.byteLength,
+          rawSha256: sha256(bytes),
+          bytes,
+        }),
+      }),
+    ).rejects.toThrow(
+      'SOURCE_DATA_NOT_ADMITTED: item[0].link destination is not admitted',
+    );
+    await expectNoEvidenceWrites(evidenceDirectory);
   });
 
   it('canonicalizes positive and negative RFC822 offsets across UTC date boundaries', async () => {
