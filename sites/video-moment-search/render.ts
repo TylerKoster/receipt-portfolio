@@ -597,7 +597,7 @@ export function renderSearchShell(
     ? ` Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record status: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`
     : '';
   const rightsBoundary = allInitialEntriesReviewed
-    ? `These reviewed Commons source records. Each provides a timestamp link plus an original editorial annotation only.${historicalReviewBoundary} It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.`
+    ? `These reviewed Commons source records each provide a timestamp link plus an original editorial annotation only. The index does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence.${historicalReviewBoundary} It is not a live creator library.`
     : 'Each controlled result exposes its stored rights, provenance, and correction state. Review status is shown only when a validated evidence record is present. This route does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence.';
   const body = `<section class="information-panel" aria-labelledby="start-heading">
     <h2 id="start-heading">Recover the explanation, then verify its context</h2>

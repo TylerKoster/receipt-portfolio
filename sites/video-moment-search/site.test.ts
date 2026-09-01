@@ -2035,9 +2035,7 @@ describe('AI Moment Index public search surface', () => {
       'How to use it',
       '<strong>What you get:</strong>',
       '<strong>Rights boundary:</strong>',
-      'These reviewed Commons source records.',
-      'timestamp link plus an original editorial annotation only',
-      'does not host, embed, or distribute media or transcripts',
+      'These reviewed Commons source records each provide a timestamp link plus an original editorial annotation only. The index does not host, embed, or distribute media or transcripts',
       'claim endorsement or inferred permission',
       'not a live creator library',
       'usability, demand, or revenue evidence',
@@ -2045,6 +2043,8 @@ describe('AI Moment Index public search surface', () => {
       expect(html).toContain(copy);
     }
     expect(html).not.toContain('This reviewed Commons source');
+    expect(html).not.toContain('These reviewed Commons source records. Each');
+    expect(html).not.toContain('It does not host, embed');
   });
 
   it('indexes every nonempty admitted canonical page while keeping query state out of discovery', () => {
