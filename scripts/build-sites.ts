@@ -121,8 +121,8 @@ interface VideoMomentPublication {
 
 async function loadVideoMomentPublication(
   manifestPath?: string,
+  validationNow: Date = new Date(),
 ): Promise<VideoMomentPublication> {
-  const validationNow = new Date();
   const [fixture, manifest] = await Promise.all([
     readFile(
       join(
@@ -1118,6 +1118,7 @@ export async function buildSites(options: {
   includeVideoMomentSearch?: boolean;
   blogRegistryRoot?: string;
   videoMomentEvidenceManifestPath?: string;
+  videoMomentValidationNow?: Date;
 }): Promise<void> {
   const publicBaseUrl = normalizePublicBaseUrl(
     options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
@@ -1172,7 +1173,10 @@ export async function buildSites(options: {
   );
   await inspectOptionalRealDirectory(outputDirectory, 'Output root');
   const videoMomentPublication = options.includeVideoMomentSearch
-    ? await loadVideoMomentPublication(options.videoMomentEvidenceManifestPath)
+    ? await loadVideoMomentPublication(
+        options.videoMomentEvidenceManifestPath,
+        options.videoMomentValidationNow,
+      )
     : undefined;
   const backupDirectory = `${outputDirectory}.previous`;
   try {

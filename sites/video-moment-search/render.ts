@@ -28,6 +28,88 @@ function routeUrl(baseUrl: string, suffix = ''): string {
   return `${normalizePublicBaseUrl(baseUrl)}video-moment-search/${suffix}`;
 }
 
+function sameIndexValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => sameIndexValue(value, right[index]))
+    );
+  }
+  if (
+    typeof left !== 'object' ||
+    left === null ||
+    typeof right !== 'object' ||
+    right === null
+  ) {
+    return false;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) =>
+        key === rightKeys[index] &&
+        sameIndexValue(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
+function normalizeIndexText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    .replace(/[\p{Pd}_]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function indexTokens(value: string): readonly string[] {
+  return normalizeIndexText(value).match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+function assertSearchIndexMatchesCorpus(
+  corpus: VideoCorpus,
+  searchIndex: SearchIndex,
+): void {
+  const publicMoments = corpus.moments.filter(
+    (moment) => moment.state === 'active' || moment.state === 'corrected',
+  );
+  if (searchIndex.entries.length !== publicMoments.length) {
+    throw new Error('Search index does not match validated corpus');
+  }
+  const videos = new Map(corpus.videos.map((video) => [video.id, video]));
+  for (const [index, moment] of publicMoments.entries()) {
+    const entry = searchIndex.entries[index];
+    const video = videos.get(moment.videoId);
+    if (entry === undefined || video === undefined) {
+      throw new Error('Search index does not match validated corpus');
+    }
+    const title = normalizeIndexText(video.title);
+    const topics = normalizeIndexText(moment.topicSlugs.join(' '));
+    const excerpt = normalizeIndexText(moment.excerpt);
+    const expectedTokens = new Set(
+      indexTokens(`${title} ${topics} ${excerpt}`),
+    );
+    if (
+      !sameIndexValue(entry.moment, moment) ||
+      !sameIndexValue(entry.video, video) ||
+      entry.title !== title ||
+      entry.topics !== topics ||
+      entry.excerpt !== excerpt ||
+      entry.tokens.size !== expectedTokens.size ||
+      [...expectedTokens].some((token) => !entry.tokens.has(token))
+    ) {
+      throw new Error('Search index does not match validated corpus');
+    }
+  }
+}
+
 function formatSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
@@ -90,6 +172,7 @@ export function serializePublicSearchIndex(
       );
     }
   }
+  assertSearchIndexMatchesCorpus(corpus, searchIndex);
   const evidenceRecords =
     sourceEvidence === undefined
       ? new Map()

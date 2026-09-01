@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildSearchIndex,
   searchMoments,
@@ -19,7 +19,8 @@ import {
   serializePublicSearchIndex as serializePublicSearchIndexRaw,
 } from './render.js';
 import {
-  searchPublicIndex,
+  buildVideoMomentSearchClient,
+  searchPublicIndex as searchPublicIndexRaw,
   VIDEO_MOMENT_SEARCH_CLIENT,
 } from './search-client.js';
 import {
@@ -49,6 +50,14 @@ const sourceEvidenceManifest = JSON.parse(
 const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
+const validationNow = new Date('2026-08-31T12:00:00.000Z');
+
+function searchPublicIndex(
+  index: Parameters<typeof searchPublicIndexRaw>[0],
+  query: string,
+): ReturnType<typeof searchPublicIndexRaw> {
+  return searchPublicIndexRaw(index, query, validationNow);
+}
 
 function manifestFor(
   corpus: VideoCorpus,
@@ -69,6 +78,7 @@ function serializePublicSearchIndex(
   ...args: Parameters<typeof serializePublicSearchIndexRaw>
 ): ReturnType<typeof serializePublicSearchIndexRaw> {
   args[2] ??= manifestFor(args[0]);
+  args[3] ??= validationNow;
   return serializePublicSearchIndexRaw(...args);
 }
 
@@ -76,6 +86,7 @@ function renderSearchResults(
   ...args: Parameters<typeof renderSearchResultsRaw>
 ): ReturnType<typeof renderSearchResultsRaw> {
   args[3] ??= manifestFor(args[0]);
+  args[4] ??= validationNow;
   return renderSearchResultsRaw(...args);
 }
 
@@ -83,6 +94,7 @@ function renderSearchShell(
   ...args: Parameters<typeof renderSearchShellRaw>
 ): ReturnType<typeof renderSearchShellRaw> {
   args[3] ??= manifestFor(args[0]);
+  args[4] ??= validationNow;
   return renderSearchShellRaw(...args);
 }
 
@@ -90,6 +102,7 @@ function renderVideoMomentHome(
   ...args: Parameters<typeof renderVideoMomentHomeRaw>
 ): ReturnType<typeof renderVideoMomentHomeRaw> {
   args[3] ??= manifestFor(args[0]);
+  args[4] ??= validationNow;
   return renderVideoMomentHomeRaw(...args);
 }
 
@@ -97,6 +110,7 @@ function renderVideoPage(
   ...args: Parameters<typeof renderVideoPageRaw>
 ): ReturnType<typeof renderVideoPageRaw> {
   args[5] ??= manifestFor(args[0]);
+  args[6] ??= validationNow;
   return renderVideoPageRaw(...args);
 }
 
@@ -104,6 +118,7 @@ function renderMomentPage(
   ...args: Parameters<typeof renderMomentPageRaw>
 ): ReturnType<typeof renderMomentPageRaw> {
   args[5] ??= manifestFor(args[0]);
+  args[6] ??= validationNow;
   return renderMomentPageRaw(...args);
 }
 
@@ -111,6 +126,7 @@ function renderTopicPage(
   ...args: Parameters<typeof renderTopicPageRaw>
 ): ReturnType<typeof renderTopicPageRaw> {
   args[6] ??= manifestFor(args[0]);
+  args[7] ??= validationNow;
   return renderTopicPageRaw(...args);
 }
 
@@ -118,6 +134,7 @@ function renderCreatorPage(
   ...args: Parameters<typeof renderCreatorPageRaw>
 ): ReturnType<typeof renderCreatorPageRaw> {
   args[5] ??= manifestFor(args[0]);
+  args[6] ??= validationNow;
   return renderCreatorPageRaw(...args);
 }
 
@@ -125,6 +142,7 @@ function renderGuidePage(
   ...args: Parameters<typeof renderGuidePageRaw>
 ): ReturnType<typeof renderGuidePageRaw> {
   args[5] ??= manifestFor(args[0]);
+  args[6] ??= validationNow;
   return renderGuidePageRaw(...args);
 }
 
@@ -293,6 +311,16 @@ function twoReviewedPublication(): {
 
 type Mutable<Value> = {
   -readonly [Key in keyof Value]: Mutable<Value[Key]>;
+};
+
+type SearchIndexEntry = (typeof searchIndex.entries)[number];
+type MutableSearchIndex = {
+  entries: Array<
+    Omit<SearchIndexEntry, 'moment' | 'video'> & {
+      moment: Mutable<SearchIndexEntry['moment']>;
+      video: Mutable<SearchIndexEntry['video']>;
+    }
+  >;
 };
 
 type SubmitListener = (event: { preventDefault(): void }) => void;
@@ -493,7 +521,10 @@ async function flushClientPromises(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
 
-function executeClientPayload(): ClientHarness {
+function executeClientPayload(
+  payload = buildVideoMomentSearchClient(validationNow),
+  runtimeNowMs?: number,
+): ClientHarness {
   FakeHTMLElement.activeElement = null;
   const initializationOrder: string[] = [];
   const form = new FakeHTMLFormElement(initializationOrder);
@@ -563,7 +594,15 @@ function executeClientPayload(): ClientHarness {
     querySelector: (selector: string) => selectors.get(selector) ?? null,
   };
 
-  runInNewContext(VIDEO_MOMENT_SEARCH_CLIENT, {
+  const ContextDate =
+    runtimeNowMs === undefined
+      ? Date
+      : class extends Date {
+          static override now(): number {
+            return runtimeNowMs;
+          }
+        };
+  runInNewContext(payload, {
     document,
     fetch: (input: string, options: unknown) => {
       initializationOrder.push('fetch-started');
@@ -587,6 +626,7 @@ function executeClientPayload(): ClientHarness {
               : Promise.resolve(),
       },
     },
+    Date: ContextDate,
     URL,
   });
 
@@ -824,6 +864,111 @@ describe('AI Moment Index public search surface', () => {
     }
   });
 
+  it('rejects stale or forged search indexes before reviewed publication produces output', () => {
+    const mutations: readonly [
+      string,
+      (candidate: MutableSearchIndex) => void,
+    ][] = [
+      [
+        'source URL',
+        (candidate) => {
+          candidate.entries[0]!.video.sourceUrl =
+            'https://attacker.invalid/stale-source.webm';
+        },
+      ],
+      [
+        'timestamp',
+        (candidate) => {
+          candidate.entries[0]!.moment.startSeconds = 131;
+        },
+      ],
+      [
+        'title',
+        (candidate) => {
+          candidate.entries[0]!.video.title = 'Stale title';
+        },
+      ],
+      [
+        'creator',
+        (candidate) => {
+          candidate.entries[0]!.video.creatorName = 'Forged creator';
+        },
+      ],
+      [
+        'annotation content',
+        (candidate) => {
+          candidate.entries[0]!.moment.excerpt = 'Forged annotation';
+        },
+      ],
+    ];
+
+    for (const [name, mutate] of mutations) {
+      const candidate = structuredClone(
+        searchIndex,
+      ) as unknown as MutableSearchIndex;
+      mutate(candidate);
+      expect(
+        () =>
+          serializePublicSearchIndexRaw(
+            fixture,
+            candidate,
+            sourceEvidenceManifest,
+            validationNow,
+          ),
+        name,
+      ).toThrow('Search index does not match validated corpus');
+      let html: string | undefined;
+      expect(() => {
+        html = renderVideoMomentHomeRaw(
+          fixture,
+          candidate,
+          baseUrl,
+          sourceEvidenceManifest,
+          validationNow,
+        );
+      }, name).toThrow('Search index does not match validated corpus');
+      expect(html, name).toBeUndefined();
+    }
+  });
+
+  it('injects deterministic client clocks after expiry while the production adapter reads runtime time', async () => {
+    const validIndex = serializePublicSearchIndex(
+      fixture,
+      searchIndex,
+      sourceEvidenceManifest,
+      validationNow,
+    );
+    const afterExpiry = new Date('2026-10-01T00:00:00.000Z');
+
+    vi.useFakeTimers();
+    vi.setSystemTime(afterExpiry);
+    try {
+      expect(
+        searchPublicIndexRaw(validIndex, 'robots control', validationNow),
+      ).not.toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const deterministicHarness = executeClientPayload(
+      buildVideoMomentSearchClient(validationNow),
+      afterExpiry.getTime(),
+    );
+    await deterministicHarness.resolveIndex(validIndex);
+    expect(deterministicHarness.error.hidden).toBe(true);
+    deterministicHarness.submit('robots control');
+    expect(deterministicHarness.results.children).not.toHaveLength(0);
+
+    const productionHarness = executeClientPayload(
+      buildVideoMomentSearchClient(),
+      afterExpiry.getTime(),
+    );
+    await productionHarness.resolveIndex(validIndex);
+    expect(productionHarness.error.hidden).toBe(false);
+    productionHarness.submit('robots control');
+    expect(productionHarness.results.children).toEqual([]);
+  });
+
   it('preserves exact source, annotation, and product boundaries without network access', () => {
     const serialized = serializePublicSearchIndex(
       fixture,
@@ -950,7 +1095,11 @@ describe('AI Moment Index public search surface', () => {
 
   it('binds the public fixture to the deterministic Commons rights evidence', () => {
     expect(
-      validateCommonsSourceEvidence(fixture, sourceEvidenceManifest),
+      validateCommonsSourceEvidence(
+        fixture,
+        sourceEvidenceManifest,
+        validationNow,
+      ),
     ).toEqual({
       ok: true,
       diagnostics: [],
@@ -1141,9 +1290,10 @@ describe('AI Moment Index public search surface', () => {
         sourceEvidenceManifest,
       ) as Mutable<VideoSourceEvidenceManifest>;
       invalidate(candidate);
-      expect(validateCommonsSourceEvidence(fixture, candidate).ok, name).toBe(
-        false,
-      );
+      expect(
+        validateCommonsSourceEvidence(fixture, candidate, validationNow).ok,
+        name,
+      ).toBe(false);
       expect(
         () => serializePublicSearchIndex(fixture, searchIndex, candidate),
         name,

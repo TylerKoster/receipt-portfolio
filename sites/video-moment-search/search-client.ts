@@ -122,7 +122,10 @@ function canonicalInstant(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
-function safeReviewEvidence(value: unknown): value is PublicReviewEvidence {
+function safeReviewEvidence(
+  value: unknown,
+  validationNowMs: number,
+): value is PublicReviewEvidence {
   if (!isReviewedSourceEvidenceSubstantive(value)) {
     return false;
   }
@@ -154,10 +157,9 @@ function safeReviewEvidence(value: unknown): value is PublicReviewEvidence {
   }
   const observedAt = new Date(observedStatus.observedAt).getTime();
   const expiresAt = new Date(observedStatus.expiresAt).getTime();
-  const now = Date.now();
   if (
-    observedAt > now ||
-    now >= expiresAt ||
+    observedAt > validationNowMs ||
+    validationNowMs >= expiresAt ||
     expiresAt <= observedAt ||
     expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000
   ) {
@@ -222,6 +224,7 @@ function claimsMatchEvidence(entry: PublicSearchEntry): boolean {
 function safeTimestampEntry(
   value: unknown,
   expectedCorpusId: string,
+  validationNowMs: number,
 ): value is PublicSearchEntry {
   if (typeof value !== 'object' || value === null) return false;
   const entry = value as Partial<PublicSearchEntry>;
@@ -255,7 +258,7 @@ function safeTimestampEntry(
       entry.timestampStrategy !== 'query-parameter' &&
       entry.timestampStrategy !== 'media-fragment') ||
     (entry.reviewEvidence !== undefined &&
-      !safeReviewEvidence(entry.reviewEvidence))
+      !safeReviewEvidence(entry.reviewEvidence, validationNowMs))
   ) {
     return false;
   }
@@ -309,8 +312,10 @@ function score(entry: PublicSearchEntry, query: string): number {
 export function searchPublicIndex(
   value: unknown,
   query: string,
+  validationNow: Date,
   limit = 10,
 ): readonly PublicSearchEntry[] {
+  const validationNowMs = validationNow.getTime();
   const candidateIndex = value as Partial<PublicSearchIndex>;
   if (
     typeof value !== 'object' ||
@@ -318,13 +323,16 @@ export function searchPublicIndex(
     candidateIndex.schemaVersion !== 1 ||
     typeof candidateIndex.corpusId !== 'string' ||
     !Array.isArray(candidateIndex.entries) ||
+    Number.isNaN(validationNowMs) ||
     normalize(query).length === 0 ||
     limit <= 0
   ) {
     return [];
   }
   return candidateIndex.entries
-    .filter((entry) => safeTimestampEntry(entry, candidateIndex.corpusId!))
+    .filter((entry) =>
+      safeTimestampEntry(entry, candidateIndex.corpusId!, validationNowMs),
+    )
     .map((entry) => ({ entry, score: score(entry, query) }))
     .filter((candidate) => candidate.score > 0)
     .sort(
@@ -338,7 +346,14 @@ export function searchPublicIndex(
     .map((candidate) => candidate.entry);
 }
 
-export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
+export function buildVideoMomentSearchClient(validationNow?: Date): string {
+  const injectedNow = validationNow?.getTime();
+  if (injectedNow !== undefined && !Number.isFinite(injectedNow)) {
+    throw new Error('Client validation clock must be a valid date');
+  }
+  const clockExpression =
+    injectedNow === undefined ? 'Date.now()' : String(injectedNow);
+  return String.raw`((validationNow) => {
   'use strict';
   const form = document.querySelector('[data-moment-search]');
   const input = document.querySelector('[data-moment-query]');
@@ -428,8 +443,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
           !review.productBoundary.excluded.every(nonBlank)) return false;
       const observedAt = new Date(review.observedStatus.observedAt).getTime();
       const expiresAt = new Date(review.observedStatus.expiresAt).getTime();
-      const now = Date.now();
-      if (observedAt > now || now >= expiresAt || expiresAt <= observedAt ||
+      if (observedAt > validationNow || validationNow >= expiresAt || expiresAt <= observedAt ||
           expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) return false;
       return [review.licenseUrl, review.canonicalRightsPageUrl,
         review.immutableRightsRevisionUrl,
@@ -735,4 +749,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       index = null;
       showLoadError();
     });
-})();`;
+})(${clockExpression});`;
+}
+
+export const VIDEO_MOMENT_SEARCH_CLIENT = buildVideoMomentSearchClient();

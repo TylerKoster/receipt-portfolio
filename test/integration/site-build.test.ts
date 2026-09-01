@@ -1925,6 +1925,7 @@ describe('static receipt site build', () => {
       evidenceDirectory: testEvidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
+      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
     });
     const previousInventory = await fileInventory(outputDirectory);
     const entry = (await searchReceiptEntries())[0]!;
@@ -1941,6 +1942,7 @@ describe('static receipt site build', () => {
         evidenceDirectory: testEvidenceDirectory,
         outputDirectory,
         includeVideoMomentSearch: true,
+        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
       }),
     ).rejects.toThrow(/digest/i);
     expect(await fileInventory(outputDirectory)).toEqual(previousInventory);

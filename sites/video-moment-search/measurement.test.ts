@@ -297,6 +297,7 @@ describe('privacy-preserving measurement contract', () => {
       buildSearchIndex(fixture),
       'https://receipt-portfolio.example/',
       evidenceManifest,
+      new Date('2026-08-31T12:00:00.000Z'),
     );
 
     expect(html).toContain('data-measurement-event="search"');

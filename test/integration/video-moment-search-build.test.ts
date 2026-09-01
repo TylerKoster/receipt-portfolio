@@ -71,6 +71,7 @@ describe('atomic AI Moment Index build', () => {
         outputDirectory,
         includeVideoMomentSearch: true,
         videoMomentEvidenceManifestPath: manifestPath,
+        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
       }),
     ).rejects.toThrow(
       /SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH.*SOURCE_EVIDENCE_RECORD_MISSING/iu,
@@ -119,6 +120,7 @@ describe('atomic AI Moment Index build', () => {
       evidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
+      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
     });
 
     const routeDirectory = join(outputDirectory, 'video-moment-search');
@@ -157,7 +159,11 @@ describe('atomic AI Moment Index build', () => {
     expect(client).not.toContain('sessionStorage');
     expect(styles).toContain(':focus-visible');
 
-    const results = searchPublicIndex(JSON.parse(indexJson), 'robots control');
+    const results = searchPublicIndex(
+      JSON.parse(indexJson),
+      'robots control',
+      new Date('2026-08-31T12:00:00.000Z'),
+    );
     expect(results[0]).toMatchObject({
       momentId: 'moment-robots-control',
       startSeconds: 132,
@@ -197,6 +203,7 @@ describe('atomic AI Moment Index build', () => {
       evidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
+      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
       publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
     });
 

@@ -29,6 +29,7 @@ const evidenceManifest = JSON.parse(
   ),
 ) as VideoSourceEvidenceManifest;
 const baseUrl = 'https://receipt-portfolio.example/';
+const validationNow = new Date('2026-08-31T12:00:00.000Z');
 
 function manifestFor(candidate: VideoCorpus): VideoSourceEvidenceManifest {
   const manifest = structuredClone(evidenceManifest);
@@ -43,6 +44,7 @@ function renderSitemap(
   ...args: Parameters<typeof renderSitemapRaw>
 ): ReturnType<typeof renderSitemapRaw> {
   args[4] ??= manifestFor(args[0]);
+  args[5] ??= validationNow;
   return renderSitemapRaw(...args);
 }
 
@@ -50,6 +52,7 @@ function renderAtomFeed(
   ...args: Parameters<typeof renderAtomFeedRaw>
 ): ReturnType<typeof renderAtomFeedRaw> {
   args[3] ??= manifestFor(args[0]);
+  args[4] ??= validationNow;
   return renderAtomFeedRaw(...args);
 }
 
