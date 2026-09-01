@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "siteId": "search-receipt",
+  "title": "Invalid controlled blog fixture",
+  "description": "This fixture is intentionally missing source bindings.",
+  "posts": [
+    {
+      "id": "invalid-controlled-post",
+      "slug": "invalid-controlled-post",
+      "feedId": "urn:receipt-portfolio:search-receipt:invalid-controlled-post",
+      "title": "Invalid controlled post",
+      "description": "A deliberately invalid record used only by fail-closed tests.",
+      "publishedAt": "2026-08-30T12:00:00.000Z",
+      "modifiedAt": "2026-08-30T12:00:00.000Z",
+      "author": {
+        "name": "Controlled fixture",
+        "role": "Test editor"
+      },
+      "editorialDisclosure": "This invalid fixture is not product content.",
+      "sourceBindings": [],
+      "sections": [],
+      "links": [],
+      "boundaries": {
+        "currentness": "This post does not report a current status or incident.",
+        "noCausation": "This post does not diagnose a change and does not establish cause."
+      }
+    }
+  ]
+}

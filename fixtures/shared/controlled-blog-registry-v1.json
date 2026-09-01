@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "siteId": "search-receipt",
+  "title": "Controlled Search Receipt blog fixture",
+  "description": "Test-only evidence-bound posts that are never discovered by the production build.",
+  "posts": [
+    {
+      "id": "controlled-search-handoff-post",
+      "slug": "controlled-search-handoff-checklist",
+      "feedId": "urn:receipt-portfolio:search-receipt:controlled-search-handoff-post",
+      "title": "How to prepare a bounded Search investigation handoff",
+      "description": "A test-only walkthrough for separating official observations, own-site evidence, and unknowns.",
+      "publishedAt": "2026-08-30T12:00:00.000Z",
+      "modifiedAt": "2026-08-31T12:00:00.000Z",
+      "author": {
+        "name": "Receipt Portfolio editorial test fixture",
+        "role": "Project-original editor"
+      },
+      "editorialDisclosure": "This controlled fixture tests original editorial structure and is not a published product article.",
+      "sourceBindings": [
+        {
+          "sourceId": "google-search-status",
+          "url": "https://status.search.google.com/incidents.json",
+          "observedAt": "2026-08-30T11:30:00.000Z",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "purpose": "Controlled binding to the admitted official status endpoint."
+        }
+      ],
+      "sections": [
+        {
+          "heading": "Separate the observations",
+          "paragraphs": [
+            {
+              "text": "Record the decision-time official observation separately from dated evidence collected from the site under review.",
+              "sourceBindingIds": ["google-search-status"]
+            }
+          ]
+        }
+      ],
+      "links": [
+        {
+          "label": "Open the Search Receipt guide",
+          "href": "/search-receipt/guides/is-google-search-down-or-my-site/",
+          "kind": "internal"
+        },
+        {
+          "label": "Inspect Google Search Status",
+          "href": "https://status.search.google.com/incidents.json",
+          "kind": "external"
+        }
+      ],
+      "boundaries": {
+        "currentness": "This post does not report a current status or incident; inspect the admitted official source directly at decision time.",
+        "noCausation": "This post does not diagnose a change and does not establish cause from the recorded observations."
+      }
+    }
+  ]
+}
