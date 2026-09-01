@@ -235,14 +235,19 @@
     {
       "id": "source-bound-evergreen-blog-post-v1",
       "rank": 14,
-      "status": "CONTENT_CONTRACT_ADMITTED_PENDING_RELEASE",
+      "status": "ROUTE_RELEASE_VERIFIED",
       "hypothesis": "A source-bound evergreen blog post may help a site owner separate official Google Search observations from dated own-site evidence before deciding what to inspect or escalate, without stating current status, diagnosis, cause, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.",
       "firstUserOutcome": "Use an answer-first, three-step workflow to inspect official source records at decision time and keep own-site evidence separate before escalation.",
       "metric": "Deterministic registry admission with every source binding resolving to a PASS receipt and matching immutable object bytes.",
       "target": "100% deterministic source-binding and route-output admission before publication.",
       "stopRule": "Stop publication preparation if any source binding lacks a PASS receipt, matching object bytes, or a required boundary.",
       "noDataBoundary": "Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
-      "coordinatorDependency": "Publication remains pending coordinator integration and public verification; no accepted release evidence exists for this candidate.",
+      "coordinatorDependency": "The coordinator-owned evidence-bound blog adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.",
+      "coordinatorReleaseEvidence": {
+        "releaseHead": "366fd53948f46388036ad404c0fad828c86d64af",
+        "tag": "v0.1.64",
+        "provenance": "Coordinator-provided accepted release evidence."
+      },
       "admittedEvidence": [
         {
           "sourceId": "google-search-status",
@@ -261,7 +266,7 @@
           "manifestSha256": "6a5ff11cac77df30fd5a5e3697c6a8cf281e23eb69bec54a0231bc26f6dc2c2e"
         }
       ],
-      "nextSafeAction": "Integrate and publicly verify the scheduled static blog release before recording accepted release evidence; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+      "nextSafeAction": "Maintain admitted source bindings and blog boundaries; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
     }
   ]
 }

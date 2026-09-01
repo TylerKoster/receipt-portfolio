@@ -18,6 +18,7 @@ const handoffPath = new URL(
   './source-bound-investigation-handoff.json',
   import.meta.url,
 );
+const blogRegistryPath = new URL('./blog-registry.json', import.meta.url);
 
 const observationBlocker =
   'No privacy-reviewed, authorized non-synthetic observation channel exists; absence of measurement is not failure or zero demand.';
@@ -34,6 +35,11 @@ const worksheetCoordinatorReleaseEvidence = {
 const discoveryCoordinatorReleaseEvidence = {
   releaseHead: '05448aecc2a8e93dc3ab661fdfe1a86840c17da2',
   tag: 'v0.1.45',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
+const blogCoordinatorReleaseEvidence = {
+  releaseHead: '366fd53948f46388036ad404c0fad828c86d64af',
+  tag: 'v0.1.64',
   provenance: 'Coordinator-provided accepted release evidence.',
 };
 
@@ -218,6 +224,27 @@ function assertDiscoveryReleaseEvidenceMatchesLedger(
   );
 }
 
+function assertBlogReleaseEvidenceMatchesLedger(
+  registry: Record<string, unknown>,
+  ledger: Record<string, unknown>,
+) {
+  const publication = registry.publication as Record<string, unknown>;
+  const experiments = ledger.experiments as Array<Record<string, unknown>>;
+  const rankFourteen = experiments.find((experiment) => experiment.rank === 14);
+
+  expect(publication.coordinatorReleaseEvidence).toEqual(
+    blogCoordinatorReleaseEvidence,
+  );
+  expect(rankFourteen).toMatchObject({
+    id: 'source-bound-evergreen-blog-post-v1',
+    rank: 14,
+    status: 'ROUTE_RELEASE_VERIFIED',
+  });
+  expect(rankFourteen?.coordinatorReleaseEvidence).toEqual(
+    publication.coordinatorReleaseEvidence,
+  );
+}
+
 describe('Search Receipt product experiment ledger', () => {
   it('records the adapter-pending source-bound investigation handoff without implying any outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
@@ -241,13 +268,13 @@ describe('Search Receipt product experiment ledger', () => {
     });
   });
 
-  it('records the first source-bound public-blog experiment without claiming an outcome', () => {
+  it('records the release-verified source-bound public-blog experiment without claiming an outcome', () => {
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
 
     expect(ledger.experiments[13]).toMatchObject({
       id: 'source-bound-evergreen-blog-post-v1',
       rank: 14,
-      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_RELEASE',
+      status: 'ROUTE_RELEASE_VERIFIED',
       metric:
         'Deterministic registry admission with every source binding resolving to a PASS receipt and matching immutable object bytes.',
       target:
@@ -257,13 +284,36 @@ describe('Search Receipt product experiment ledger', () => {
       noDataBoundary:
         'Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
       coordinatorDependency:
-        'Publication remains pending coordinator integration and public verification; no accepted release evidence exists for this candidate.',
+        'The coordinator-owned evidence-bound blog adapter remains the public-route owner; release and public verification are recorded only from coordinator-provided accepted release evidence.',
+      coordinatorReleaseEvidence: blogCoordinatorReleaseEvidence,
       nextSafeAction:
-        'Integrate and publicly verify the scheduled static blog release before recording accepted release evidence; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.',
+        'Maintain admitted source bindings and blog boundaries; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.',
     });
-    expect(ledger.experiments[13]).not.toHaveProperty(
-      'coordinatorReleaseEvidence',
+  });
+
+  it('keeps the blog registry and rank-fourteen ledger release evidence in one accepted contract', () => {
+    const registry = JSON.parse(readFileSync(blogRegistryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    assertBlogReleaseEvidenceMatchesLedger(registry, ledger);
+  });
+
+  it('rejects a rank-fourteen ledger release-evidence mutation', () => {
+    const registry = JSON.parse(readFileSync(blogRegistryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedLedger = structuredClone(ledger);
+    const rankFourteen = mutatedLedger.experiments.find(
+      (experiment: { rank: number }) => experiment.rank === 14,
     );
+
+    rankFourteen.coordinatorReleaseEvidence = {
+      ...blogCoordinatorReleaseEvidence,
+      tag: 'v0.1.63',
+    };
+
+    expect(() =>
+      assertBlogReleaseEvidenceMatchesLedger(registry, mutatedLedger),
+    ).toThrow();
   });
 
   it('keeps the rank-thirteen ledger contract aligned with the admitted handoff contract', () => {

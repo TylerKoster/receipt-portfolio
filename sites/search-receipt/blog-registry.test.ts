@@ -6,6 +6,12 @@ import {
 } from '../shared/blog.js';
 
 const registryPath = new URL('./blog-registry.json', import.meta.url);
+const ledgerPath = new URL('./product-experiment-ledger.json', import.meta.url);
+const coordinatorReleaseEvidence = {
+  releaseHead: '366fd53948f46388036ad404c0fad828c86d64af',
+  tag: 'v0.1.64',
+  provenance: 'Coordinator-provided accepted release evidence.',
+};
 const statusRawObject = new URL(
   '../../evidence/objects/raw/23ae3be78b87801c0dc74c1501fa120c3b441d055519f35f367aa59125c30f55.bin',
   import.meta.url,
@@ -38,7 +44,54 @@ const evidenceObjects: readonly ProductBlogEvidenceObject[] = [
   },
 ];
 
+function assertBlogReleaseEvidenceMatchesLedger(
+  registry: Record<string, unknown>,
+  ledger: Record<string, unknown>,
+) {
+  const publication = registry.publication as Record<string, unknown>;
+  const experiments = ledger.experiments as Array<Record<string, unknown>>;
+  const rankFourteen = experiments.find((experiment) => experiment.rank === 14);
+
+  expect(publication).toMatchObject({ status: 'ROUTE_RELEASE_VERIFIED' });
+  expect(publication.coordinatorReleaseEvidence).toEqual(
+    coordinatorReleaseEvidence,
+  );
+  expect(rankFourteen).toMatchObject({
+    id: 'source-bound-evergreen-blog-post-v1',
+    rank: 14,
+    status: 'ROUTE_RELEASE_VERIFIED',
+  });
+  expect(rankFourteen?.coordinatorReleaseEvidence).toEqual(
+    publication.coordinatorReleaseEvidence,
+  );
+}
+
 describe('Search Receipt public blog registry', () => {
+  it('records the accepted public release only from coordinator evidence', () => {
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    assertBlogReleaseEvidenceMatchesLedger(registry, ledger);
+  });
+
+  it('rejects a stale blog release-evidence mutation', () => {
+    const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const mutatedRegistry = structuredClone(registry);
+
+    mutatedRegistry.publication = {
+      status: 'ROUTE_RELEASE_VERIFIED',
+      coordinatorReleaseEvidence: {
+        ...coordinatorReleaseEvidence,
+        releaseHead: 'stale-release-head',
+      },
+    };
+
+    expect(() =>
+      assertBlogReleaseEvidenceMatchesLedger(mutatedRegistry, ledger),
+    ).toThrow();
+  });
+
   it('admits the first source-bound decision-time post without outcome claims', () => {
     const registry = JSON.parse(readFileSync(registryPath, 'utf8'));
 

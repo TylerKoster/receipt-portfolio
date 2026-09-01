@@ -3,6 +3,14 @@
   "siteId": "search-receipt",
   "title": "Search Receipt notes",
   "description": "Original, source-bound notes for separating official Google Search observations from evidence recorded on your own site.",
+  "publication": {
+    "status": "ROUTE_RELEASE_VERIFIED",
+    "coordinatorReleaseEvidence": {
+      "releaseHead": "366fd53948f46388036ad404c0fad828c86d64af",
+      "tag": "v0.1.64",
+      "provenance": "Coordinator-provided accepted release evidence."
+    }
+  },
   "posts": [
     {
       "id": "separate-google-search-status-from-site-evidence",
