@@ -4,8 +4,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson, sha256 } from '../packages/evidence-core/src/index.js';
 import {
   loadProductBlogRegistries,
+  loadProductBlogEvidenceObjects,
   productBlogRoutes,
+  type ProductBlogEvidenceObject,
 } from '../sites/shared/blog.js';
+import { loadVerifiedReceipts } from './evidence-cli.js';
 
 const PUBLIC_SITE_ROOTS = [
   'search-receipt',
@@ -238,12 +241,32 @@ async function strictPublicFiles(
 
 export async function hashPublicBuild(
   outputDirectory: string,
-  options: { readonly blogRegistryRoot?: string } = {},
+  options: {
+    readonly blogRegistryRoot?: string;
+    readonly blogEvidenceObjects?: readonly ProductBlogEvidenceObject[];
+    readonly evidenceDirectory?: string;
+  } = {},
 ): Promise<PublicBuildManifest> {
   const resolvedOutput = resolve(outputDirectory);
-  const blogValidation = await loadProductBlogRegistries(
-    options.blogRegistryRoot ?? projectRoot(),
+  const registryRoot = options.blogRegistryRoot ?? projectRoot();
+  let blogValidation = await loadProductBlogRegistries(
+    registryRoot,
+    options.blogEvidenceObjects,
   );
+  if (
+    options.blogEvidenceObjects === undefined &&
+    blogValidation.diagnostics.some((diagnostic) =>
+      diagnostic.startsWith('BLOG_EVIDENCE_'),
+    )
+  ) {
+    const evidenceDirectory =
+      options.evidenceDirectory ?? join(projectRoot(), 'evidence');
+    const receipts = await loadVerifiedReceipts(evidenceDirectory);
+    blogValidation = await loadProductBlogRegistries(
+      registryRoot,
+      await loadProductBlogEvidenceObjects(receipts, evidenceDirectory),
+    );
+  }
   if (!blogValidation.ok) {
     throw new Error(
       `Product blog registries are not admitted: ${blogValidation.diagnostics.join(', ')}`,

@@ -2,7 +2,21 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadProductBlogRegistries, type ProductBlogRegistry } from './blog.js';
+import {
+  loadProductBlogRegistries,
+  type ProductBlogEvidenceObject,
+  type ProductBlogRegistry,
+} from './blog.js';
+
+const evidenceObject: ProductBlogEvidenceObject = {
+  receiptId: 'b'.repeat(64),
+  sourceId: 'google-search-status',
+  url: 'https://status.search.google.com/incidents.json',
+  observedAt: '2026-08-30T11:00:00.000Z',
+  sha256: '553273914b991b391c4fb34fcb6eaaf3ee14d5107a95b942be90554779796b1a',
+  policyDecision: 'PASS',
+  bytes: new TextEncoder().encode('controlled repository evidence object'),
+};
 
 const registry: ProductBlogRegistry = {
   schemaVersion: 1,
@@ -22,10 +36,11 @@ const registry: ProductBlogRegistry = {
       editorialDisclosure: 'This is a controlled loader fixture.',
       sourceBindings: [
         {
+          receiptId: 'b'.repeat(64),
           sourceId: 'google-search-status',
           url: 'https://status.search.google.com/incidents.json',
           observedAt: '2026-08-30T11:00:00.000Z',
-          sha256: 'a'.repeat(64),
+          sha256: evidenceObject.sha256,
           purpose: 'Controlled source binding.',
         },
       ],
@@ -100,7 +115,9 @@ describe('fixed product blog registry discovery', () => {
     const projectRoot = await root();
     await writeRegistry(projectRoot, 'search-receipt', registry);
 
-    const result = await loadProductBlogRegistries(projectRoot);
+    const result = await loadProductBlogRegistries(projectRoot, [
+      evidenceObject,
+    ]);
     expect(result.ok).toBe(true);
     expect(result.registries.map((entry) => entry.siteId)).toEqual([
       'search-receipt',
@@ -111,7 +128,9 @@ describe('fixed product blog registry discovery', () => {
     const projectRoot = await root();
     await writeRegistry(projectRoot, 'skill-ledger', registry);
 
-    const result = await loadProductBlogRegistries(projectRoot);
+    const result = await loadProductBlogRegistries(projectRoot, [
+      evidenceObject,
+    ]);
     expect(result.ok).toBe(false);
     expect(result.registries).toEqual([]);
     expect(result.diagnostics).toContain(
@@ -130,7 +149,9 @@ describe('fixed product blog registry discovery', () => {
       posts: [],
     });
 
-    const result = await loadProductBlogRegistries(projectRoot);
+    const result = await loadProductBlogRegistries(projectRoot, [
+      evidenceObject,
+    ]);
     expect(result.ok).toBe(false);
     expect(result.registries).toEqual([]);
     expect(result.diagnostics).toEqual(
@@ -152,7 +173,7 @@ describe('fixed product blog registry discovery', () => {
       process.platform === 'win32' ? 'junction' : 'dir',
     );
 
-    const result = await loadProductBlogRegistries(rootPath);
+    const result = await loadProductBlogRegistries(rootPath, [evidenceObject]);
     expect(result.ok).toBe(false);
     expect(result.registries).toEqual([]);
     expect(result.diagnostics).toContain(

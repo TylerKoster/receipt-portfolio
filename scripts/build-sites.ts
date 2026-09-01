@@ -54,6 +54,7 @@ import { validateSourceBoundInvestigationHandoff } from '../sites/search-receipt
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
   loadProductBlogRegistries,
+  loadProductBlogEvidenceObjects,
   productBlogRoutes,
   renderProductBlogAtom,
   renderProductBlogIndex,
@@ -1069,8 +1070,39 @@ export async function buildSites(options: {
     options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
   );
   const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
+  const blogRegistryRoot = options.blogRegistryRoot ?? projectRoot();
+  if (options.includeVideoMomentSearch !== true) {
+    try {
+      const videoRegistry = JSON.parse(
+        await readFile(
+          join(
+            blogRegistryRoot,
+            'sites',
+            'video-moment-search',
+            'blog-registry.json',
+          ),
+          'utf8',
+        ),
+      ) as { readonly posts?: unknown };
+      if (
+        Array.isArray(videoRegistry.posts) &&
+        videoRegistry.posts.length > 0
+      ) {
+        throw new Error(
+          'Product blog registry targets excluded site video-moment-search',
+        );
+      }
+    } catch (error) {
+      if (!missingPath(error)) throw error;
+    }
+  }
+  const blogEvidenceObjects = await loadProductBlogEvidenceObjects(
+    receipts,
+    options.evidenceDirectory,
+  );
   const blogValidation = await loadProductBlogRegistries(
-    options.blogRegistryRoot ?? projectRoot(),
+    blogRegistryRoot,
+    blogEvidenceObjects,
   );
   if (!blogValidation.ok) {
     throw new Error(

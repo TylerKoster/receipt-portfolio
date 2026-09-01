@@ -1,5 +1,9 @@
 import { lstat, readFile, realpath } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  sha256,
+  type Receipt,
+} from '../../packages/evidence-core/src/index.js';
 import {
   DEFAULT_PUBLIC_BASE_URL,
   escapeHtml,
@@ -18,11 +22,22 @@ export const PRODUCT_BLOG_SITE_IDS = [
 ] as const satisfies readonly SiteId[];
 
 export interface ProductBlogSourceBinding {
+  receiptId: string;
   sourceId: string;
   url: string;
   observedAt: string;
   sha256: string;
   purpose: string;
+}
+
+export interface ProductBlogEvidenceObject {
+  readonly receiptId: string;
+  readonly sourceId: string;
+  readonly url: string;
+  readonly observedAt: string;
+  readonly sha256: string;
+  readonly policyDecision: 'PASS' | 'REVIEW_REQUIRED' | 'REJECTED';
+  readonly bytes: Uint8Array;
 }
 
 export interface ProductBlogParagraph {
@@ -201,6 +216,7 @@ function absoluteFeedId(value: unknown): boolean {
 
 export function validateProductBlogRegistries(
   values: readonly unknown[],
+  evidenceObjects: readonly ProductBlogEvidenceObject[] = [],
 ): BlogValidationResult {
   const diagnostics: string[] = [];
   const registries: ProductBlogRegistry[] = [];
@@ -209,6 +225,9 @@ export function validateProductBlogRegistries(
   const feedIds = new Set<string>();
   const titles = new Set<string>();
   const descriptions = new Set<string>();
+  const evidenceByReceipt = new Map(
+    evidenceObjects.map((object) => [object.receiptId, object]),
+  );
 
   values.forEach((value, registryIndex) => {
     if (!isRecord(value)) {
@@ -348,6 +367,8 @@ export function validateProductBlogRegistries(
       for (const source of sources) {
         if (
           !isRecord(source) ||
+          typeof source.receiptId !== 'string' ||
+          !/^[a-f0-9]{64}$/u.test(source.receiptId) ||
           !slug(source.sourceId) ||
           sourceIds.has(source.sourceId) ||
           !allowedExternalUrl(source.url, approvedSiteId) ||
@@ -360,6 +381,35 @@ export function validateProductBlogRegistries(
             `BLOG_SOURCE_BINDING_INVALID:${registryIndex}:${postIndex}`,
           );
           continue;
+        }
+        const evidence = evidenceByReceipt.get(source.receiptId);
+        if (evidence === undefined) {
+          diagnostics.push(
+            `BLOG_EVIDENCE_OBJECT_MISSING:${registryIndex}:${postIndex}`,
+          );
+          continue;
+        }
+        if (evidence.policyDecision !== 'PASS') {
+          diagnostics.push(
+            `BLOG_EVIDENCE_OBJECT_NOT_ADMITTED:${registryIndex}:${postIndex}`,
+          );
+        }
+        if (
+          sha256(evidence.bytes) !== evidence.sha256 ||
+          source.sha256 !== evidence.sha256
+        ) {
+          diagnostics.push(
+            `BLOG_EVIDENCE_DIGEST_MISMATCH:${registryIndex}:${postIndex}`,
+          );
+        }
+        if (
+          source.sourceId !== evidence.sourceId ||
+          source.url !== evidence.url ||
+          source.observedAt !== evidence.observedAt
+        ) {
+          diagnostics.push(
+            `BLOG_EVIDENCE_SOURCE_MISMATCH:${registryIndex}:${postIndex}`,
+          );
         }
         sourceIds.add(source.sourceId);
       }
@@ -388,6 +438,9 @@ export function validateProductBlogRegistries(
       const renderedLinks = Array.isArray(postValue.links)
         ? postValue.links
         : [];
+      if (!Array.isArray(postValue.links)) {
+        diagnostics.push(`BLOG_LINKS_INVALID:${registryIndex}:${postIndex}`);
+      }
       for (const link of renderedLinks) {
         if (isRecord(link) && typeof link.label === 'string') {
           claimTexts.push(link.label);
@@ -696,8 +749,49 @@ async function realDirectoryState(
   }
 }
 
+export async function loadProductBlogEvidenceObjects(
+  receipts: readonly Receipt[],
+  evidenceDirectory: string,
+): Promise<ProductBlogEvidenceObject[]> {
+  const root = resolve(evidenceDirectory);
+  return Promise.all(
+    receipts.map(async (receipt) => {
+      const objectPath = resolve(root, receipt.payload.rawObjectPath);
+      const objectRelative = relative(root, objectPath);
+      if (
+        objectRelative === '' ||
+        objectRelative === '..' ||
+        objectRelative.startsWith(`..${sep}`) ||
+        isAbsolute(objectRelative)
+      ) {
+        throw new Error(
+          `Blog evidence object escapes evidence root: ${receipt.id}`,
+        );
+      }
+      const stats = await lstat(objectPath);
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        throw new Error(`Blog evidence object is not immutable: ${receipt.id}`);
+      }
+      const bytes = await readFile(objectPath);
+      if (sha256(bytes) !== receipt.payload.rawSha256) {
+        throw new Error(`Blog evidence object digest mismatch: ${receipt.id}`);
+      }
+      return {
+        receiptId: receipt.id,
+        sourceId: receipt.payload.sourceId,
+        url: receipt.payload.sourceUrl,
+        observedAt: receipt.payload.observedAt,
+        sha256: receipt.payload.rawSha256,
+        policyDecision: receipt.payload.policy.decision,
+        bytes,
+      };
+    }),
+  );
+}
+
 export async function loadProductBlogRegistries(
   root: string,
+  evidenceObjects: readonly ProductBlogEvidenceObject[] = [],
 ): Promise<BlogValidationResult> {
   const values: unknown[] = [];
   const expectedSiteIds: SiteId[] = [];
@@ -732,7 +826,7 @@ export async function loadProductBlogRegistries(
     }
   }
 
-  const validation = validateProductBlogRegistries(values);
+  const validation = validateProductBlogRegistries(values, evidenceObjects);
   const namespaceDiagnostics = values.flatMap((value, index) =>
     isRecord(value) && value.siteId === expectedSiteIds[index]
       ? []

@@ -19,10 +19,11 @@
       "editorialDisclosure": "This controlled fixture tests original editorial structure and is not a published product article.",
       "sourceBindings": [
         {
+          "receiptId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "sourceId": "google-search-status",
           "url": "https://status.search.google.com/incidents.json",
           "observedAt": "2026-08-30T11:30:00.000Z",
-          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sha256": "553273914b991b391c4fb34fcb6eaaf3ee14d5107a95b942be90554779796b1a",
           "purpose": "Controlled binding to the admitted official status endpoint."
         }
       ],

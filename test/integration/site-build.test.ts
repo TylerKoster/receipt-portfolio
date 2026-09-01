@@ -280,13 +280,58 @@ async function writeBlogRegistryRoot(
   root: string,
   siteId: string,
   fixtureName: string,
+  alignToOwnedSite = true,
 ): Promise<void> {
   const destination = join(root, 'sites', siteId, 'blog-registry.json');
   await mkdir(dirname(destination), { recursive: true });
-  await writeFile(
-    destination,
-    await readFile(join(projectRoot, 'fixtures', 'shared', fixtureName)),
-  );
+  const registry = JSON.parse(
+    await readFile(
+      join(projectRoot, 'fixtures', 'shared', fixtureName),
+      'utf8',
+    ),
+  ) as ProductBlogRegistry;
+  if (alignToOwnedSite && registry.posts.length > 0) {
+    registry.siteId = siteId as ProductBlogRegistry['siteId'];
+    const receiptDirectory = join(testEvidenceDirectory, 'receipts', siteId);
+    const receipts = (await Promise.all(
+      (await readdir(receiptDirectory)).map(async (name) =>
+        JSON.parse(await readFile(join(receiptDirectory, name), 'utf8')),
+      ),
+    )) as Receipt[];
+    const receipt =
+      receipts.find((value) =>
+        value.payload.sourceUrl.startsWith(
+          'https://raw.githubusercontent.com/',
+        ),
+      ) ?? receipts[0]!;
+    const binding = registry.posts[0]!.sourceBindings[0]!;
+    binding.receiptId = receipt.id;
+    binding.sourceId = receipt.payload.sourceId;
+    binding.url = receipt.payload.sourceUrl;
+    binding.observedAt = receipt.payload.observedAt;
+    binding.sha256 = receipt.payload.rawSha256;
+    for (const section of registry.posts[0]!.sections) {
+      for (const paragraph of section.paragraphs) {
+        paragraph.sourceBindingIds = [binding.sourceId];
+      }
+    }
+    registry.posts[0]!.feedId = `urn:receipt-portfolio:${siteId}:controlled-blog-post`;
+    if (siteId === 'skill-ledger') {
+      registry.posts[0]!.links = [
+        {
+          label: 'Open SkillLedger inventory',
+          href: '/skill-ledger/inventory/',
+          kind: 'internal',
+        },
+        {
+          label: 'Inspect the admitted source',
+          href: receipt.payload.sourceUrl,
+          kind: 'external',
+        },
+      ];
+    }
+  }
+  await writeFile(destination, JSON.stringify(registry));
 }
 
 async function runProductionBuild(options?: {
@@ -354,7 +399,7 @@ describe('static receipt site build', () => {
     const registryRoot = join(dirname(outputDirectory), 'blog-registry-root');
     await writeBlogRegistryRoot(
       registryRoot,
-      'search-receipt',
+      'skill-ledger',
       'controlled-blog-registry-v1.json',
     );
 
@@ -367,18 +412,18 @@ describe('static receipt site build', () => {
     const inventory = Object.keys(await fileInventory(outputDirectory));
     expect(inventory).toEqual(
       expect.arrayContaining([
-        'search-receipt/blog/index.html',
-        'search-receipt/blog/feed.xml',
-        'search-receipt/blog/controlled-search-handoff-checklist/index.html',
+        'skill-ledger/blog/index.html',
+        'skill-ledger/blog/feed.xml',
+        'skill-ledger/blog/controlled-search-handoff-checklist/index.html',
       ]),
     );
     expect(
-      inventory.some((path) => path.startsWith('skill-ledger/blog/')),
+      inventory.some((path) => path.startsWith('search-receipt/blog/')),
     ).toBe(false);
     await expect(
-      readFile(join(outputDirectory, 'search-receipt', 'sitemap.xml'), 'utf8'),
+      readFile(join(outputDirectory, 'skill-ledger', 'sitemap.xml'), 'utf8'),
     ).resolves.toContain(
-      '/search-receipt/blog/controlled-search-handoff-checklist/',
+      '/skill-ledger/blog/controlled-search-handoff-checklist/',
     );
   });
 
@@ -393,6 +438,7 @@ describe('static receipt site build', () => {
       registryRoot,
       'skill-ledger',
       'controlled-blog-registry-v1.json',
+      false,
     );
 
     await expect(
@@ -404,6 +450,73 @@ describe('static receipt site build', () => {
     ).rejects.toThrow(/namespace/i);
     expect(await fileInventory(outputDirectory)).toEqual(before);
   });
+
+  it.each([
+    [
+      'missing object',
+      (
+        binding: ProductBlogRegistry['posts'][number]['sourceBindings'][number],
+      ) => (binding.receiptId = 'c'.repeat(64)),
+    ],
+    [
+      'digest mismatch',
+      (
+        binding: ProductBlogRegistry['posts'][number]['sourceBindings'][number],
+      ) => (binding.sha256 = 'd'.repeat(64)),
+    ],
+    [
+      'URL mismatch',
+      (
+        binding: ProductBlogRegistry['posts'][number]['sourceBindings'][number],
+      ) =>
+        (binding.url =
+          'https://raw.githubusercontent.com/microsoft/skills/other/SKILL.md'),
+    ],
+    [
+      'timestamp mismatch',
+      (
+        binding: ProductBlogRegistry['posts'][number]['sourceBindings'][number],
+      ) => (binding.observedAt = '2026-08-30T00:00:00.000Z'),
+    ],
+  ])(
+    'preserves the prior output for blog evidence %s',
+    async (_label, mutate) => {
+      await buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+      });
+      const before = await fileInventory(outputDirectory);
+      const registryRoot = join(
+        dirname(outputDirectory),
+        'evidence-failure-blog-root',
+      );
+      await writeBlogRegistryRoot(
+        registryRoot,
+        'skill-ledger',
+        'controlled-blog-registry-v1.json',
+      );
+      const registryPath = join(
+        registryRoot,
+        'sites',
+        'skill-ledger',
+        'blog-registry.json',
+      );
+      const registry = JSON.parse(
+        await readFile(registryPath, 'utf8'),
+      ) as ProductBlogRegistry;
+      mutate(registry.posts[0]!.sourceBindings[0]!);
+      await writeFile(registryPath, JSON.stringify(registry));
+
+      await expect(
+        buildSites({
+          evidenceDirectory: testEvidenceDirectory,
+          outputDirectory,
+          blogRegistryRoot: registryRoot,
+        }),
+      ).rejects.toThrow(/BLOG_EVIDENCE_/u);
+      expect(await fileInventory(outputDirectory)).toEqual(before);
+    },
+  );
 
   it('keeps missing and empty product registries byte-compatible', async () => {
     const emptyOutput = join(dirname(outputDirectory), 'empty-registry-sites');

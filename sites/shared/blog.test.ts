@@ -7,6 +7,7 @@ import {
   renderProductBlogIndex,
   renderProductBlogPost,
   validateProductBlogRegistries,
+  type ProductBlogEvidenceObject,
   type ProductBlogPost,
   type ProductBlogRegistry,
 } from './blog.js';
@@ -21,6 +22,16 @@ const fixture = JSON.parse(
   ),
 ) as ProductBlogRegistry;
 
+const evidenceObject: ProductBlogEvidenceObject = {
+  receiptId: 'b'.repeat(64),
+  sourceId: 'google-search-status',
+  url: 'https://status.search.google.com/incidents.json',
+  observedAt: '2026-08-30T11:30:00.000Z',
+  sha256: '553273914b991b391c4fb34fcb6eaaf3ee14d5107a95b942be90554779796b1a',
+  policyDecision: 'PASS',
+  bytes: new TextEncoder().encode('controlled repository evidence object'),
+};
+
 const invalidFixture = JSON.parse(
   readFileSync(
     new URL(
@@ -32,12 +43,13 @@ const invalidFixture = JSON.parse(
 );
 
 function diagnosticsFor(registries: readonly unknown[]): readonly string[] {
-  return validateProductBlogRegistries(registries).diagnostics;
+  return validateProductBlogRegistries(registries, [evidenceObject])
+    .diagnostics;
 }
 
 describe('evidence-bound product blog contract', () => {
   it('admits the complete controlled registry as a Search-owned namespace', () => {
-    const result = validateProductBlogRegistries([fixture]);
+    const result = validateProductBlogRegistries([fixture], [evidenceObject]);
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
@@ -46,7 +58,10 @@ describe('evidence-bound product blog contract', () => {
   });
 
   it('rejects the controlled invalid fixture without admitting any registry', () => {
-    const result = validateProductBlogRegistries([invalidFixture]);
+    const result = validateProductBlogRegistries(
+      [invalidFixture],
+      [evidenceObject],
+    );
 
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContain('BLOG_SOURCE_BINDING_MISSING:0:0');
@@ -169,6 +184,13 @@ describe('evidence-bound product blog contract', () => {
       'BLOG_LINK_NOT_ALLOWLISTED:0:0',
     ],
     [
+      'missing links array',
+      (candidate: ProductBlogRegistry) => {
+        delete (candidate.posts[0] as Partial<ProductBlogPost>).links;
+      },
+      'BLOG_LINKS_INVALID:0:0',
+    ],
+    [
       'missing author disclosure',
       (candidate: ProductBlogRegistry) => {
         candidate.posts[0]!.author.name = '';
@@ -179,11 +201,48 @@ describe('evidence-bound product blog contract', () => {
     const candidate = structuredClone(fixture);
     mutate(candidate);
 
-    const result = validateProductBlogRegistries([candidate]);
+    const result = validateProductBlogRegistries([candidate], [evidenceObject]);
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContain(expectedDiagnostic);
     expect(result.registries).toEqual([]);
   });
+
+  it.each([
+    ['missing object', [], 'BLOG_EVIDENCE_OBJECT_MISSING:0:0'],
+    [
+      'object digest mismatch',
+      [{ ...evidenceObject, bytes: new TextEncoder().encode('tampered') }],
+      'BLOG_EVIDENCE_DIGEST_MISMATCH:0:0',
+    ],
+    [
+      'non-admitted receipt',
+      [{ ...evidenceObject, policyDecision: 'REVIEW_REQUIRED' }],
+      'BLOG_EVIDENCE_OBJECT_NOT_ADMITTED:0:0',
+    ],
+    [
+      'source URL mismatch',
+      [
+        {
+          ...evidenceObject,
+          url: 'https://status.search.google.com/other.json',
+        },
+      ],
+      'BLOG_EVIDENCE_SOURCE_MISMATCH:0:0',
+    ],
+    [
+      'observed timestamp mismatch',
+      [{ ...evidenceObject, observedAt: '2026-08-30T11:31:00.000Z' }],
+      'BLOG_EVIDENCE_SOURCE_MISMATCH:0:0',
+    ],
+  ] as const)(
+    'rejects a source binding with %s',
+    (_label, evidence, expectedDiagnostic) => {
+      const result = validateProductBlogRegistries([fixture], evidence);
+      expect(result.ok).toBe(false);
+      expect(result.registries).toEqual([]);
+      expect(result.diagnostics).toContain(expectedDiagnostic);
+    },
+  );
 
   it.each([
     [
