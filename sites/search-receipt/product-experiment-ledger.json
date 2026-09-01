@@ -242,6 +242,7 @@
       "target": "100% deterministic source-binding and route-output admission before publication.",
       "stopRule": "Stop publication preparation if any source binding lacks a PASS receipt, matching object bytes, or a required boundary.",
       "noDataBoundary": "Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
+      "coordinatorDependency": "Publication remains pending coordinator integration and public verification; no accepted release evidence exists for this candidate.",
       "admittedEvidence": [
         {
           "sourceId": "google-search-status",
@@ -260,7 +261,7 @@
           "manifestSha256": "6a5ff11cac77df30fd5a5e3697c6a8cf281e23eb69bec54a0231bc26f6dc2c2e"
         }
       ],
-      "nextSafeAction": "Run the admitted static blog route through coordinator integration and public verification; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+      "nextSafeAction": "Integrate and publicly verify the scheduled static blog release before recording accepted release evidence; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
     }
   ]
 }

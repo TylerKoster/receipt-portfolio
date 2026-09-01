@@ -256,7 +256,14 @@ describe('Search Receipt product experiment ledger', () => {
         'Stop publication preparation if any source binding lacks a PASS receipt, matching object bytes, or a required boundary.',
       noDataBoundary:
         'Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
+      coordinatorDependency:
+        'Publication remains pending coordinator integration and public verification; no accepted release evidence exists for this candidate.',
+      nextSafeAction:
+        'Integrate and publicly verify the scheduled static blog release before recording accepted release evidence; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.',
     });
+    expect(ledger.experiments[13]).not.toHaveProperty(
+      'coordinatorReleaseEvidence',
+    );
   });
 
   it('keeps the rank-thirteen ledger contract aligned with the admitted handoff contract', () => {

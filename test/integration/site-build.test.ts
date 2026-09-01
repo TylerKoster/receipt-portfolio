@@ -556,6 +556,10 @@ describe('static receipt site build', () => {
   );
 
   it('keeps missing and empty product registries byte-compatible', async () => {
+    const missingRegistryRoot = join(
+      dirname(outputDirectory),
+      'missing-blog-root',
+    );
     const emptyOutput = join(dirname(outputDirectory), 'empty-registry-sites');
     const emptyRegistryRoot = join(dirname(outputDirectory), 'empty-blog-root');
     await mkdir(join(emptyRegistryRoot, 'sites', 'search-receipt'), {
@@ -575,6 +579,7 @@ describe('static receipt site build', () => {
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
       outputDirectory,
+      blogRegistryRoot: missingRegistryRoot,
     });
     await buildSites({
       evidenceDirectory: testEvidenceDirectory,
@@ -584,6 +589,47 @@ describe('static receipt site build', () => {
 
     expect(await fileInventory(emptyOutput)).toEqual(
       await fileInventory(outputDirectory),
+    );
+  });
+
+  it('keeps scheduled publication metadata separate from source observations', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+
+    const scheduledPublicationAt = '2026-09-01T15:15:00.000Z';
+    const statusObservedAt = '2026-09-01T14:05:27.778Z';
+    const feedObservedAt = '2026-09-01T14:05:27.745Z';
+    const [page, atom] = await Promise.all([
+      readFile(
+        join(
+          outputDirectory,
+          'search-receipt',
+          'blog',
+          'separate-google-search-status-from-site-evidence',
+          'index.html',
+        ),
+        'utf8',
+      ),
+      readFile(
+        join(outputDirectory, 'search-receipt', 'blog', 'feed.xml'),
+        'utf8',
+      ),
+    ]);
+
+    expect(page).toContain(
+      `<time datetime="${scheduledPublicationAt}">${scheduledPublicationAt}</time>`,
+    );
+    expect(page).toContain(`"datePublished":"${scheduledPublicationAt}"`);
+    expect(page).toContain(`"dateModified":"${scheduledPublicationAt}"`);
+    expect(atom).toContain(`<published>${scheduledPublicationAt}</published>`);
+    expect(atom).toContain(`<updated>${scheduledPublicationAt}</updated>`);
+    expect(page).toContain(
+      `<time datetime="${statusObservedAt}">${statusObservedAt}</time>`,
+    );
+    expect(page).toContain(
+      `<time datetime="${feedObservedAt}">${feedObservedAt}</time>`,
     );
   });
 

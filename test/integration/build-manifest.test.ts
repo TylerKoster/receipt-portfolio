@@ -16,6 +16,9 @@ const EXPECTED_PATHS = [
   'index.html',
   'portfolio.css',
   'robots.txt',
+  'search-receipt/blog/feed.xml',
+  'search-receipt/blog/index.html',
+  'search-receipt/blog/separate-google-search-status-from-site-evidence/index.html',
   'search-receipt/checklists/record-before-escalating-google-search-change/index.html',
   'search-receipt/discover/choose-google-search-guide-or-worksheet/index.html',
   'search-receipt/guides/is-google-search-down-or-my-site/index.html',
@@ -64,7 +67,7 @@ const EXPECTED_PATHS = [
   'workflow-test-lab/topics/example-topic/index.html',
 ] as const;
 const EXPECTED_DIGEST =
-  '9b95a02eeb904cd19f4d2ed3c696f8f22f0ec054c0c62c3dcbb2b5de2567583b';
+  '5e1ca2d9b10781b90be43de3b61c7c2995cbcf57600d4eb3b74361c9bb4a8990';
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;

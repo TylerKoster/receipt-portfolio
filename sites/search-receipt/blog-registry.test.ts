@@ -73,8 +73,19 @@ describe('Search Receipt public blog registry', () => {
     });
 
     const post = registry.posts[0];
+    const scheduledPublicationAt = '2026-09-01T15:15:00.000Z';
+    const sourceObservationTimes = post.sourceBindings.map(
+      (binding: { observedAt: string }) => binding.observedAt,
+    );
     expect(post.publishedAt).toBe(post.modifiedAt);
-    expect(post.publishedAt).toBe('2026-09-01T14:05:27.778Z');
+    expect(post.publishedAt).toBe(scheduledPublicationAt);
+    expect(sourceObservationTimes).not.toContain(post.publishedAt);
+    expect(
+      sourceObservationTimes.every(
+        (observedAt: string) =>
+          new Date(post.publishedAt).getTime() > new Date(observedAt).getTime(),
+      ),
+    ).toBe(true);
     expect(post.sourceBindings).toEqual([
       {
         receiptId:
