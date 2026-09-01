@@ -414,6 +414,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const compareText = (left, right) => left < right ? -1 : left > right ? 1 : 0;
   const reviewedConfidence = 'Reviewed public source; original editorial annotation, not transcript text';
   const controlledConfidence = 'Rights-validated controlled fixture match';
+  const correctionStateDefinition = 'Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.';
   const nonBlank = (value) => typeof value === 'string' && value.trim().length > 0;
   const canonicalInstant = (value) => {
     if (typeof value !== 'string' ||
@@ -698,6 +699,13 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       select.addEventListener('click', () => changeSelection(entry, select));
       article.append(select);
     }
+    const correctionState = document.createElement('p');
+    correctionState.className = 'correction-state';
+    correctionState.textContent = 'Current index state: ' + entry.correctionState + '. ' + correctionStateDefinition;
+    const correctionDetails = document.createElement('a');
+    correctionDetails.href = momentPageUrl(entry) + '#correction-and-removal';
+    correctionDetails.textContent = 'Correction and removal details';
+    article.append(correctionState, correctionDetails);
     article.append(metadata);
     return article;
   };

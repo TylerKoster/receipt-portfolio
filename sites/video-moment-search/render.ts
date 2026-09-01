@@ -403,6 +403,31 @@ function contextualLinks(
     .join(' · ')}</nav>`;
 }
 
+const correctionStateDefinition =
+  'Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.';
+
+function correctionDetailsHref(
+  entry: PublicSearchEntry,
+  baseUrl?: string,
+): string {
+  const suffix = `moments/${encodeURIComponent(entry.momentId)}/`;
+  return `${baseUrl === undefined ? suffix : routeUrl(baseUrl, suffix)}#correction-and-removal`;
+}
+
+function correctionAndRemovalSection(entry: PublicSearchEntry): string {
+  return `<section id="correction-and-removal" aria-labelledby="correction-and-removal-heading">
+  <h2 id="correction-and-removal-heading">Correction and removal details</h2>
+  <p><strong>Current index state:</strong> ${escapeHtml(entry.correctionState)}. ${escapeHtml(correctionStateDefinition)}</p>
+  <p><strong>Moment ID:</strong> ${escapeHtml(entry.momentId)}</p>
+  <h3>What to include for manual review</h3>
+  <ul><li>Requested change</li><li>Factual or source evidence</li><li>Rights authority when relevant</li></ul>
+  <p><strong>Privacy warning:</strong> Do not publish private or sensitive evidence.</p>
+  <p><a href="https://github.com/TylerKoster/receipt-portfolio/issues/new">Open the public GitHub issue form</a></p>
+  <p>GitHub sign-in is required to submit. This site does not send or store the request. Review is manual and nothing changes automatically.</p>
+  <p><strong>Rights boundary:</strong> Rights ambiguity or revocation remains fail-closed pending manual review; this page does not claim a completed disposition.</p>
+</section>`;
+}
+
 function renderEntry(
   entry: PublicSearchEntry,
   baseUrl?: string,
@@ -421,6 +446,8 @@ function renderEntry(
   <p class="eyebrow">Controlled fixture moment</p>
   <h3 id="heading-${escapeHtml(entry.momentId)}">${link}</h3>
   ${baseUrl === undefined ? '' : contextualLinks(entry, baseUrl, discovery)}
+  <p class="correction-state"><strong>Current index state:</strong> ${escapeHtml(entry.correctionState)}. ${escapeHtml(correctionStateDefinition)}</p>
+  <a href="${escapeHtml(correctionDetailsHref(entry, baseUrl))}">Correction and removal details</a>
   <dl class="moment-meta">${detailRows(entry)}</dl>
 </article>`;
 }
@@ -818,7 +845,9 @@ export function renderMomentPage(
     baseUrl,
     suffix,
     undefined,
-    undefined,
+    entry === undefined
+      ? undefined
+      : `<section><h2>${escapeHtml(title)}</h2>${renderEntries([entry], baseUrl, discovery)}${correctionAndRemovalSection(entry)}</section>`,
     undefined,
     discovery,
   );

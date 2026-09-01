@@ -1383,7 +1383,6 @@ describe('AI Moment Index public search surface', () => {
     expect(html).toContain('Observed source record');
     expect(html).toContain('Observed on 2026-08-31 (date precision)');
     expect(html).not.toContain('2026-08-31T00:00:00.000Z');
-    expect(html).not.toMatch(/current (?:permission|availability)/iu);
     expect(html).not.toContain('Source and license availability was reviewed');
     for (const boundary of [
       'hosting',
@@ -1470,6 +1469,101 @@ describe('AI Moment Index public search surface', () => {
       timestampUrl:
         'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
     });
+  });
+
+  it('renders bounded correction details for admitted moments without adding a submission path', async () => {
+    // Break caught: removing the correction state definition, fragment action, or
+    // manual-review boundary leaves people no truthful way to locate request details.
+    const stateDefinition =
+      'Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.';
+    const correctionHref =
+      'https://receipt-portfolio.example/video-moment-search/moments/moment-robots-control/#correction-and-removal';
+    const server = renderSearchShell(fixture, searchIndex, baseUrl);
+    const serverStart = server.indexOf(
+      'data-moment-id="moment-robots-control"',
+    );
+    const serverCard = server.slice(
+      serverStart,
+      server.indexOf('</article>', serverStart),
+    );
+
+    expect(serverCard).toContain(stateDefinition);
+    expect(serverCard).toContain(`href="${correctionHref}"`);
+    expect(serverCard.indexOf('Related pages')).toBeLessThan(
+      serverCard.indexOf('Correction and removal details'),
+    );
+    expect(serverCard.indexOf('Correction and removal details')).toBeLessThan(
+      serverCard.indexOf('<dl class="moment-meta">'),
+    );
+
+    const moment = renderMomentPage(
+      fixture,
+      searchIndex,
+      'moment-robots-control',
+      baseUrl,
+    );
+    expect(moment).toContain('<section id="correction-and-removal"');
+    expect(moment).toContain(
+      '<strong>Moment ID:</strong> moment-robots-control',
+    );
+    expect(moment).toContain(stateDefinition);
+    for (const checklistField of [
+      'Requested change',
+      'Factual or source evidence',
+      'Rights authority when relevant',
+      'Do not publish private or sensitive evidence.',
+    ]) {
+      expect(moment).toContain(checklistField);
+    }
+    expect(moment).toContain(
+      'https://github.com/TylerKoster/receipt-portfolio/issues/new',
+    );
+    expect(moment).toContain('GitHub sign-in is required to submit.');
+    expect(moment).toContain('This site does not send or store the request.');
+    expect(moment).toContain(
+      'Review is manual and nothing changes automatically.',
+    );
+    expect(moment).toContain(
+      'Rights ambiguity or revocation remains fail-closed pending manual review; this page does not claim a completed disposition.',
+    );
+    expect(moment).not.toContain('<form');
+
+    const unavailable = renderMomentPage(
+      fixture,
+      searchIndex,
+      'moment-unavailable',
+      baseUrl,
+    );
+    expect(unavailable).not.toContain('correction-and-removal');
+    expect(unavailable).not.toContain(
+      'https://github.com/TylerKoster/receipt-portfolio/issues/new',
+    );
+
+    const client = executeClientPayload();
+    await client.resolveIndex(serializePublicSearchIndex(fixture, searchIndex));
+    client.submit('robots control');
+    const clientCard = descendants(client.results, 'article')[0]!;
+    expect(
+      byText(
+        clientCard,
+        'p',
+        `Current index state: active. ${stateDefinition}`,
+      ),
+    ).toBeDefined();
+    expect(descendants(clientCard, 'a').map((anchor) => anchor.href)).toEqual([
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+      'moments/moment-robots-control/',
+      correctionHref,
+    ]);
+    expect(client.indexRequests).toEqual([
+      { input: 'search-index.json', options: { credentials: 'omit' } },
+    ]);
+    expect(VIDEO_MOMENT_SEARCH_CLIENT.match(/\bfetch\(/gu) ?? []).toHaveLength(
+      1,
+    );
+    expect(VIDEO_MOMENT_SEARCH_CLIENT).not.toMatch(
+      /localStorage|sessionStorage|sendBeacon|analytics|issues\/new/iu,
+    );
   });
 
   it('binds the public fixture to the deterministic Commons rights evidence', () => {
@@ -2337,6 +2431,7 @@ describe('AI Moment Index public search surface', () => {
       [
         'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
         'moments/moment-robots-control/',
+        'https://receipt-portfolio.example/video-moment-search/moments/moment-robots-control/#correction-and-removal',
       ],
     );
     expect(harness.status.textContent).toBe('Showing 1 moment.');
@@ -2387,14 +2482,16 @@ describe('AI Moment Index public search surface', () => {
       'h3:',
       'a:Open the evidence-bound moment page',
       'button:Add to temporary handoff',
+      'p:Current index state: active. Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.',
+      'a:Correction and removal details',
       '.moment-meta',
     ]);
     expect(
-      byText(reviewedCard.children[3]!, 'dt', 'Rights status'),
+      byText(reviewedCard.children[5]!, 'dt', 'Rights status'),
     ).toBeDefined();
-    expect(byText(reviewedCard.children[3]!, 'dt', 'Provenance')).toBeDefined();
+    expect(byText(reviewedCard.children[5]!, 'dt', 'Provenance')).toBeDefined();
     expect(
-      byText(reviewedCard.children[3]!, 'dt', 'Correction state'),
+      byText(reviewedCard.children[5]!, 'dt', 'Correction state'),
     ).toBeDefined();
 
     const unreviewed = executeClientPayload();
@@ -2414,7 +2511,13 @@ describe('AI Moment Index public search surface', () => {
           ? '.moment-meta'
           : `${child.tagName}:${child.textContent}`,
       ),
-    ).toEqual(['h3:', 'a:Open the evidence-bound moment page', '.moment-meta']);
+    ).toEqual([
+      'h3:',
+      'a:Open the evidence-bound moment page',
+      'p:Current index state: active. Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.',
+      'a:Correction and removal details',
+      '.moment-meta',
+    ]);
     expect(descendants(unreviewedCard, 'button')).toEqual([]);
   });
 
