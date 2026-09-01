@@ -396,7 +396,9 @@ export function validateCommonsSourceEvidence(
   addSetDiagnostics(expectedEvidenceIds, actualEvidenceIds, diagnostics);
 
   const reviewedMomentIds = corpus.moments.flatMap((moment) => {
-    const video = corpus.videos.find((candidate) => candidate.id === moment.videoId);
+    const video = corpus.videos.find(
+      (candidate) => candidate.id === moment.videoId,
+    );
     const grant = corpus.rights.find(
       (candidate) => candidate.id === moment.rightsGrantId,
     );
@@ -412,7 +414,9 @@ export function validateCommonsSourceEvidence(
   const manifestMomentIds = manifestMomentBindings.map(
     ({ moment }) => moment.momentId,
   );
-  const manifestCueIds = manifestMomentBindings.map(({ moment }) => moment.cueId);
+  const manifestCueIds = manifestMomentBindings.map(
+    ({ moment }) => moment.cueId,
+  );
   for (const momentId of duplicates(manifestMomentIds)) {
     diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_DUPLICATE:${momentId}`);
   }

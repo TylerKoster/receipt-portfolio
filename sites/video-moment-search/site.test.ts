@@ -1175,8 +1175,7 @@ describe('AI Moment Index public search surface', () => {
       sourceEvidenceManifest,
     ) as unknown as MutableV3Manifest;
     const robots = manifest.records.find(
-      (record) =>
-        record.evidenceId === 'commons-will-robots-outsmart-us-v1',
+      (record) => record.evidenceId === 'commons-will-robots-outsmart-us-v1',
     );
     const medicine = manifest.records.find(
       (record) => record.evidenceId === 'commons-ethics-ai-digital-medicine-v1',
@@ -2045,8 +2044,9 @@ describe('AI Moment Index public search surface', () => {
       [
         'annotation hash',
         (candidate: Mutable<VideoSourceEvidenceManifest>) =>
-          (candidate.records[0]!.moments[0]!.annotation.sha256 =
-            '0'.repeat(64)),
+          (candidate.records[0]!.moments[0]!.annotation.sha256 = '0'.repeat(
+            64,
+          )),
       ],
       [
         'source linkage',

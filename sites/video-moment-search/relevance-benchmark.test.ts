@@ -162,7 +162,7 @@ function controlledPositiveContractDiagnostics(
         ? undefined
         : benchmarkCase.queryBasis === 'reviewed-visual-and-topic-synthesis'
           ? new Set(normalizedTokens(benchmarkCase.query))
-        : supportedTokensByBasis[benchmarkCase.queryBasis];
+          : supportedTokensByBasis[benchmarkCase.queryBasis];
     for (const token of queryTokens) {
       if (!supportedTokens?.has(token)) {
         diagnostics.push(
@@ -812,7 +812,9 @@ describe('controlled researcher-relevance benchmark', () => {
     for (const [momentId, queries] of expectedNewQueries) {
       expect(
         positiveCases
-          .filter((benchmarkCase) => benchmarkCase.expectedMomentId === momentId)
+          .filter(
+            (benchmarkCase) => benchmarkCase.expectedMomentId === momentId,
+          )
           .map((benchmarkCase) => benchmarkCase.query),
       ).toEqual(queries);
       for (const query of queries) {
@@ -823,7 +825,9 @@ describe('controlled researcher-relevance benchmark', () => {
       }
     }
     expect(
-      new Set(positiveCases.map((benchmarkCase) => benchmarkCase.expectedMomentId)),
+      new Set(
+        positiveCases.map((benchmarkCase) => benchmarkCase.expectedMomentId),
+      ),
     ).toEqual(
       new Set([
         'moment-robots-control',

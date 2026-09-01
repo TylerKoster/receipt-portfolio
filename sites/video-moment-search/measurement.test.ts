@@ -399,9 +399,9 @@ describe('privacy-preserving measurement contract', () => {
   });
 
   it('binds the controlled creator preview gate to all ten admitted moments', () => {
-    expect(ledger.controlledCreatorReviewGate.target.admittedReviewedMoments).toBe(
-      10,
-    );
+    expect(
+      ledger.controlledCreatorReviewGate.target.admittedReviewedMoments,
+    ).toBe(10);
     expect(runbook).toContain(
       'Target: **10 admitted reviewed moments; exact timestamp landing error 0;',
     );
