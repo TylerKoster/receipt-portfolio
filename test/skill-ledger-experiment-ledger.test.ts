@@ -52,7 +52,7 @@ interface SyntheticUsabilityLedger {
 }
 
 describe('SkillLedger synthetic usability ledger', () => {
-  it('keeps the ranked portfolio with released filtering completed and source-bound comparison readiness active', () => {
+  it('keeps the ranked portfolio with the AMD source contract transition and comparison readiness active', () => {
     const ledgerPath = resolve(
       process.cwd(),
       'docs/skill-ledger/experiments/2026-08-30-synthetic-usability.json',
@@ -63,8 +63,19 @@ describe('SkillLedger synthetic usability ledger', () => {
 
     expect(ledger.experimentPortfolio).toEqual([
       {
-        area: 'source-bound-comparison',
+        area: 'source-bound-content',
         rank: 1,
+        experiment: 'amd-local-ai-use-source-contract-v1',
+        status: 'completed-source-contract-fixture',
+        metric: 'designated AMD static source-contract validation coverage',
+        target:
+          'A controlled candidate with the exact AMD source, license, hash, and declared-field contract reaches ready disclosure; altered coordinates, hashes, licenses, or fields fail closed without disclosure.',
+        stopRule:
+          'The contract validates designated static fields only. It does not fetch, collect, persist, publish instruction bodies, execute, establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, recommendation, endorsement, demand, conversion, revenue, or public deployment; coordinator-owned evidence collection and inventory wiring remain required.',
+      },
+      {
+        area: 'source-bound-comparison',
+        rank: 2,
         experiment: 'source-bound-comparison-readiness-v1',
         status: 'active',
         metric: 'source-bound comparison readiness notice coverage',
@@ -75,7 +86,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'searchable-filterable-discovery',
-        rank: 2,
+        rank: 3,
         experiment: 'source-bound-evidence-class-filter-v1',
         status: 'completed-public-evidence-class-filter',
         metric: 'evidence-class filter completion coverage',
@@ -86,7 +97,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'current-original-guides',
-        rank: 3,
+        rank: 4,
         experiment: 'controlled-guide-draft-admission-contract',
         status: 'completed-internal',
         metric: 'controlled guide draft admission coverage',
@@ -97,7 +108,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'discoverability',
-        rank: 4,
+        rank: 5,
         experiment: 'public-discoverability-evaluation',
         status: 'blocked',
         metric: 'public discovery evidence',
@@ -107,7 +118,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'measurement',
-        rank: 5,
+        rank: 6,
         experiment: 'internal-controlled-measurement',
         status: 'completed-internal',
         metric: 'synthetic event accounting',
@@ -118,7 +129,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'conversion',
-        rank: 6,
+        rank: 7,
         experiment: 'real-user-conversion-evaluation',
         status: 'not-started',
         metric: 'authorized real-user conversion evidence',
@@ -128,7 +139,7 @@ describe('SkillLedger synthetic usability ledger', () => {
       },
       {
         area: 'monetization',
-        rank: 7,
+        rank: 8,
         experiment: 'authorized-monetization-evaluation',
         status: 'not-started',
         metric: 'authorized payment evidence',
@@ -186,6 +197,12 @@ describe('SkillLedger synthetic usability ledger', () => {
         status: 'completed-public-evidence-class-filter',
         boundary:
           'Released in-memory evidence-class filtering separates admitted source-bound observations and controlled examples without fetching, collecting, persisting, executing, or establishing currentness, provenance, security, safety, runtime behavior, adoption, suitability, ranking, recommendation, endorsement, demand, conversion, revenue, or public deployment.',
+      },
+      {
+        experiment: 'amd-local-ai-use-source-contract-v1',
+        status: 'completed-source-contract-fixture',
+        boundary:
+          'The AMD contract validates designated static source and hash fields only; it does not establish currentness, provenance, security, safety, runtime behavior, adoption, suitability, recommendation, endorsement, demand, conversion, revenue, or public deployment. Coordinator-owned evidence collection and inventory wiring remain required.',
       },
     ]);
     expect(ledger.rejectedCandidates).toEqual([
