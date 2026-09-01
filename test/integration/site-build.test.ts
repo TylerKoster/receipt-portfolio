@@ -118,6 +118,23 @@ async function searchReceiptEntries(): Promise<
   );
 }
 
+async function searchReceiptEntryByIdentity(
+  sourceId: string,
+  sequence: number,
+): Promise<{ readonly path: string; readonly receipt: Receipt }> {
+  const matchingEntries = (await searchReceiptEntries()).filter(
+    ({ receipt }) =>
+      receipt.payload.sourceId === sourceId &&
+      receipt.payload.sequence === sequence,
+  );
+  if (matchingEntries.length !== 1) {
+    throw new Error(
+      `Expected exactly one Search Receipt entry for ${sourceId} sequence ${sequence}; found ${matchingEntries.length}.`,
+    );
+  }
+  return matchingEntries[0]!;
+}
+
 async function collectAcceptedFixtures(): Promise<void> {
   await collectFixturePair(
     'search-receipt',
@@ -1940,7 +1957,9 @@ describe('static receipt site build', () => {
   );
 
   it('omits a REVIEW_REQUIRED record from public rendering', async () => {
-    const receipt = (await searchReceiptEntries())[0]!.receipt;
+    const receipt = (
+      await searchReceiptEntryByIdentity('google-search-status-example', 2)
+    ).receipt;
     const held = {
       ...receipt,
       payload: {
@@ -1961,7 +1980,9 @@ describe('static receipt site build', () => {
       '&lt;script&gt;alert(1)&lt;/script&gt;',
     );
 
-    const receipt = (await searchReceiptEntries())[0]!.receipt;
+    const receipt = (
+      await searchReceiptEntryByIdentity('google-search-status-example', 2)
+    ).receipt;
     const hostile = {
       ...receipt,
       payload: {
@@ -1991,7 +2012,10 @@ describe('static receipt site build', () => {
       videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
     });
     const previousInventory = await fileInventory(outputDirectory);
-    const entry = (await searchReceiptEntries())[0]!;
+    const entry = await searchReceiptEntryByIdentity(
+      'google-search-status-example',
+      2,
+    );
     const receipt = entry.receipt;
     const path = entry.path;
     const mutatedReceipt = {
