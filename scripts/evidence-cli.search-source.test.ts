@@ -1,6 +1,5 @@
 import {
   access,
-  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -468,16 +467,16 @@ describe('bounded Search Receipt live collection', () => {
     });
     const before = await evidenceSnapshot(evidenceDirectory);
     const changedStatus = Buffer.from(
-      STATUS_BYTES.toString('utf8').replace('Delayed reports.', 'Late reports.'),
+      STATUS_BYTES.toString('utf8').replace(
+        'Delayed reports.',
+        'Late reports.',
+      ),
     );
     const changedFeed = Buffer.from(
-      FEED_BYTES.toString('utf8').replace('Second &amp; newer', 'Second updated'),
-    );
-    const obstruction = join(
-      evidenceDirectory,
-      'objects',
-      'raw',
-      `${sha256(changedFeed)}.bin`,
+      FEED_BYTES.toString('utf8').replace(
+        'Second &amp; newer',
+        'Second updated',
+      ),
     );
     await expect(
       collectAllSearchSources({
@@ -495,14 +494,13 @@ describe('bounded Search Receipt live collection', () => {
             bytes,
           };
         },
-        beforePersistSearchPlan: async (_sourceId, index) => {
-          if (index === 1) await mkdir(obstruction, { recursive: true });
-        },
+        failPersistSearchPlanAtIndex: 1,
       }),
-    ).rejects.toThrow(/existing target is not a regular file/);
-    await rm(obstruction, { recursive: true });
+    ).rejects.toThrow(/INJECTED_SEARCH_PERSISTENCE_FAILURE/);
     expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
-    await expect(verifyEvidenceTree(evidenceDirectory)).resolves.toBeUndefined();
+    await expect(
+      verifyEvidenceTree(evidenceDirectory),
+    ).resolves.toBeUndefined();
   });
 
   it('requires review when the complete incident set is replaced', async () => {
@@ -732,12 +730,34 @@ describe('bounded Search Receipt live collection', () => {
       'invalid raw control character',
       `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>x</id><title>bad \u0001</title></entry></feed>`,
     ],
-    ['malformed XML declaration', `<?xml?><feed xmlns="http://www.w3.org/2005/Atom"/>`],
+    [
+      'malformed XML declaration',
+      `<?xml?><feed xmlns="http://www.w3.org/2005/Atom"/>`,
+    ],
     [
       'misplaced XML declaration',
       `<feed xmlns="http://www.w3.org/2005/Atom"><?xml version="1.0"?></feed>`,
     ],
-    ['CDATA outside its root', `<![CDATA[]]><feed xmlns="http://www.w3.org/2005/Atom"/>`],
+    [
+      'CDATA outside its root',
+      `<![CDATA[]]><feed xmlns="http://www.w3.org/2005/Atom"/>`,
+    ],
+    [
+      'namespace prefix with mismatched case',
+      `<atom:feed xmlns:Atom="http://www.w3.org/2005/Atom"></atom:feed>`,
+    ],
+    [
+      'uppercase default namespace pseudo-attribute',
+      `<feed XMLNS="http://www.w3.org/2005/Atom"></feed>`,
+    ],
+    [
+      'uppercase Atom link attribute',
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>x</id><title>X</title><link HREF="https://developers.google.com/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    ],
+    [
+      'above-Unicode numeric character reference',
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>x</id><title>&#x110000;</title></entry></feed>`,
+    ],
   ] as const)('rejects malformed XML with an %s', async (_label, xml) => {
     const bytes = Buffer.from(xml);
     const evidenceDirectory = await newEvidenceDirectory('search-xml-invalid-');

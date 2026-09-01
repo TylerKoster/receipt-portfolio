@@ -158,19 +158,30 @@ function decodeXml(value: string, name: string): string {
   );
   if (unknownEntity !== null)
     return notAdmitted(`${name} contains an unknown XML entity`);
+  const numericCharacter = (digits: string, radix: number): string => {
+    const codePoint = Number.parseInt(digits, radix);
+    if (!validXmlCodePoint(codePoint)) {
+      return notAdmitted(`${name} contains an invalid XML character reference`);
+    }
+    return String.fromCodePoint(codePoint);
+  };
   const decoded = withoutCdata
     .replace(/&#x([a-fA-F0-9]+);/g, (_match, digits: string) =>
-      String.fromCodePoint(Number.parseInt(digits, 16)),
+      numericCharacter(digits, 16),
     )
     .replace(/&#(\d+);/g, (_match, digits: string) =>
-      String.fromCodePoint(Number.parseInt(digits, 10)),
+      numericCharacter(digits, 10),
     )
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
     .replaceAll('&apos;', "'")
     .replaceAll('&amp;', '&');
-  if ([...decoded].some((character) => !validXmlCodePoint(character.codePointAt(0)!))) {
+  if (
+    [...decoded].some(
+      (character) => !validXmlCodePoint(character.codePointAt(0)!),
+    )
+  ) {
     return notAdmitted(`${name} contains an invalid XML character`);
   }
   return decoded;
@@ -194,7 +205,10 @@ const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
 const ATOM_NAMESPACE = 'http://www.w3.org/2005/Atom';
 const NC_NAME = /^[A-Za-z_][\w.-]*$/;
 
-function qualifiedName(name: string, label: string): {
+function qualifiedName(
+  name: string,
+  label: string,
+): {
   readonly prefix?: string;
   readonly local: string;
 } {
@@ -249,7 +263,7 @@ function parseAttributes(value: string): Readonly<Record<string, string>> {
     pattern.lastIndex = offset;
     const match = pattern.exec(value);
     if (match === null) return notAdmitted('feed tag attributes are malformed');
-    const name = match[1]?.toLowerCase();
+    const name = match[1];
     const rawValue = match[2] ?? match[3];
     if (
       name === undefined ||
@@ -268,7 +282,9 @@ function parseAttributes(value: string): Readonly<Record<string, string>> {
 }
 
 function parseXml(xml: string): XmlNode {
-  if ([...xml].some((character) => !validXmlCodePoint(character.codePointAt(0)!))) {
+  if (
+    [...xml].some((character) => !validXmlCodePoint(character.codePointAt(0)!))
+  ) {
     return notAdmitted('feed contains an invalid XML character');
   }
   const roots: XmlNode[] = [];
@@ -318,7 +334,8 @@ function parseXml(xml: string): XmlNode {
     if (xml.startsWith('<![CDATA[', offset)) {
       const end = xml.indexOf(']]>', offset + 9);
       if (end < 0) return notAdmitted('feed CDATA is malformed');
-      if (stack.length === 0) return notAdmitted('feed CDATA is outside its root');
+      if (stack.length === 0)
+        return notAdmitted('feed CDATA is outside its root');
       appendText(xml.slice(offset + 9, end), false);
       offset = end + 3;
       continue;
@@ -370,7 +387,7 @@ function parseXml(xml: string): XmlNode {
         const prefix = name.slice(6);
         if (
           !NC_NAME.test(prefix) ||
-          /^xml/i.test(prefix) && prefix !== 'xml' ||
+          (/^xml/i.test(prefix) && prefix !== 'xml') ||
           prefix === 'xmlns' ||
           namespace.length === 0 ||
           namespace === XMLNS_NAMESPACE ||
@@ -387,10 +404,7 @@ function parseXml(xml: string): XmlNode {
       for (const name of Object.keys(parsedAttributes)) {
         if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
         const attributePrefix = qualifiedName(name, 'feed attribute').prefix;
-        if (
-          attributePrefix !== undefined &&
-          !namespaces.has(attributePrefix)
-        ) {
+        if (attributePrefix !== undefined && !namespaces.has(attributePrefix)) {
           return notAdmitted('feed attribute uses an unbound namespace prefix');
         }
       }

@@ -848,10 +848,7 @@ export async function collectMicrosoftSkillCreatorObservation(options: {
 export interface CollectSearchSourceOptions {
   readonly evidenceDirectory: string;
   readonly fetchSource?: (manifest: SourceManifest) => Promise<RawFetch>;
-  readonly beforePersistSearchPlan?: (
-    sourceId: SearchSourceId,
-    index: number,
-  ) => Promise<void>;
+  readonly failPersistSearchPlanAtIndex?: number;
 }
 
 export interface SearchCollectionResult {
@@ -1111,7 +1108,7 @@ async function pathExists(path: string): Promise<boolean> {
 async function persistSearchPlansAtomically(
   plans: readonly PlannedSearchSource[],
   evidenceDirectory: string,
-  beforePersist?: (sourceId: SearchSourceId, index: number) => Promise<void>,
+  failAtIndex?: number,
 ): Promise<void> {
   const targets = plans.flatMap((plan) =>
     searchPlanPaths(plan, evidenceDirectory),
@@ -1122,9 +1119,12 @@ async function persistSearchPlansAtomically(
   }
   try {
     for (const [index, plan] of plans.entries()) {
-      await beforePersist?.(plan.prepared.sourceId, index);
+      if (index === failAtIndex) {
+        throw new Error('INJECTED_SEARCH_PERSISTENCE_FAILURE');
+      }
       await persistSearchPlan(plan, evidenceDirectory);
     }
+    await verifyEvidenceTree(evidenceDirectory);
   } catch (error) {
     for (const target of [...absentBefore].reverse()) {
       try {
@@ -1213,9 +1213,8 @@ export async function collectAllSearchSources(
           await persistSearchPlansAtomically(
             plans,
             options.evidenceDirectory,
-            options.beforePersistSearchPlan,
+            options.failPersistSearchPlanAtIndex,
           );
-          await verifyEvidenceTree(options.evidenceDirectory);
           return plans.map((plan) => ({
             receipt: plan.receipt,
             path: plan.path,
