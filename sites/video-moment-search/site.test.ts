@@ -501,6 +501,11 @@ class FakeHTMLInputElement extends FakeHTMLElement {
 
 interface ClientHarness {
   readonly clear: FakeHTMLElement;
+  readonly creatorPreviewReset: FakeHTMLElement;
+  readonly creatorPreviewResults: FakeHTMLElement;
+  readonly creatorPreviewStart: FakeHTMLElement;
+  readonly creatorPreviewStatus: FakeHTMLElement;
+  readonly creatorPreviewSummary: FakeHTMLElement;
   readonly controlledQueries: readonly FakeHTMLElement[];
   readonly copy: FakeHTMLElement;
   readonly error: FakeHTMLElement;
@@ -571,6 +576,16 @@ function executeClientPayload(
   const handoffStatus = new FakeHTMLElement('p');
   const copy = new FakeHTMLElement('button');
   const clear = new FakeHTMLElement('button');
+  const creatorPreviewStart = new FakeHTMLElement('button');
+  creatorPreviewStart.disabled = true;
+  const creatorPreviewStatus = new FakeHTMLElement('p');
+  const creatorPreviewResults = new FakeHTMLElement('div');
+  creatorPreviewResults.hidden = true;
+  creatorPreviewResults.inert = true;
+  const creatorPreviewSummary = new FakeHTMLElement('p');
+  creatorPreviewSummary.textContent = 'No local preview decisions.';
+  const creatorPreviewReset = new FakeHTMLElement('button');
+  creatorPreviewReset.disabled = true;
   const controlledQueries = [
     'robots control',
     'generative AI',
@@ -596,6 +611,11 @@ function executeClientPayload(
     handoffStatus,
     copy,
     clear,
+    creatorPreviewStart,
+    creatorPreviewStatus,
+    creatorPreviewResults,
+    creatorPreviewSummary,
+    creatorPreviewReset,
     handoff,
     ...controlledQueries,
   ].forEach((element) => element.setConnected(true));
@@ -627,6 +647,11 @@ function executeClientPayload(
     ['[data-handoff-status]', handoffStatus],
     ['[data-copy-handoff]', copy],
     ['[data-clear-handoff]', clear],
+    ['[data-creator-preview-start]', creatorPreviewStart],
+    ['[data-creator-preview-status]', creatorPreviewStatus],
+    ['[data-creator-preview-results]', creatorPreviewResults],
+    ['[data-creator-preview-summary]', creatorPreviewSummary],
+    ['[data-creator-preview-reset]', creatorPreviewReset],
   ]);
   let copyFails = false;
   let copyDeferred = false;
@@ -677,6 +702,11 @@ function executeClientPayload(
 
   return {
     clear,
+    creatorPreviewReset,
+    creatorPreviewResults,
+    creatorPreviewStart,
+    creatorPreviewStatus,
+    creatorPreviewSummary,
     controlledQueries,
     copy,
     error,
@@ -3232,6 +3262,71 @@ describe('AI Moment Index public search surface', () => {
     expect(html).toContain('data-creator-preview-start');
     expect(html).toContain('Referral evidence: unavailable');
     expect(html).toContain('does not submit a library');
+  });
+
+  it('keeps creator review decisions separate from the L&D handoff and resets them in page memory', async () => {
+    const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const originalIndex = structuredClone(publicIndex);
+    const harness = executeClientPayload();
+
+    await harness.resolveIndex(publicIndex);
+    expect(harness.creatorPreviewStart.disabled).toBe(false);
+    expect(harness.indexRequests).toEqual([
+      { input: 'search-index.json', options: { credentials: 'omit' } },
+    ]);
+
+    harness.creatorPreviewStart.click();
+    const cards = descendants(harness.creatorPreviewResults, 'article');
+    expect(cards).toHaveLength(3);
+    expect(
+      cards.map((card) =>
+        descendants(card, 'button').map((button) => button.textContent),
+      ),
+    ).toEqual([
+      ['keep as shown', 'correction needed', 'remove from future preview'],
+      ['keep as shown', 'correction needed', 'remove from future preview'],
+      ['keep as shown', 'correction needed', 'remove from future preview'],
+    ]);
+    expect(cards.map((card) => descendants(card, 'a')[0]?.href)).toEqual([
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+      'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18',
+      'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75',
+    ]);
+
+    byText(cards[0]!, 'button', 'correction needed')!.click();
+    byText(cards[1]!, 'button', 'remove from future preview')!.click();
+    byText(cards[2]!, 'button', 'keep as shown')!.click();
+    expect(harness.creatorPreviewSummary.textContent).toBe(
+      'Local preview decisions: correction needed; remove from future preview; keep as shown.',
+    );
+    expect(harness.handoffList.children).toHaveLength(0);
+    expect(harness.handoffText.value).toBe('');
+    expect(publicIndex).toEqual(originalIndex);
+    expect(FakeHTMLElement.activeElement).toBe(harness.creatorPreviewStatus);
+
+    harness.creatorPreviewReset.click();
+    expect(harness.creatorPreviewSummary.textContent).toBe(
+      'No local preview decisions.',
+    );
+    expect(harness.creatorPreviewReset.disabled).toBe(true);
+    expect(FakeHTMLElement.activeElement).toBe(harness.creatorPreviewStatus);
+    expect(harness.indexRequests).toHaveLength(1);
+  });
+
+  it('keeps the creator preview unavailable when the index does not load', async () => {
+    const harness = executeClientPayload();
+
+    await harness.rejectFetch();
+
+    expect(harness.creatorPreviewStart.disabled).toBe(true);
+    expect(harness.creatorPreviewResults.hidden).toBe(true);
+    expect(harness.creatorPreviewStatus.textContent).toContain(
+      'unavailable because the search index could not load',
+    );
+    expect(harness.serverResults.textContent).toBe(
+      'server-rendered initial result',
+    );
+    expect(harness.indexRequests).toHaveLength(1);
   });
 
   it('records the bounded deterministic-route experiment without usability or demand claims', () => {

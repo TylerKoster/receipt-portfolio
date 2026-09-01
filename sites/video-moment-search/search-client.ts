@@ -638,7 +638,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     copy.disabled = entries.length === 0;
     clear.disabled = entries.length === 0;
   };
-  const renderShown = () => results.replaceChildren(...shown.map(card));
+  const renderShown = () =>
+    results.replaceChildren(...shown.map((entry) => card(entry)));
   const updateSelectionControl = (control, isSelected) => {
     control.textContent = isSelected
       ? 'Remove from temporary handoff'
@@ -658,7 +659,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     renderHandoff();
     updateSelectionControl(control, selected.has(entry.momentId));
   };
-  const card = (entry) => {
+  const card = (entry, includeHandoff = true) => {
     const article = document.createElement('article');
     article.className = 'moment-card';
     article.dataset.momentId = entry.momentId;
@@ -699,7 +700,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     related.href = 'moments/' + encodeURIComponent(entry.momentId) + '/';
     related.textContent = 'Open the evidence-bound moment page';
     article.append(heading, related);
-    if (entry.reviewEvidence) {
+    if (includeHandoff && entry.reviewEvidence) {
       const select = document.createElement('button');
       const alreadySelected = selected.has(entry.momentId);
       select.type = 'button';
@@ -728,7 +729,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       return;
     }
     const creatorCard = (entry) => {
-      const article = card(entry);
+      const article = card(entry, false);
       const controls = document.createElement('div');
       ['keep as shown', 'correction needed', 'remove from future preview'].forEach((decision) => {
         const control = document.createElement('button');
