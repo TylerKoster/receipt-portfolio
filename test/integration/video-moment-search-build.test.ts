@@ -53,6 +53,66 @@ afterEach(async () => {
 });
 
 describe('atomic AI Moment Index build', () => {
+  it('rejects tandem publication-boundary removal before output or staging residue', async () => {
+    const [corpus, manifest] = await Promise.all(
+      [
+        '../../fixtures/video-moment-search/authorized-ai-video-v1.json',
+        '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      ].map(async (path) =>
+        JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8')),
+      ),
+    );
+    const evidenceId = 'commons-how-can-we-keep-robots-under-control-v1';
+    const review = corpus.rights.find(
+      (grant: { reviewEvidence?: { evidenceId: string } }) =>
+        grant.reviewEvidence?.evidenceId === evidenceId,
+    )?.reviewEvidence;
+    const record = manifest.records.find(
+      (candidate: { evidenceId: string }) =>
+        candidate.evidenceId === evidenceId,
+    );
+    expect(review).toBeDefined();
+    expect(record).toBeDefined();
+    if (review === undefined || record === undefined) return;
+    review.productBoundary.excluded = review.productBoundary.excluded.filter(
+      (value: string) => value !== 'hosting',
+    );
+    record.productBoundary.excluded = record.productBoundary.excluded.filter(
+      (value: string) => value !== 'hosting',
+    );
+
+    const corpusPath = join(dirname(outputDirectory), 'invalid-corpus.json');
+    const manifestPath = join(
+      dirname(outputDirectory),
+      'invalid-boundary-manifest.json',
+    );
+    await Promise.all([
+      writeFile(corpusPath, JSON.stringify(corpus)),
+      writeFile(manifestPath, JSON.stringify(manifest)),
+    ]);
+
+    await expect(
+      buildSites({
+        evidenceDirectory,
+        outputDirectory,
+        includeVideoMomentSearch: true,
+        videoMomentCorpusPath: corpusPath,
+        videoMomentEvidenceManifestPath: manifestPath,
+        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+      }),
+    ).rejects.toThrow(
+      'SOURCE_EVIDENCE_CORPUS_PRODUCT_BOUNDARY_POLICY_MISMATCH:commons-how-can-we-keep-robots-under-control-v1, SOURCE_EVIDENCE_MANIFEST_PRODUCT_BOUNDARY_POLICY_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
+    );
+    await expect(readdir(outputDirectory)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.includes('.sites-stage-'),
+      ),
+    ).toEqual([]);
+  });
+
   it('blocks every reviewed output when one new admitted record is invalid', async () => {
     const manifest = JSON.parse(
       await readFile(

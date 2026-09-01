@@ -138,6 +138,19 @@ export interface CommonsSourceEvidenceValidation {
   readonly diagnostics: readonly string[];
 }
 
+export const AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1 = Object.freeze({
+  policyId: 'ai-moment-index-publication-boundary-v1',
+  included: Object.freeze(['timestamp link', 'original editorial annotation']),
+  excluded: Object.freeze([
+    'hosting',
+    'embedding',
+    'media distribution',
+    'transcript distribution',
+    'endorsement claim',
+    'inferred permission',
+  ]),
+});
+
 function sameStrings(
   left: readonly string[],
   right: readonly string[],
@@ -255,6 +268,24 @@ export function validateCommonsSourceEvidence(
   ) {
     diagnostics.push('SOURCE_EVIDENCE_CORPUS_REVIEW_SET_MISMATCH');
   }
+  for (const grant of corpus.rights) {
+    const review = grant.reviewEvidence;
+    if (
+      review !== undefined &&
+      (!sameStrings(
+        review.productBoundary.included,
+        AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1.included,
+      ) ||
+        !sameStrings(
+          review.productBoundary.excluded,
+          AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1.excluded,
+        ))
+    ) {
+      diagnostics.push(
+        `SOURCE_EVIDENCE_CORPUS_PRODUCT_BOUNDARY_POLICY_MISMATCH:${review.evidenceId}`,
+      );
+    }
+  }
   if (manifest.records.length !== expectedEvidenceIds.size) {
     diagnostics.push(
       `SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=${expectedEvidenceIds.size}:actual=${manifest.records.length}`,
@@ -296,6 +327,20 @@ export function validateCommonsSourceEvidence(
 
   for (const record of manifest.records) {
     const id = record.evidenceId;
+    if (
+      !sameStrings(
+        record.productBoundary.included,
+        AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1.included,
+      ) ||
+      !sameStrings(
+        record.productBoundary.excluded,
+        AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1.excluded,
+      )
+    ) {
+      diagnostics.push(
+        `SOURCE_EVIDENCE_MANIFEST_PRODUCT_BOUNDARY_POLICY_MISMATCH:${id}`,
+      );
+    }
     const video = corpus.videos.find(
       (candidate) => candidate.id === record.bindings.videoId,
     );

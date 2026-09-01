@@ -958,6 +958,58 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual({ ok: true, diagnostics: [] });
   });
 
+  it('rejects tandem removal of a mandatory publication-boundary exclusion before reviewed serialization or rendering', () => {
+    const corpus = structuredClone(fixture) as Mutable<VideoCorpus>;
+    const manifest = structuredClone(
+      sourceEvidenceManifest,
+    ) as Mutable<VideoSourceEvidenceManifest>;
+    const evidenceId =
+      'commons-how-can-we-keep-robots-under-control-v1' as const;
+    const review = corpus.rights.find(
+      (grant) => grant.reviewEvidence?.evidenceId === evidenceId,
+    )?.reviewEvidence;
+    const record = manifest.records.find(
+      (candidate) => candidate.evidenceId === evidenceId,
+    );
+    expect(review).toBeDefined();
+    expect(record).toBeDefined();
+    if (review === undefined || record === undefined) return;
+
+    review.productBoundary.excluded = review.productBoundary.excluded.filter(
+      (value) => value !== 'hosting',
+    );
+    record.productBoundary.excluded = record.productBoundary.excluded.filter(
+      (value) => value !== 'hosting',
+    );
+    const expectedDiagnostics = [
+      `SOURCE_EVIDENCE_CORPUS_PRODUCT_BOUNDARY_POLICY_MISMATCH:${evidenceId}`,
+      `SOURCE_EVIDENCE_MANIFEST_PRODUCT_BOUNDARY_POLICY_MISMATCH:${evidenceId}`,
+    ];
+
+    expect(
+      validateCommonsSourceEvidence(corpus, manifest, validationNow),
+    ).toEqual({ ok: false, diagnostics: expectedDiagnostics });
+    expect(() =>
+      serializePublicSearchIndexRaw(
+        corpus,
+        buildSearchIndex(corpus),
+        manifest,
+        validationNow,
+      ),
+    ).toThrow(expectedDiagnostics.join(', '));
+    let html: string | undefined;
+    expect(() => {
+      html = renderVideoMomentHomeRaw(
+        corpus,
+        buildSearchIndex(corpus),
+        baseUrl,
+        manifest,
+        validationNow,
+      );
+    }).toThrow(expectedDiagnostics.join(', '));
+    expect(html).toBeUndefined();
+  });
+
   it('rejects missing, duplicate, orphaned, and stale reviewed evidence sets deterministically', () => {
     expect(() => serializePublicSearchIndexRaw(fixture, searchIndex)).toThrow(
       'Evidence manifest is required for reviewed corpus records',

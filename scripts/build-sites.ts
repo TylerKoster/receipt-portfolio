@@ -120,17 +120,19 @@ interface VideoMomentPublication {
 }
 
 async function loadVideoMomentPublication(
+  corpusPath?: string,
   manifestPath?: string,
   validationNow: Date = new Date(),
 ): Promise<VideoMomentPublication> {
   const [fixture, manifest] = await Promise.all([
     readFile(
-      join(
-        projectRoot(),
-        'fixtures',
-        'video-moment-search',
-        'authorized-ai-video-v1.json',
-      ),
+      corpusPath ??
+        join(
+          projectRoot(),
+          'fixtures',
+          'video-moment-search',
+          'authorized-ai-video-v1.json',
+        ),
       'utf8',
     ).then((content) => JSON.parse(content) as VideoCorpus),
     readFile(
@@ -1117,6 +1119,7 @@ export async function buildSites(options: {
   trustedWorkspaceDirectory?: string;
   includeVideoMomentSearch?: boolean;
   blogRegistryRoot?: string;
+  videoMomentCorpusPath?: string;
   videoMomentEvidenceManifestPath?: string;
   videoMomentValidationNow?: Date;
 }): Promise<void> {
@@ -1174,6 +1177,7 @@ export async function buildSites(options: {
   await inspectOptionalRealDirectory(outputDirectory, 'Output root');
   const videoMomentPublication = options.includeVideoMomentSearch
     ? await loadVideoMomentPublication(
+        options.videoMomentCorpusPath,
         options.videoMomentEvidenceManifestPath,
         options.videoMomentValidationNow,
       )
