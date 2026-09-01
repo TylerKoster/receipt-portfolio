@@ -18,6 +18,7 @@ import {
   type SourceManifest,
 } from '../packages/evidence-core/src/index.js';
 import {
+  collectAllSearchSources,
   collectSearchSource,
   runCli,
   verifyEvidenceTree,
@@ -496,6 +497,85 @@ describe('bounded Search Receipt live collection', () => {
     ).toHaveLength(1);
   });
 
+  it('rejects out-of-order observations before all-source persistence', async () => {
+    const evidenceDirectory = await newEvidenceDirectory('search-chronology-');
+    await collectAllSearchSources({
+      evidenceDirectory,
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        observedAt: '2026-09-01T02:00:00.000Z',
+      }),
+    });
+    const before = await evidenceSnapshot(evidenceDirectory);
+    const changedStatus = Buffer.from(
+      STATUS_BYTES.toString('utf8').replace(
+        'Delayed reports.',
+        'Delayed data.',
+      ),
+    );
+    await expect(
+      collectAllSearchSources({
+        evidenceDirectory,
+        fetchSource: async (manifest) =>
+          manifest.sourceId === 'google-search-status'
+            ? {
+                ...rawFetch(manifest),
+                observedAt: '2026-09-01T01:00:00.000Z',
+                byteCount: changedStatus.byteLength,
+                rawSha256: sha256(changedStatus),
+                bytes: changedStatus,
+              }
+            : {
+                ...rawFetch(manifest),
+                observedAt: '2026-09-01T01:00:00.000Z',
+              },
+      }),
+    ).rejects.toThrow(/OBSERVATION_OUT_OF_ORDER/);
+    expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
+    await verifyEvidenceTree(evidenceDirectory);
+  });
+
+  it('appends an A-to-B-to-A reversion instead of collapsing to old history', async () => {
+    const evidenceDirectory = await newEvidenceDirectory('search-reversion-');
+    const first = await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const changedBytes = Buffer.from(
+      STATUS_BYTES.toString('utf8').replace(
+        'Delayed reports.',
+        'Delayed data.',
+      ),
+    );
+    const second = await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        observedAt: '2026-08-31T17:20:30.000Z',
+        byteCount: changedBytes.byteLength,
+        rawSha256: sha256(changedBytes),
+        bytes: changedBytes,
+      }),
+    });
+    const third = await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        observedAt: '2026-08-31T18:20:30.000Z',
+      }),
+    });
+
+    expect([
+      first.receipt.payload.sequence,
+      second.receipt.payload.sequence,
+      third.receipt.payload.sequence,
+    ]).toEqual([1, 2, 3]);
+    expect(third.idempotent).toBe(false);
+    expect(third.receipt.payload.predecessorReceiptId).toBe(second.receipt.id);
+    expect(third.receipt.payload.observedAt).toBe('2026-08-31T18:20:30.000Z');
+    await verifyEvidenceTree(evidenceDirectory, { expectedReceiptCount: 3 });
+  });
+
   it('ignores a complete entry contained only in an XML comment', async () => {
     const bytes = Buffer.from(
       `<feed><!--<entry><id>comment</id><title>Comment</title><link href="https://developers.google.com/search/blog/comment"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry>--></feed>`,
@@ -541,6 +621,52 @@ describe('bounded Search Receipt live collection', () => {
     const evidenceDirectory = await newEvidenceDirectory(
       'search-feed-admission-',
     );
+    await expect(
+      collectSearchSource('google-search-central-blog', {
+        evidenceDirectory,
+        fetchSource: async (manifest) => ({
+          ...rawFetch(manifest),
+          byteCount: bytes.byteLength,
+          rawSha256: sha256(bytes),
+          bytes,
+        }),
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    await expectNoEvidenceWrites(evidenceDirectory);
+  });
+
+  it.each([
+    ['illegal comment', `<feed><!--bad--comment--></feed>`],
+    [
+      'forbidden text terminator',
+      `<feed><entry><id>x</id><title>bad ]]> text</title><link href="https://developers.google.com/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    ],
+    [
+      'unbound namespace prefix',
+      `<x:feed><x:entry><x:id>x</x:id><x:title>X</x:title><x:link href="https://developers.google.com/search/blog/x"/><x:published>2026-08-31T00:00:00Z</x:published><x:updated>2026-08-31T00:00:00Z</x:updated></x:entry></x:feed>`,
+    ],
+  ] as const)('rejects malformed XML with an %s', async (_label, xml) => {
+    const bytes = Buffer.from(xml);
+    const evidenceDirectory = await newEvidenceDirectory('search-xml-invalid-');
+    await expect(
+      collectSearchSource('google-search-central-blog', {
+        evidenceDirectory,
+        fetchSource: async (manifest) => ({
+          ...rawFetch(manifest),
+          byteCount: bytes.byteLength,
+          rawSha256: sha256(bytes),
+          bytes,
+        }),
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    await expectNoEvidenceWrites(evidenceDirectory);
+  });
+
+  it('rejects a Search Central URL with a nondefault port', async () => {
+    const bytes = Buffer.from(
+      `<feed><entry><id>port</id><title>Port</title><link href="https://developers.google.com:444/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    );
+    const evidenceDirectory = await newEvidenceDirectory('search-feed-port-');
     await expect(
       collectSearchSource('google-search-central-blog', {
         evidenceDirectory,

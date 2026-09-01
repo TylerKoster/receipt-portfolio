@@ -958,12 +958,22 @@ function planSearchSource(
   const { sourceId, manifest, fetch: fetched, publicFacts } = prepared;
   const history = sourceHistory(verifiedReceipts, sourceId);
   const manifestDigest = manifestSha256(manifest);
-  const existing = history.find(
-    (receipt) =>
-      receipt.payload.manifestSha256 === manifestDigest &&
-      receipt.payload.rawSha256 === fetched.rawSha256 &&
-      receipt.payload.normalizedSha256 === prepared.normalizedSha256,
-  );
+  const predecessor = history.at(-1);
+  if (
+    predecessor !== undefined &&
+    fetched.observedAt < predecessor.payload.observedAt
+  ) {
+    throw new Error(
+      `OBSERVATION_OUT_OF_ORDER: ${sourceId} ${fetched.observedAt} precedes ${predecessor.payload.observedAt}`,
+    );
+  }
+  const existing =
+    predecessor !== undefined &&
+    predecessor.payload.manifestSha256 === manifestDigest &&
+    predecessor.payload.rawSha256 === fetched.rawSha256 &&
+    predecessor.payload.normalizedSha256 === prepared.normalizedSha256
+      ? predecessor
+      : undefined;
   if (existing !== undefined) {
     return {
       prepared,
@@ -979,7 +989,6 @@ function planSearchSource(
     };
   }
 
-  const predecessor = history.at(-1);
   const gateInputs = {
     manifestValid: true,
     enabled: manifest.enabled,

@@ -179,6 +179,11 @@ interface XmlNode {
   readonly text: string[];
 }
 
+interface XmlFrame {
+  readonly node: XmlNode;
+  readonly namespaces: ReadonlySet<string>;
+}
+
 function localName(name: string): string {
   return (name.split(':').at(-1) ?? '').toLowerCase();
 }
@@ -223,15 +228,20 @@ function parseAttributes(value: string): Readonly<Record<string, string>> {
 
 function parseXml(xml: string): XmlNode {
   const roots: XmlNode[] = [];
-  const stack: XmlNode[] = [];
+  const stack: XmlFrame[] = [];
   let offset = 0;
   const appendText = (value: string, decode = true) => {
+    if (decode && value.includes(']]>')) {
+      return notAdmitted('feed text contains a forbidden CDATA terminator');
+    }
     if (stack.length === 0) {
       if (value.trim().length > 0)
         return notAdmitted('feed has text outside its root');
       return;
     }
-    stack.at(-1)?.text.push(decode ? decodeXml(value, 'feed text') : value);
+    stack
+      .at(-1)
+      ?.node.text.push(decode ? decodeXml(value, 'feed text') : value);
   };
 
   while (offset < xml.length) {
@@ -245,6 +255,10 @@ function parseXml(xml: string): XmlNode {
     if (xml.startsWith('<!--', offset)) {
       const end = xml.indexOf('-->', offset + 4);
       if (end < 0) return notAdmitted('feed comment is malformed');
+      const comment = xml.slice(offset + 4, end);
+      if (comment.includes('--') || comment.endsWith('-')) {
+        return notAdmitted('feed comment uses forbidden XML syntax');
+      }
       offset = end + 3;
       continue;
     }
@@ -274,7 +288,7 @@ function parseXml(xml: string): XmlNode {
         return notAdmitted('feed closing tag is malformed');
       }
       const open = stack.pop();
-      if (open === undefined || open.name !== closingName) {
+      if (open === undefined || open.node.name !== closingName) {
         return notAdmitted('feed tags are not properly nested');
       }
     } else {
@@ -284,16 +298,39 @@ function parseXml(xml: string): XmlNode {
       if (match?.[1] === undefined || match[2] === undefined) {
         return notAdmitted('feed opening tag is malformed');
       }
+      const parsedAttributes = parseAttributes(match[2]);
+      const parent = stack.at(-1);
+      const namespaces = new Set(parent?.namespaces ?? ['xml']);
+      for (const name of Object.keys(parsedAttributes)) {
+        if (name.startsWith('xmlns:')) namespaces.add(name.slice(6));
+      }
+      const elementPrefix = match[1].includes(':')
+        ? match[1].split(':', 1)[0]?.toLowerCase()
+        : undefined;
+      if (elementPrefix !== undefined && !namespaces.has(elementPrefix)) {
+        return notAdmitted('feed element uses an unbound namespace prefix');
+      }
+      for (const name of Object.keys(parsedAttributes)) {
+        const attributePrefix = name.includes(':')
+          ? name.split(':', 1)[0]
+          : undefined;
+        if (
+          attributePrefix !== undefined &&
+          attributePrefix !== 'xmlns' &&
+          !namespaces.has(attributePrefix)
+        ) {
+          return notAdmitted('feed attribute uses an unbound namespace prefix');
+        }
+      }
       const node: XmlNode = {
         name: match[1],
-        attributes: parseAttributes(match[2]),
+        attributes: parsedAttributes,
         children: [],
         text: [],
       };
-      const parent = stack.at(-1);
       if (parent === undefined) roots.push(node);
-      else parent.children.push(node);
-      if (!selfClosing) stack.push(node);
+      else parent.node.children.push(node);
+      if (!selfClosing) stack.push({ node, namespaces });
     }
     offset = end + 1;
   }
@@ -338,6 +375,7 @@ function entryUrl(entry: XmlNode, name: string): string {
   const parsed = new URL(url);
   if (
     parsed.hostname !== 'developers.google.com' ||
+    parsed.port !== '' ||
     !parsed.pathname.startsWith('/search/blog/')
   ) {
     return notAdmitted(`${name} destination is not admitted`);
