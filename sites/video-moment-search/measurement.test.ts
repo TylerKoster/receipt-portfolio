@@ -333,6 +333,38 @@ describe('privacy-preserving measurement contract', () => {
     expect(validateExperimentLedger(ledger).diagnostics).toEqual([]);
   });
 
+  it('fails closed when the controlled literal match-explanation gate is absent or altered', () => {
+    expect(ledger.controlledLiteralMatchExplanationGate).toEqual({
+      evidenceClassification: 'synthetic-heuristic-only',
+      metric: 'deterministic literal match-explanation integrity',
+      baseline: 'ranked results expose no field-level reason',
+      target: {
+        controlledQueries: 3,
+        truthfulReasons: 3,
+        exactTimestampLandingError: 0,
+        falseReasons: 0,
+        rawQueryReflection: 0,
+        extraRequests: 0,
+        retainedOrTransmittedMeasurementRecords: 0,
+      },
+      stopRule:
+        'stop on any unsupported reason, query reflection, ranking or routing change, persistence or transmission, extra network, fallback loss, semantic relevance claim, or user-outcome claim',
+      evidencePath: 'sites/video-moment-search/site.test.ts',
+    });
+
+    const invalid = structuredClone(ledger);
+    delete invalid.controlledLiteralMatchExplanationGate;
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'controlledLiteralMatchExplanationGate must match the approved controlled literal match-explanation gate',
+    );
+
+    const altered = structuredClone(ledger);
+    altered.controlledLiteralMatchExplanationGate.target.extraRequests = 1;
+    expect(validateExperimentLedger(altered).diagnostics).toContain(
+      'controlledLiteralMatchExplanationGate must match the approved controlled literal match-explanation gate',
+    );
+  });
+
   it('binds the rank-3 regression to controlled query recovery', () => {
     expect(ledger.experiments[2].evidencePaths).toContainEqual({
       role: 'controlled-query-recovery-regression',

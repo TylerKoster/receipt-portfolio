@@ -283,6 +283,7 @@ const allowedLedgerKeys = new Set([
   'siteId',
   'historicalArtifact',
   'measurementStatus',
+  'controlledLiteralMatchExplanationGate',
   'controlledCreatorReviewGate',
   'noDataState',
   'requiredMetrics',
@@ -347,6 +348,24 @@ const expectedControlledCreatorReviewGate = {
   },
   stopRule:
     'stop on missing or ambiguous rights evidence, index mutation, wrong timestamp, persistence or transmission, extra network destination, broken search or fallback, or prohibited outcome claims',
+  evidencePath: 'sites/video-moment-search/site.test.ts',
+} as const;
+
+const expectedControlledLiteralMatchExplanationGate = {
+  evidenceClassification: 'synthetic-heuristic-only',
+  metric: 'deterministic literal match-explanation integrity',
+  baseline: 'ranked results expose no field-level reason',
+  target: {
+    controlledQueries: 3,
+    truthfulReasons: 3,
+    exactTimestampLandingError: 0,
+    falseReasons: 0,
+    rawQueryReflection: 0,
+    extraRequests: 0,
+    retainedOrTransmittedMeasurementRecords: 0,
+  },
+  stopRule:
+    'stop on any unsupported reason, query reflection, ranking or routing change, persistence or transmission, extra network, fallback loss, semantic relevance claim, or user-outcome claim',
   evidencePath: 'sites/video-moment-search/site.test.ts',
 } as const;
 
@@ -744,6 +763,16 @@ export function validateExperimentLedger(
   if (ledger.measurementStatus !== 'not-configured') {
     diagnostics.push(
       'measurementStatus must be not-configured without an approved endpoint',
+    );
+  }
+  if (
+    !sameExactStructure(
+      ledger.controlledLiteralMatchExplanationGate,
+      expectedControlledLiteralMatchExplanationGate,
+    )
+  ) {
+    diagnostics.push(
+      'controlledLiteralMatchExplanationGate must match the approved controlled literal match-explanation gate',
     );
   }
   if (

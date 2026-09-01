@@ -8,6 +8,22 @@
     "role": "released-single-experiment-historical-artifact"
   },
   "measurementStatus": "not-configured",
+  "controlledLiteralMatchExplanationGate": {
+    "evidenceClassification": "synthetic-heuristic-only",
+    "metric": "deterministic literal match-explanation integrity",
+    "baseline": "ranked results expose no field-level reason",
+    "target": {
+      "controlledQueries": 3,
+      "truthfulReasons": 3,
+      "exactTimestampLandingError": 0,
+      "falseReasons": 0,
+      "rawQueryReflection": 0,
+      "extraRequests": 0,
+      "retainedOrTransmittedMeasurementRecords": 0
+    },
+    "stopRule": "stop on any unsupported reason, query reflection, ranking or routing change, persistence or transmission, extra network, fallback loss, semantic relevance claim, or user-outcome claim",
+    "evidencePath": "sites/video-moment-search/site.test.ts"
+  },
   "controlledCreatorReviewGate": {
     "evidenceClassification": "synthetic-heuristic-only",
     "metric": "deterministic controlled creator review-flow integrity",

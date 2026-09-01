@@ -402,6 +402,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
 
   let index = null;
   let shown = [];
+  let shownQuery = '';
   let handoffRevision = 0;
   const selected = new Map();
   const creatorDecisions = new Map();
@@ -659,7 +660,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     clear.disabled = entries.length === 0;
   };
   const renderShown = () =>
-    results.replaceChildren(...shown.map((entry) => card(entry)));
+    results.replaceChildren(...shown.map((entry) => card(entry, true, shownQuery)));
   const updateSelectionControl = (control, isSelected) => {
     control.textContent = isSelected
       ? 'Remove from temporary handoff'
@@ -679,7 +680,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     renderHandoff();
     updateSelectionControl(control, selected.has(entry.momentId));
   };
-  const card = (entry, includeHandoff = true) => {
+  const card = (entry, includeHandoff = true, query = '') => {
     const article = document.createElement('article');
     article.className = 'moment-card';
     article.dataset.momentId = entry.momentId;
@@ -720,6 +721,21 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     related.href = 'moments/' + encodeURIComponent(entry.momentId) + '/';
     related.textContent = 'Open the evidence-bound moment page';
     article.append(heading, related);
+    if (query.length > 0) {
+      const queryTokens = tokens(query);
+      const fields = [
+        ['Source title', entry.videoTitle],
+        ['Topics', entry.topicSlugs.join(' ')],
+        ['Original editorial annotation', entry.excerpt],
+      ].filter(([, value]) =>
+        queryTokens.some((token) => tokens(value).includes(token)),
+      ).map(([label]) => label);
+      if (fields.length > 0) {
+        const reason = document.createElement('p');
+        reason.textContent = 'Literal match fields: ' + fields.join(', ') + '.';
+        article.append(reason);
+      }
+    }
     if (includeHandoff && entry.reviewEvidence) {
       const select = document.createElement('button');
       const alreadySelected = selected.has(entry.momentId);
@@ -861,6 +877,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       }
       const found = find(query);
       shown = found;
+      shownQuery = query;
       renderShown();
       results.hidden = false;
       results.inert = false;

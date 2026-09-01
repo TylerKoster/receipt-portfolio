@@ -28,6 +28,16 @@ This fixed synthetic gate covers only the three server-rendered controls: `robot
 - Stop: any wrong/multiple result, timestamp mismatch, native navigation, query/history/storage/telemetry persistence, extra network destination, loss of the server fallback, unsupported or transcript-derived example, or prohibited outcome claim.
 - Evidence boundary: `sites/video-moment-search/site.test.ts` exercises the shipped client payload and stored exact timestamp links. This fixed synthetic recovery gate is not user research or evidence of any user outcome.
 
+## Controlled literal match-explanation gate
+
+This deterministic synthetic gate verifies only that dynamic search cards name the already-admitted field(s) containing literal query tokens: Source title, Topics, or Original editorial annotation. It preserves the same ranked results and exact stored timestamp links; server-rendered initial results, creator-review cards, L&D handoff cards, zero-result state, and unavailable-index fallback show no reason.
+
+- Metric: **deterministic literal match-explanation integrity**.
+- Baseline: ranked results expose no field-level reason.
+- Target: **3/3 controlled queries truthful; timestamp landing error 0; false reasons 0; raw-query reflection 0; extra requests 0; retained or transmitted measurement records 0**.
+- Stop: any unsupported reason, query reflection, ranking or routing change, persistence or transmission, extra network, fallback loss, semantic relevance claim, or user-outcome claim.
+- Evidence boundary: `sites/video-moment-search/site.test.ts` exercises the shipped client payload with the existing synthetic fixture. This is not usability, relevance, demand, conversion, or revenue evidence.
+
 ## Controlled creator review preview gate
 
 This page-memory-only preview is a deterministic synthetic integrity gate for the three admitted reviewed fixture moments. It allows inspection of stored source, creator, interval, exact source timestamp, evidence, license, immutable rights revision, historical review/freshness wording, product boundary, and correction state. It does not submit a library, change a published record, prove creator onboarding, send or store review/referral data, or establish any user outcome.

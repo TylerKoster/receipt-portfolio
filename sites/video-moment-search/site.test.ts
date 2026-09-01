@@ -2581,6 +2581,94 @@ describe('AI Moment Index public search surface', () => {
     },
   );
 
+  it.each([
+    ['robots control', 'moment-robots-control', 132],
+    ['generative AI', 'moment-generative-ai-interface', 18],
+    ['AI industry society', 'moment-ai-industry-society-panel', 75],
+  ] as const)(
+    'discloses only the truthful literal fields for the controlled %s result',
+    async (query, momentId, timestamp) => {
+      const harness = executeClientPayload();
+      await harness.resolveIndex(
+        serializePublicSearchIndex(fixture, searchIndex),
+      );
+
+      harness.submit(query);
+
+      const card = descendants(harness.results, 'article')[0]!;
+      expect(card.dataset.momentId).toBe(momentId);
+      expect(descendants(card, 'a')[0]?.href).toContain(`#t=${timestamp}`);
+      const reason = descendants(card, 'p').find((node) =>
+        node.textContent.startsWith('Literal match fields:'),
+      );
+      expect(reason).toBeDefined();
+      expect(reason!.textContent).not.toContain(query);
+      expect(reason!.textContent).toMatch(
+        /^Literal match fields: (Source title|Topics|Original editorial annotation)(, (Source title|Topics|Original editorial annotation))*\.$/u,
+      );
+    },
+  );
+
+  it('reports exactly source title and topics for a title/topic-spanning literal match', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+
+    harness.submit('Davos AI industry society');
+
+    expect(
+      byText(
+        descendants(harness.results, 'article')[0]!,
+        'p',
+        'Literal match fields: Source title, Topics.',
+      ),
+    ).toBeDefined();
+  });
+
+  it('reports only the original editorial annotation for an annotation-only literal query', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+
+    harness.submit('blue lit room');
+
+    const card = descendants(harness.results, 'article')[0]!;
+    expect(card.dataset.momentId).toBe('moment-ai-industry-society-panel');
+    expect(
+      byText(card, 'p', 'Literal match fields: Original editorial annotation.'),
+    ).toBeDefined();
+    expect(
+      descendants(card, 'p').map((node) => node.textContent),
+    ).not.toContain('Literal match fields: Source title, Topics.');
+  });
+
+  it('keeps zero results and creator review cards free of literal-match reasons', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+
+    harness.submit('unrelated zero result');
+    expect(descendants(harness.results, 'article')).toEqual([]);
+    expect(
+      descendants(harness.results, 'p').some((node) =>
+        node.textContent.startsWith('Literal match fields:'),
+      ),
+    ).toBe(false);
+
+    harness.creatorPreviewStart.click();
+    expect(
+      descendants(harness.creatorPreviewResults, 'p').some((node) =>
+        node.textContent.startsWith('Literal match fields:'),
+      ),
+    ).toBe(false);
+    expect(harness.indexRequests).toEqual([
+      { input: 'search-index.json', options: { credentials: 'omit' } },
+    ]);
+  });
+
   it('keeps server fallback actions before evidence when renderEntry reorders related navigation above moment-meta', () => {
     const html = renderSearchShell(fixture, searchIndex, baseUrl);
     const articleStart = html.indexOf('data-moment-id="moment-robots-control"');
@@ -2625,17 +2713,18 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual([
       'h3:',
       'a:Open the evidence-bound moment page',
+      'p:Literal match fields: Source title, Topics, Original editorial annotation.',
       'button:Add to temporary handoff',
       'p:Current index state: active. Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.',
       'a:Correction and removal details',
       '.moment-meta',
     ]);
     expect(
-      byText(reviewedCard.children[5]!, 'dt', 'Rights status'),
+      byText(reviewedCard.children[6]!, 'dt', 'Rights status'),
     ).toBeDefined();
-    expect(byText(reviewedCard.children[5]!, 'dt', 'Provenance')).toBeDefined();
+    expect(byText(reviewedCard.children[6]!, 'dt', 'Provenance')).toBeDefined();
     expect(
-      byText(reviewedCard.children[5]!, 'dt', 'Correction state'),
+      byText(reviewedCard.children[6]!, 'dt', 'Correction state'),
     ).toBeDefined();
 
     const unreviewed = executeClientPayload();
@@ -2658,6 +2747,7 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual([
       'h3:',
       'a:Open the evidence-bound moment page',
+      'p:Literal match fields: Source title.',
       'p:Current index state: active. Active means published in this generated index with no correction or removal record applied in this build. Corrected means published with an admitted corrected state in this generated index. Neither index state proves current source availability, current permission, or endorsement.',
       'a:Correction and removal details',
       '.moment-meta',
