@@ -474,6 +474,10 @@ const expectedExperiments = [
         path: 'sites/video-moment-search/site.test.ts',
       },
       {
+        role: 'controlled-query-recovery-regression',
+        path: 'sites/video-moment-search/site.test.ts',
+      },
+      {
         role: 'released-historical-artifact',
         path: 'sites/video-moment-search/product-experiment-ledger.json',
       },

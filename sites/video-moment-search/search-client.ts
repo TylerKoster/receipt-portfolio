@@ -386,6 +386,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const handoffStatus = document.querySelector('[data-handoff-status]');
   const copy = document.querySelector('[data-copy-handoff]');
   const clear = document.querySelector('[data-clear-handoff]');
+  const controlledQueries = Array.from(document.querySelectorAll('[data-controlled-query]'));
   if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement) ||
       !(status instanceof HTMLElement) || !(results instanceof HTMLElement) ||
       !(error instanceof HTMLElement) || !(serverResults instanceof HTMLElement) ||
@@ -757,8 +758,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     handoffStatus.focus();
   });
 
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
+  const runSearch = () => {
     try {
       if (!index) {
         showSearchError();
@@ -788,6 +788,20 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     } catch {
       showSearchError();
     }
+  };
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    runSearch();
+  });
+  controlledQueries.forEach((control) => {
+    if (!(control instanceof HTMLElement)) return;
+    control.addEventListener('click', (event) => {
+      event.preventDefault();
+      const query = control.dataset.controlledQuery;
+      if (typeof query !== 'string') return;
+      input.value = query;
+      runSearch();
+    });
   });
   input.name = 'q';
 

@@ -642,6 +642,12 @@ export function renderSearchShell(
       <div><label for="moment-query">What explanation do you remember?</label><input id="moment-query" type="search" autocomplete="off" data-moment-query></div>
       <button type="submit">Search moments</button>
     </form>
+    <div aria-label="Controlled recovery examples">
+      <p>Try a controlled recovery example:</p>
+      <button type="button" data-controlled-query="robots control">robots control</button>
+      <button type="button" data-controlled-query="generative AI">generative AI</button>
+      <button type="button" data-controlled-query="AI industry society">AI industry society</button>
+    </div>
     <p class="boundary" data-measurement-status="not-configured">No measurement endpoint is configured. Future measurement hooks do not send or store search text or event data.</p>
     <noscript><p class="guidance">Interactive search requires JavaScript; the admitted initial moments remain available below without sending your query.</p></noscript>
     <p class="search-status" aria-live="polite" data-search-status>Enter a phrase; the initial controlled moments remain available below.</p>

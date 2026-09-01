@@ -39,6 +39,13 @@ const ledger = JSON.parse(
     'utf8',
   ),
 );
+const runbook = readFileSync(
+  new URL(
+    '../../docs/video-moment-search/operator-runbook.md',
+    import.meta.url,
+  ),
+  'utf8',
+);
 
 const canonicalHistoricalArtifact = {
   relationship: 'supplements',
@@ -313,6 +320,39 @@ describe('privacy-preserving measurement contract', () => {
 
   it('accepts a ranked 90-day ledger with required metrics, personas, targets, stop rules, and evidence boundaries', () => {
     expect(validateExperimentLedger(ledger).diagnostics).toEqual([]);
+  });
+
+  it('binds the rank-3 regression to controlled query recovery', () => {
+    expect(ledger.experiments[2].evidencePaths).toContainEqual({
+      role: 'controlled-query-recovery-regression',
+      path: 'sites/video-moment-search/site.test.ts',
+    });
+
+    const invalid = structuredClone(ledger);
+    invalid.experiments[2].evidencePaths =
+      invalid.experiments[2].evidencePaths.filter(
+        (path: { role: string }) =>
+          path.role !== 'controlled-query-recovery-regression',
+      );
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'experiments[2].evidencePaths must match the approved evidence roles',
+    );
+  });
+
+  it('documents controlled query recovery as a synthetic integrity gate without outcome claims', () => {
+    expect(runbook).toContain(
+      'Metric: **deterministic controlled-query recovery integrity**.',
+    );
+    expect(runbook).toContain(
+      'Target: **3/3 controls recover from an unrelated zero-result state to the expected unique moment at 132/18/75 with timestamp landing error 0, native navigations 0, extra requests 0, and retained or transmitted measurement data 0**.',
+    );
+    expect(runbook).toContain(
+      'Stop: any wrong/multiple result, timestamp mismatch, native navigation, query/history/storage/telemetry persistence, extra network destination, loss of the server fallback, unsupported or transcript-derived example, or prohibited outcome claim.',
+    );
+    expect(runbook).toContain(
+      'This fixed synthetic recovery gate is not user research or evidence of any user outcome.',
+    );
   });
 
   it('uses exact structured source authority, no-data, and persona contracts', () => {

@@ -334,12 +334,13 @@ type MutableSearchIndex = {
 };
 
 type SubmitListener = (event: { preventDefault(): void }) => void;
+type ClickListener = (event: { preventDefault(): void }) => void;
 
 class FakeHTMLElement {
   static activeElement: FakeHTMLElement | null = null;
   readonly children: FakeHTMLElement[] = [];
   readonly dataset: Record<string, string> = {};
-  private readonly clickListeners = new Map<string, (() => void)[]>();
+  private readonly clickListeners = new Map<string, ClickListener[]>();
   private elementValue = '';
   className = '';
   disabled = false;
@@ -347,6 +348,8 @@ class FakeHTMLElement {
   href = '';
   inert = false;
   isConnected = false;
+  lastClickPrevented = false;
+  nativeClickCount = 0;
   parentElement: FakeHTMLElement | null = null;
   readOnly = false;
   textContent = '';
@@ -385,7 +388,7 @@ class FakeHTMLElement {
     this.children.forEach((child) => child.setConnected(isConnected));
   }
 
-  addEventListener(type: string, listener: () => void): void {
+  addEventListener(type: string, listener: ClickListener): void {
     this.clickListeners.set(type, [
       ...(this.clickListeners.get(type) ?? []),
       listener,
@@ -401,8 +404,16 @@ class FakeHTMLElement {
   }
 
   click(): void {
-    if (!this.disabled && !this.hasHiddenOrInertAncestor())
-      this.clickListeners.get('click')?.forEach((listener) => listener());
+    if (this.disabled || this.hasHiddenOrInertAncestor()) return;
+    this.lastClickPrevented = false;
+    this.clickListeners.get('click')?.forEach((listener) =>
+      listener({
+        preventDefault: () => {
+          this.lastClickPrevented = true;
+        },
+      }),
+    );
+    if (!this.lastClickPrevented) this.nativeClickCount += 1;
   }
 
   focus(): void {
@@ -490,6 +501,7 @@ class FakeHTMLInputElement extends FakeHTMLElement {
 
 interface ClientHarness {
   readonly clear: FakeHTMLElement;
+  readonly controlledQueries: readonly FakeHTMLElement[];
   readonly copy: FakeHTMLElement;
   readonly error: FakeHTMLElement;
   readonly form: FakeHTMLFormElement;
@@ -559,6 +571,17 @@ function executeClientPayload(
   const handoffStatus = new FakeHTMLElement('p');
   const copy = new FakeHTMLElement('button');
   const clear = new FakeHTMLElement('button');
+  const controlledQueries = [
+    'robots control',
+    'generative AI',
+    'AI industry society',
+  ].map((query) => {
+    const control = new FakeHTMLElement('button');
+    control.dataset.controlledQuery = query;
+    control.textContent = query;
+    control.type = 'button';
+    return control;
+  });
   const handoff = new FakeHTMLElement('section');
   handoff.dataset.momentPageBase =
     'https://receipt-portfolio.example/video-moment-search/moments/';
@@ -574,6 +597,7 @@ function executeClientPayload(
     copy,
     clear,
     handoff,
+    ...controlledQueries,
   ].forEach((element) => element.setConnected(true));
   const serverResults = new FakeHTMLElement('section');
   serverResults.textContent = 'server-rendered initial result';
@@ -611,6 +635,8 @@ function executeClientPayload(
   const document = {
     createElement: (tagName: string) => new FakeHTMLElement(tagName),
     querySelector: (selector: string) => selectors.get(selector) ?? null,
+    querySelectorAll: (selector: string) =>
+      selector === '[data-controlled-query]' ? controlledQueries : [],
   };
 
   const ContextDate =
@@ -651,6 +677,7 @@ function executeClientPayload(
 
   return {
     clear,
+    controlledQueries,
     copy,
     error,
     form,
@@ -2172,6 +2199,22 @@ describe('AI Moment Index public search surface', () => {
     expect(html).not.toContain('It does not host, embed');
   });
 
+  it('server-renders the three controlled recovery queries in their fixed order', () => {
+    const html = renderVideoMomentHome(fixture, searchIndex, baseUrl);
+
+    expect(
+      [
+        ...html.matchAll(
+          /<button type="button" data-controlled-query="([^"]+)">([^<]+)<\/button>/gu,
+        ),
+      ].map((match) => [match[1], match[2]]),
+    ).toEqual([
+      ['robots control', 'robots control'],
+      ['generative AI', 'generative AI'],
+      ['AI industry society', 'AI industry society'],
+    ]);
+  });
+
   it('indexes every nonempty admitted canonical page while keeping query state out of discovery', () => {
     const search = renderVideoMomentHome(fixture, searchIndex, baseUrl);
     expect(search).toContain('<meta name="robots" content="index,follow">');
@@ -2458,6 +2501,55 @@ describe('AI Moment Index public search surface', () => {
     );
     expect(harness.status.textContent).toBe('Showing 1 moment.');
   });
+
+  it.each([
+    [
+      'robots control',
+      'moment-robots-control',
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    ],
+    [
+      'generative AI',
+      'moment-generative-ai-interface',
+      'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18',
+    ],
+    [
+      'AI industry society',
+      'moment-ai-industry-society-panel',
+      'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75',
+    ],
+  ] as const)(
+    'recovers from an unrelated zero-result query with the controlled %s example',
+    async (query, momentId, timestampUrl) => {
+      const harness = executeClientPayload();
+      await harness.resolveIndex(
+        serializePublicSearchIndex(fixture, searchIndex),
+      );
+      harness.submit('unrelated zero result');
+      expect(harness.status.textContent).toBe(
+        'No moments match this phrase. Try fewer or different words.',
+      );
+
+      const control = harness.controlledQueries.find(
+        (candidate) => candidate.dataset.controlledQuery === query,
+      );
+      expect(control).toBeDefined();
+      control!.click();
+
+      expect(control!.lastClickPrevented).toBe(true);
+      expect(control!.nativeClickCount).toBe(0);
+      expect(harness.input.value).toBe(query);
+      expect(
+        descendants(harness.results, 'article').map(
+          (article) => article.dataset.momentId,
+        ),
+      ).toEqual([momentId]);
+      expect(descendants(harness.results, 'a')[0]?.href).toBe(timestampUrl);
+      expect(harness.indexRequests).toEqual([
+        { input: 'search-index.json', options: { credentials: 'omit' } },
+      ]);
+    },
+  );
 
   it('keeps server fallback actions before evidence when renderEntry reorders related navigation above moment-meta', () => {
     const html = renderSearchShell(fixture, searchIndex, baseUrl);

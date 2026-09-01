@@ -18,6 +18,16 @@ The released preview is a heuristic regression gate only. It does not establish 
 6. **Offer interest (rank 6).** Only after approval, use the provisional bounded observation target of **10 offer clicks in 90 days**. This is not revenue or demand proof.
 7. **Paid-pilot evidence (rank 7).** The continuation gate is **one paid pilot or credible signed paid commitment within 90 days**. It remains unknown/blocked until primary evidence exists.
 
+## Controlled query-recovery integrity gate
+
+This fixed synthetic gate covers only the three server-rendered controls: `robots control`, `generative AI`, and `AI industry society`. It uses the admitted public index and exact ordinary source timestamp links; it neither fetches new sources nor creates user, demand, usability, task-completion, or outcome evidence.
+
+- Metric: **deterministic controlled-query recovery integrity**.
+- Baseline: one prose example is visible; zero-result recovery is generic; the other two admitted moments have no executable example control.
+- Target: **3/3 controls recover from an unrelated zero-result state to the expected unique moment at 132/18/75 with timestamp landing error 0, native navigations 0, extra requests 0, and retained or transmitted measurement data 0**.
+- Stop: any wrong/multiple result, timestamp mismatch, native navigation, query/history/storage/telemetry persistence, extra network destination, loss of the server fallback, unsupported or transcript-derived example, or prohibited outcome claim.
+- Evidence boundary: `sites/video-moment-search/site.test.ts` exercises the shipped client payload and stored exact timestamp links. This fixed synthetic recovery gate is not user research or evidence of any user outcome.
+
 ## Persona boundaries
 
 - **Applied-AI researcher:** the preview-testable heuristic route above; no usability or task-completion claim.
