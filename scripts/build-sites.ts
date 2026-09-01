@@ -141,7 +141,7 @@ async function loadVideoMomentPublication(
           projectRoot(),
           'fixtures',
           'video-moment-search',
-          'video-source-evidence-manifest-v2.json',
+          'video-source-evidence-manifest-v3.json',
         ),
       'utf8',
     ).then((content) => JSON.parse(content) as VideoSourceEvidenceManifest),

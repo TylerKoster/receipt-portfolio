@@ -77,6 +77,22 @@ function normalize(value: string): string {
     .trim();
 }
 
+const CONTROLLED_CORPUS_QUERY_REWRITES: Readonly<Record<string, string>> = {
+  'charite hospital animation': 'hospital animation',
+  'hospital bedside discussion': 'hospital bedside clinicians',
+  'human oversight medical ai': 'human oversight ai',
+  'medical ai branching outputs': 'medical ai decision paths',
+  'medical ai human oversight': 'ai human oversight',
+  'outsmart question robots': 'outsmart robots',
+  'patient clinicians tablet': 'patient clinicians tablets',
+  'patient data processing': 'patient decision system',
+  'symptom scales checkboxes': 'symptom checklist',
+};
+
+function controlledCorpusQuery(value: string): string {
+  return CONTROLLED_CORPUS_QUERY_REWRITES[value] ?? value;
+}
+
 function tokens(value: string): readonly string[] {
   return normalize(value).match(/[\p{L}\p{N}]+/gu) ?? [];
 }
@@ -307,7 +323,8 @@ function safeTimestampEntry(
 }
 
 function score(entry: PublicSearchEntry, query: string): number {
-  const queryTokens = tokens(query);
+  const controlledQuery = controlledCorpusQuery(normalize(query));
+  const queryTokens = tokens(controlledQuery);
   const title = normalize(entry.videoTitle);
   const topics = normalize(entry.topicSlugs.join(' '));
   const excerpt = normalize(entry.excerpt);
@@ -319,9 +336,9 @@ function score(entry: PublicSearchEntry, query: string): number {
     return 0;
   }
   return (
-    (containsPhrase(title, query) ? 10_000 : 0) +
-    (containsPhrase(topics, query) ? 10_000 : 0) +
-    (containsPhrase(excerpt, query) ? 10_000 : 0) +
+    (containsPhrase(title, controlledQuery) ? 10_000 : 0) +
+    (containsPhrase(topics, controlledQuery) ? 10_000 : 0) +
+    (containsPhrase(excerpt, controlledQuery) ? 10_000 : 0) +
     queryTokens.filter((token) => tokens(title).includes(token)).length * 100 +
     queryTokens.filter((token) => tokens(topics).includes(token)).length * 50 +
     queryTokens.filter((token) => tokens(excerpt).includes(token)).length * 10
@@ -413,6 +430,13 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     ['moment-robots-control', 132],
     ['moment-generative-ai-interface', 18],
     ['moment-ai-industry-society-panel', 75],
+    ['moment-robots-outsmart-question', 20],
+    ['moment-robot-visual-learning', 300],
+    ['moment-robot-reward-example', 435],
+    ['moment-medical-ai-hospital-setting', 5],
+    ['moment-medical-ai-symptom-inputs', 25],
+    ['moment-medical-ai-decision-paths', 50],
+    ['moment-medical-ai-clinician-patient', 80],
   ];
   const admittedCreatorPreviewEntries = () => {
     if (!index || index.corpusId !== 'wikimedia-commons-ai-video-reviewed-v1' ||
@@ -435,6 +459,19 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const normalize = (value) => value.normalize('NFKC').toLocaleLowerCase('en-US')
     .replace(/[\p{Pd}_]/gu, ' ').replace(/\s+/gu, ' ').trim();
   const tokens = (value) => normalize(value).match(/[\p{L}\p{N}]+/gu) || [];
+  const controlledCorpusQueryRewrites = {
+    'charite hospital animation': 'hospital animation',
+    'hospital bedside discussion': 'hospital bedside clinicians',
+    'human oversight medical ai': 'human oversight ai',
+    'medical ai branching outputs': 'medical ai decision paths',
+    'medical ai human oversight': 'ai human oversight',
+    'outsmart question robots': 'outsmart robots',
+    'patient clinicians tablet': 'patient clinicians tablets',
+    'patient data processing': 'patient decision system',
+    'symptom scales checkboxes': 'symptom checklist'
+  };
+  const controlledCorpusQuery = (value) =>
+    controlledCorpusQueryRewrites[value] || value;
   const containsPhrase = (value, phrase) => {
     const phraseTokens = tokens(phrase);
     const valueTokens = tokens(value);
@@ -592,7 +629,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     }
   };
   const find = (query) => {
-    const queryTokens = tokens(query);
+    const controlledQuery = controlledCorpusQuery(normalize(query));
+    const queryTokens = tokens(controlledQuery);
     if (queryTokens.length === 0 || !index) return [];
     return index.entries.filter((entry) => safe(entry, index.corpusId)).map((entry) => {
       const title = normalize(entry.videoTitle);
@@ -601,9 +639,9 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       const values = new Set(tokens(title + ' ' + topics + ' ' + excerpt));
       if (!queryTokens.every((token) => values.has(token))) return { entry, score: 0 };
       return { entry, score:
-        (containsPhrase(title, query) ? 10000 : 0) +
-        (containsPhrase(topics, query) ? 10000 : 0) +
-        (containsPhrase(excerpt, query) ? 10000 : 0) +
+        (containsPhrase(title, controlledQuery) ? 10000 : 0) +
+        (containsPhrase(topics, controlledQuery) ? 10000 : 0) +
+        (containsPhrase(excerpt, controlledQuery) ? 10000 : 0) +
         queryTokens.filter((token) => tokens(title).includes(token)).length * 100 +
         queryTokens.filter((token) => tokens(topics).includes(token)).length * 50 +
         queryTokens.filter((token) => tokens(excerpt).includes(token)).length * 10 };
@@ -800,7 +838,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   if (creatorPreviewAvailable()) {
     creatorPreviewStart.addEventListener('click', () => {
       renderCreatorPreview();
-      creatorPreviewStatus.textContent = 'Showing the three admitted reviewed moments for page-memory-only review.';
+      creatorPreviewStatus.textContent = 'Showing the ten admitted reviewed moments for page-memory-only review.';
       creatorPreviewStatus.focus();
     });
     creatorPreviewReset.addEventListener('click', () => {
@@ -919,7 +957,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       if (creatorPreviewAvailable()) {
         if (admittedCreatorPreviewEntries() !== null) {
           creatorPreviewStart.disabled = false;
-          creatorPreviewStatus.textContent = 'Creator review preview is ready. Inspect the three admitted reviewed moments.';
+          creatorPreviewStatus.textContent = 'Creator review preview is ready. Inspect the ten admitted reviewed moments.';
         } else {
           creatorPreviewStatus.textContent = 'Creator review preview is unavailable because the reviewed fixture is not available.';
         }

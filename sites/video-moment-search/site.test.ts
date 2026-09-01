@@ -41,7 +41,7 @@ const fixture = JSON.parse(
 const sourceEvidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
       import.meta.url,
     ),
     'utf8',
@@ -50,7 +50,7 @@ const sourceEvidenceManifest = JSON.parse(
 const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
-const validationNow = new Date('2026-08-31T12:00:00.000Z');
+const validationNow = new Date('2026-09-01T12:00:00.000Z');
 
 function searchPublicIndex(
   index: Parameters<typeof searchPublicIndexRaw>[0],
@@ -252,15 +252,25 @@ function twoReviewedPublication(): {
 
   const manifest = manifestFor(corpus)!;
   const secondRecord = structuredClone(manifest.records[0]!);
-  secondRecord.manifestRecordId = 'independent-source-evidence-record-v2';
+  secondRecord.manifestRecordId = 'independent-source-evidence-record-v3';
   secondRecord.evidenceId = evidenceId;
   secondRecord.bindings = {
     corpusId: corpus.corpusId,
     videoId: 'video-independent-source',
     rightsGrantId: 'rights-independent-source',
-    momentId: 'moment-independent-source',
-    cueId: 'annotation-independent-source-45',
   };
+  secondRecord.moments = [
+    {
+      momentId: 'moment-independent-source',
+      cueId: 'annotation-independent-source-45',
+      timestamp: {
+        strategy: 'media-fragment',
+        seconds: 45,
+        url: 'https://video.example/independent-source#t=45',
+      },
+      annotation: structuredClone(secondRecord.moments[0]!.annotation),
+    },
+  ];
   secondRecord.workTitle = 'Independent controlled source';
   secondRecord.roles = {
     publisher: { id: 'synthetic-creator', name: 'Synthetic Creator' },
@@ -292,11 +302,6 @@ function twoReviewedPublication(): {
     byteLength: 1,
     acceptRanges: 'bytes',
     durationSeconds: 299.5,
-  };
-  secondRecord.timestamp = {
-    strategy: 'media-fragment',
-    seconds: 45,
-    url: 'https://video.example/independent-source#t=45',
   };
   secondRecord.historicalLicenseReview = {
     issuer: 'Wikimedia Commons',
@@ -768,11 +773,11 @@ describe('AI Moment Index public search surface', () => {
         | undefined;
       expect(observedStatus, entry.momentId).toMatchObject({
         precision: 'date',
-        observedOn: '2026-08-31',
-        normalizedAt: '2026-08-31T00:00:00.000Z',
       });
       expect(observedStatus, entry.momentId).not.toHaveProperty('observedAt');
-      expect(entry.verificationDate, entry.momentId).toBe('2026-08-31');
+      expect(entry.verificationDate, entry.momentId).toBe(
+        observedStatus?.observedOn,
+      );
     }
 
     const html = renderVideoMomentHome(
@@ -798,8 +803,9 @@ describe('AI Moment Index public search surface', () => {
           ].includes(evidenceId),
         )
         .map((record) => {
+          const momentEvidence = record.moments[0]!;
           const cue = fixture.cues.find(
-            ({ id }) => id === record.bindings.cueId,
+            ({ id }) => id === momentEvidence.cueId,
           )!;
           return {
             evidenceId: record.evidenceId,
@@ -815,9 +821,13 @@ describe('AI Moment Index public search surface', () => {
               url: record.observedStatus.sourcePageRevisionUrl,
               at: record.observedStatus.sourcePageRevisionAt,
             },
-            annotation: record.annotation,
+            annotation: momentEvidence.annotation,
             cueInterval: [cue.startSeconds, cue.endSeconds],
-            bindings: record.bindings,
+            bindings: {
+              ...record.bindings,
+              momentId: momentEvidence.momentId,
+              cueId: momentEvidence.cueId,
+            },
           };
         }),
     ).toEqual([
@@ -900,7 +910,7 @@ describe('AI Moment Index public search surface', () => {
     ]);
   });
 
-  it('publishes exactly the three admitted evidence records with exact ordinary timestamp routes', () => {
+  it('preserves the three existing evidence records and exact timestamp routes', () => {
     expect(
       validateCommonsSourceEvidence(
         fixture,
@@ -911,14 +921,14 @@ describe('AI Moment Index public search surface', () => {
       ok: true,
       diagnostics: [],
     });
-    expect(fixture.videos).toHaveLength(3);
-    expect(fixture.rights).toHaveLength(3);
-    expect(fixture.cues).toHaveLength(3);
-    expect(fixture.moments).toHaveLength(3);
-    expect(sourceEvidenceManifest.records).toHaveLength(3);
+    expect(fixture.videos).toHaveLength(5);
+    expect(fixture.rights).toHaveLength(5);
+    expect(fixture.cues).toHaveLength(10);
+    expect(fixture.moments).toHaveLength(10);
+    expect(sourceEvidenceManifest.records).toHaveLength(5);
 
     expect(
-      sourceEvidenceManifest.records.map((record) => ({
+      sourceEvidenceManifest.records.slice(0, 3).map((record) => ({
         evidenceId: record.evidenceId,
         publisher: record.roles.publisher.name,
         uploader: record.roles.uploader.name,
@@ -931,7 +941,7 @@ describe('AI Moment Index public search surface', () => {
         observedOn: record.observedStatus.observedOn,
         normalizedAt: record.observedStatus.normalizedAt,
         expiresAt: record.observedStatus.expiresAt,
-        timestampUrl: record.timestamp.url,
+        timestampUrl: record.moments[0]!.timestamp.url,
       })),
     ).toEqual([
       {
@@ -1019,9 +1029,185 @@ describe('AI Moment Index public search surface', () => {
       validateCommonsSourceEvidence(
         fixture,
         sourceEvidenceManifest,
-        new Date('2026-08-31T12:00:00.000Z'),
+        new Date('2026-09-01T12:00:00.000Z'),
       ),
     ).toEqual({ ok: true, diagnostics: [] });
+  });
+
+  it('admits schema v3 source records with every reviewed moment bound exactly once', () => {
+    const manifest = sourceEvidenceManifest as unknown as {
+      schemaVersion: number;
+      records: Array<{
+        evidenceId: string;
+        moments?: Array<{
+          momentId: string;
+          cueId: string;
+          timestamp: { seconds: number; url: string };
+          annotation: { text: string; sha256: string };
+        }>;
+      }>;
+    };
+
+    expect(manifest.schemaVersion).toBe(3);
+    expect(fixture.videos).toHaveLength(5);
+    expect(fixture.rights).toHaveLength(5);
+    expect(fixture.cues).toHaveLength(10);
+    expect(fixture.moments).toHaveLength(10);
+    expect(manifest.records).toHaveLength(5);
+    expect(
+      manifest.records.map((record) => [
+        record.evidenceId,
+        record.moments?.map((moment) => moment.momentId),
+      ]),
+    ).toEqual([
+      [
+        'commons-how-can-we-keep-robots-under-control-v1',
+        ['moment-robots-control'],
+      ],
+      [
+        'commons-generative-ai-explained-in-2-minutes-v1',
+        ['moment-generative-ai-interface'],
+      ],
+      [
+        'commons-davos-2016-state-of-artificial-intelligence-v1',
+        ['moment-ai-industry-society-panel'],
+      ],
+      [
+        'commons-will-robots-outsmart-us-v1',
+        [
+          'moment-robots-outsmart-question',
+          'moment-robot-visual-learning',
+          'moment-robot-reward-example',
+        ],
+      ],
+      [
+        'commons-ethics-ai-digital-medicine-v1',
+        [
+          'moment-medical-ai-hospital-setting',
+          'moment-medical-ai-symptom-inputs',
+          'moment-medical-ai-decision-paths',
+          'moment-medical-ai-clinician-patient',
+        ],
+      ],
+    ]);
+  });
+
+  it('serializes the annotation hash bound to each moment instead of a source record default', () => {
+    const publicIndex = serializePublicSearchIndex(
+      fixture,
+      searchIndex,
+      sourceEvidenceManifest,
+      new Date('2026-09-01T12:00:00.000Z'),
+    );
+    const expectedHashes = new Map([
+      [
+        'moment-robots-control',
+        '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
+      ],
+      [
+        'moment-generative-ai-interface',
+        '4ff3be6d42965ecebce82df2354177a313ef5a03ea0b47ac841f32618e8498ba',
+      ],
+      [
+        'moment-ai-industry-society-panel',
+        'afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531',
+      ],
+      [
+        'moment-robots-outsmart-question',
+        '029af0ff0403cc90bb40ef5a9077526c0b76e89c25baaa54a35017464469a004',
+      ],
+      [
+        'moment-robot-visual-learning',
+        'dc054ffd1c0b8af1e69805a25502433b2f80faabd802d8e5b894d7ac3841a549',
+      ],
+      [
+        'moment-robot-reward-example',
+        'f218b80bf7de026ffa6ab1897ce63d6c528372c00f56292bc30a96c3c002955d',
+      ],
+      [
+        'moment-medical-ai-hospital-setting',
+        'c520b7d6fb4150f8f2f0a4e2dcb7322904c57eef4aa4a7f00787b1e00d851b60',
+      ],
+      [
+        'moment-medical-ai-symptom-inputs',
+        'd97945fad4840be978f8b7e1fa4932349786a7e2021306afdd7a496810b99f83',
+      ],
+      [
+        'moment-medical-ai-decision-paths',
+        '818b9cb693329de30b28b89b1f347d0ac10a3fa92a9e89611531992525e94f8a',
+      ],
+      [
+        'moment-medical-ai-clinician-patient',
+        'cfe835da751723de90ba9c8c82ef19da771482c379d88da42adc5458dd06116c',
+      ],
+    ]);
+
+    expect(publicIndex.entries).toHaveLength(10);
+    for (const entry of publicIndex.entries) {
+      expect(entry.reviewEvidence?.annotationSha256, entry.momentId).toBe(
+        expectedHashes.get(entry.momentId),
+      );
+      expect(new URL(entry.timestampUrl).hash, entry.momentId).toBe(
+        `#t=${entry.startSeconds}`,
+      );
+    }
+  });
+
+  it('rejects omitted, duplicated, and cross-source moment evidence bindings', () => {
+    type MutableV3Manifest = {
+      records: Array<{
+        evidenceId: string;
+        moments: Array<{ momentId: string; cueId: string }>;
+      }>;
+    };
+    const manifest = structuredClone(
+      sourceEvidenceManifest,
+    ) as unknown as MutableV3Manifest;
+    const robots = manifest.records.find(
+      (record) =>
+        record.evidenceId === 'commons-will-robots-outsmart-us-v1',
+    );
+    const medicine = manifest.records.find(
+      (record) => record.evidenceId === 'commons-ethics-ai-digital-medicine-v1',
+    );
+    expect(robots?.moments).toHaveLength(3);
+    expect(medicine?.moments).toHaveLength(4);
+    if (robots === undefined || medicine === undefined) return;
+
+    const omitted = structuredClone(manifest);
+    omitted.records[3]!.moments.pop();
+    expect(
+      validateCommonsSourceEvidence(fixture, omitted, validationNow)
+        .diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_MOMENT_BINDING_MISSING:moment-robot-reward-example',
+    );
+
+    const duplicated = structuredClone(manifest);
+    duplicated.records[3]!.moments.push({
+      ...duplicated.records[3]!.moments[0]!,
+    });
+    expect(
+      validateCommonsSourceEvidence(fixture, duplicated, validationNow)
+        .diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_MOMENT_BINDING_DUPLICATE:moment-robots-outsmart-question',
+    );
+
+    const misbound = structuredClone(manifest);
+    misbound.records[3]!.moments[0] = {
+      ...misbound.records[4]!.moments[0]!,
+    };
+    expect(
+      validateCommonsSourceEvidence(fixture, misbound, validationNow)
+        .diagnostics,
+    ).toEqual(
+      expect.arrayContaining([
+        'SOURCE_EVIDENCE_MOMENT_BINDING_MISSING:moment-robots-outsmart-question',
+        'SOURCE_EVIDENCE_MOMENT_BINDING_DUPLICATE:moment-medical-ai-hospital-setting',
+        'SOURCE_EVIDENCE_MOMENT_BINDING_MISMATCH:commons-will-robots-outsmart-us-v1:moment-medical-ai-hospital-setting',
+      ]),
+    );
   });
 
   it('rejects uploader conflation with each distinct role in the accepted per-record contract', () => {
@@ -1131,13 +1317,15 @@ describe('AI Moment Index public search surface', () => {
       validateCommonsSourceEvidence(
         fixture,
         duplicate,
-        new Date('2026-08-31T12:00:00.000Z'),
+        new Date('2026-09-01T12:00:00.000Z'),
       ).diagnostics,
     ).toEqual([
       'SOURCE_EVIDENCE_BINDING_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
+      'SOURCE_EVIDENCE_CUE_BINDING_DUPLICATE:annotation-robots-control-132',
       'SOURCE_EVIDENCE_ID_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
-      'SOURCE_EVIDENCE_MANIFEST_ID_DUPLICATE:robots-control-evidence-record-v2',
-      'SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=3:actual=4',
+      'SOURCE_EVIDENCE_MANIFEST_ID_DUPLICATE:robots-control-evidence-record-v3',
+      'SOURCE_EVIDENCE_MOMENT_BINDING_DUPLICATE:moment-robots-control',
+      'SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=5:actual=6',
     ]);
 
     const orphan = structuredClone(sourceEvidenceManifest);
@@ -1146,7 +1334,7 @@ describe('AI Moment Index public search surface', () => {
       validateCommonsSourceEvidence(
         fixture,
         orphan,
-        new Date('2026-08-31T12:00:00.000Z'),
+        new Date('2026-09-01T12:00:00.000Z'),
       ).diagnostics,
     ).toContain(
       'SOURCE_EVIDENCE_VIDEO_BINDING_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
@@ -1158,7 +1346,7 @@ describe('AI Moment Index public search surface', () => {
       validateCommonsSourceEvidence(
         fixture,
         stale,
-        new Date('2026-08-31T12:00:00.000Z'),
+        new Date('2026-09-01T12:00:00.000Z'),
       ).diagnostics,
     ).toContain(
       'SOURCE_EVIDENCE_OBSERVATION_EXPIRED:commons-how-can-we-keep-robots-under-control-v1',
@@ -1168,9 +1356,9 @@ describe('AI Moment Index public search surface', () => {
       [
         'future',
         (candidate: Mutable<VideoSourceEvidenceManifest>) => {
-          candidate.records[0]!.observedStatus.observedOn = '2026-09-01';
+          candidate.records[0]!.observedStatus.observedOn = '2026-09-02';
           candidate.records[0]!.observedStatus.normalizedAt =
-            '2026-09-01T00:00:00.000Z';
+            '2026-09-02T00:00:00.000Z';
         },
         'SOURCE_EVIDENCE_OBSERVATION_FUTURE:commons-how-can-we-keep-robots-under-control-v1',
       ],
@@ -1208,7 +1396,7 @@ describe('AI Moment Index public search surface', () => {
         validateCommonsSourceEvidence(
           fixture,
           candidate,
-          new Date('2026-08-31T12:00:00.000Z'),
+          new Date('2026-09-01T12:00:00.000Z'),
         ).diagnostics,
         name,
       ).toContain(diagnostic);
@@ -1217,7 +1405,7 @@ describe('AI Moment Index public search surface', () => {
 
   it('validates every record in a multi-record set and rejects swapped or partially invalid bindings', () => {
     const { corpus, manifest } = twoReviewedPublication();
-    const now = new Date('2026-08-31T12:00:00.000Z');
+    const now = new Date('2026-09-01T12:00:00.000Z');
     expect(validateCommonsSourceEvidence(corpus, manifest, now)).toEqual({
       ok: true,
       diagnostics: [],
@@ -1242,7 +1430,7 @@ describe('AI Moment Index public search surface', () => {
     );
 
     const partial = structuredClone(manifest);
-    partial.records[1]!.timestamp.url =
+    partial.records[1]!.moments[0]!.timestamp.url =
       'https://video.example/independent-source#t=46';
     expect(
       validateCommonsSourceEvidence(corpus, partial, now).diagnostics,
@@ -1407,7 +1595,7 @@ describe('AI Moment Index public search surface', () => {
       fixture,
       searchIndex,
       sourceEvidenceManifest,
-      new Date('2026-08-31T12:00:00.000Z'),
+      new Date('2026-09-01T12:00:00.000Z'),
     ).entries[0]!;
     expect(serialized.timestampUrl).toBe(
       'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
@@ -1433,7 +1621,7 @@ describe('AI Moment Index public search surface', () => {
       searchIndex,
       baseUrl,
       sourceEvidenceManifest,
-      new Date('2026-08-31T12:00:00.000Z'),
+      new Date('2026-09-01T12:00:00.000Z'),
     );
     expect(html).toContain('Historical license review');
     expect(html).toContain('LicenseReviewerBot · 2022-01-18');
@@ -1486,7 +1674,7 @@ describe('AI Moment Index public search surface', () => {
       sourceEvidenceManifest,
     );
     expect(html).toContain(
-      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-08-06. Fresh source-record status: observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z.',
+      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-07-17, 2024-08-06. Fresh source-record status: observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z, observed on 2026-09-01 (date precision); freshness expires 2026-10-01T00:00:00.000Z.',
     );
     expect(html).toContain(
       'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
@@ -1657,7 +1845,7 @@ describe('AI Moment Index public search surface', () => {
       diagnostics: [],
     });
     expect(sourceRightsEvidence).toMatchObject({
-      manifestRecordId: 'robots-control-evidence-record-v2',
+      manifestRecordId: 'robots-control-evidence-record-v3',
       evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
       workTitle: 'How can we keep robots under control?',
       roles: {
@@ -1685,11 +1873,23 @@ describe('AI Moment Index public search surface', () => {
         acceptRanges: 'bytes',
         durationSeconds: 907.299,
       },
-      timestamp: {
-        strategy: 'media-fragment',
-        seconds: 132,
-        url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
-      },
+      moments: [
+        {
+          momentId: 'moment-robots-control',
+          cueId: 'annotation-robots-control-132',
+          timestamp: {
+            strategy: 'media-fragment',
+            seconds: 132,
+            url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+          },
+          annotation: {
+            kind: 'original-editorial',
+            text: 'Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.',
+            sha256:
+              '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
+          },
+        },
+      ],
       historicalLicenseReview: {
         issuer: 'Wikimedia Commons',
         reviewer: 'LicenseReviewerBot',
@@ -1701,12 +1901,6 @@ describe('AI Moment Index public search surface', () => {
         observedOn: '2026-08-31',
         normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
-      },
-      annotation: {
-        kind: 'original-editorial',
-        text: 'Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.',
-        sha256:
-          '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
       },
       productBoundary: {
         included: ['timestamp link', 'original editorial annotation'],
@@ -1721,21 +1915,22 @@ describe('AI Moment Index public search surface', () => {
       },
     });
     const evidence = sourceRightsEvidence;
+    const momentEvidence = evidence.moments[0]!;
     expect(fixture.videos[0]).toMatchObject({
       title: evidence.workTitle,
       creatorName: evidence.roles.attributedCreator.name,
       sourceUrl: evidence.delivery.url,
-      timestampStrategy: evidence.timestamp.strategy,
+      timestampStrategy: momentEvidence.timestamp.strategy,
     });
     expect(fixture.cues[0]).toMatchObject({
-      startSeconds: evidence.timestamp.seconds,
+      startSeconds: momentEvidence.timestamp.seconds,
       evidenceKind: 'editorial-annotation',
-      text: evidence.annotation.text,
-      contentSha256: evidence.annotation.sha256,
+      text: momentEvidence.annotation.text,
+      contentSha256: momentEvidence.annotation.sha256,
     });
     expect(fixture.moments[0]).toMatchObject({
-      startSeconds: evidence.timestamp.seconds,
-      excerpt: evidence.annotation.text,
+      startSeconds: momentEvidence.timestamp.seconds,
+      excerpt: momentEvidence.annotation.text,
     });
     expect(fixture.rights[0]).toMatchObject({
       id: 'rights-commons-robots-control',
@@ -1808,13 +2003,14 @@ describe('AI Moment Index public search surface', () => {
       [
         'annotation text',
         (candidate: Mutable<VideoSourceEvidenceManifest>) =>
-          (candidate.records[0]!.annotation.text =
+          (candidate.records[0]!.moments[0]!.annotation.text =
             'Unsupported standalone 02:12 claim.'),
       ],
       [
         'annotation hash',
         (candidate: Mutable<VideoSourceEvidenceManifest>) =>
-          (candidate.records[0]!.annotation.sha256 = '0'.repeat(64)),
+          (candidate.records[0]!.moments[0]!.annotation.sha256 =
+            '0'.repeat(64)),
       ],
       [
         'source linkage',
@@ -1825,7 +2021,7 @@ describe('AI Moment Index public search surface', () => {
       [
         'timestamp linkage',
         (candidate: Mutable<VideoSourceEvidenceManifest>) =>
-          (candidate.records[0]!.timestamp.seconds = 133),
+          (candidate.records[0]!.moments[0]!.timestamp.seconds = 133),
       ],
       [
         'rights linkage',
@@ -1835,7 +2031,7 @@ describe('AI Moment Index public search surface', () => {
       [
         'binding relationship',
         (candidate: Mutable<VideoSourceEvidenceManifest>) =>
-          (candidate.records[0]!.bindings.cueId = 'unsupported-cue'),
+          (candidate.records[0]!.moments[0]!.cueId = 'unsupported-cue'),
       ],
     ] as const;
 
@@ -3367,20 +3563,29 @@ describe('AI Moment Index public search surface', () => {
 
     harness.creatorPreviewStart.click();
     const cards = descendants(harness.creatorPreviewResults, 'article');
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(10);
     expect(
       cards.map((card) =>
         descendants(card, 'button').map((button) => button.textContent),
       ),
-    ).toEqual([
-      ['keep as shown', 'correction needed', 'remove from future preview'],
-      ['keep as shown', 'correction needed', 'remove from future preview'],
-      ['keep as shown', 'correction needed', 'remove from future preview'],
-    ]);
+    ).toEqual(
+      Array.from({ length: 10 }, () => [
+        'keep as shown',
+        'correction needed',
+        'remove from future preview',
+      ]),
+    );
     expect(cards.map((card) => descendants(card, 'a')[0]?.href)).toEqual([
       'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
       'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18',
       'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75',
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=20',
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=300',
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=435',
+      'https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=5',
+      'https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=25',
+      'https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=50',
+      'https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=80',
     ]);
 
     byText(cards[0]!, 'button', 'correction needed')!.click();
@@ -3476,7 +3681,7 @@ describe('AI Moment Index public search surface', () => {
       },
       experiment: {
         baseline:
-          'Accepted v0.1.65 exposes three evidence-admitted moments; no measured-user baseline exists.',
+          'The controlled corpus exposes ten evidence-admitted moments; no measured-user baseline exists.',
         target:
           '100% deterministic fixed-flow integrity; expected moment appears in the top three; zero timestamp landing error.',
         stopRule:

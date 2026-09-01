@@ -22,14 +22,14 @@ const corpus = JSON.parse(
 const evidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
       import.meta.url,
     ),
     'utf8',
   ),
 ) as VideoSourceEvidenceManifest;
 const baseUrl = 'https://receipt-portfolio.example/';
-const validationNow = new Date('2026-08-31T12:00:00.000Z');
+const validationNow = new Date('2026-09-01T12:00:00.000Z');
 
 function manifestFor(candidate: VideoCorpus): VideoSourceEvidenceManifest {
   const manifest = structuredClone(evidenceManifest);

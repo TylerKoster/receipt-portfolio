@@ -1,0 +1,504 @@
+{
+  "schemaVersion": 3,
+  "manifestId": "wikimedia-commons-ai-video-evidence-manifest-v3",
+  "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+  "records": [
+    {
+      "manifestRecordId": "robots-control-evidence-record-v3",
+      "evidenceId": "commons-how-can-we-keep-robots-under-control-v1",
+      "bindings": {
+        "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+        "videoId": "video-robots-under-control",
+        "rightsGrantId": "rights-commons-robots-control"
+      },
+      "moments": [
+        {
+          "momentId": "moment-robots-control",
+          "cueId": "annotation-robots-control-132",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 132,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.",
+            "sha256": "080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd"
+          }
+        }
+      ],
+      "workTitle": "How can we keep robots under control?",
+      "roles": {
+        "publisher": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands"
+        },
+        "uploader": { "id": "pj-geest", "name": "PJ Geest" },
+        "attributedCreator": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands"
+        },
+        "rightsAuthority": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands",
+          "relationship": "named-licensor"
+        },
+        "evidenceIssuer": {
+          "id": "wikimedia-commons",
+          "name": "Wikimedia Commons"
+        }
+      },
+      "canonicalSourceEvidenceUrl": "https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm",
+      "immutableSourceEvidenceUrl": "https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530",
+      "license": {
+        "name": "CC BY-SA 4.0 International",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "delivery": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm",
+        "mediaType": "video/webm",
+        "byteLength": 24788866,
+        "acceptRanges": "bytes",
+        "durationSeconds": 907.299
+      },
+      "historicalLicenseReview": {
+        "issuer": "Wikimedia Commons",
+        "reviewer": "LicenseReviewerBot",
+        "reviewedOn": "2022-01-18",
+        "finding": "LicenseReviewerBot recorded CC BY-SA 4.0 International for the immutable source record on 2022-01-18."
+      },
+      "observedStatus": {
+        "status": "source-record-observed",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
+        "expiresAt": "2026-09-30T00:00:00.000Z",
+        "sourcePageRevisionId": "1092595523",
+        "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1092595523",
+        "sourcePageRevisionAt": "2025-09-29T14:11:03.000Z"
+      },
+      "productBoundary": {
+        "included": ["timestamp link", "original editorial annotation"],
+        "excluded": [
+          "hosting",
+          "embedding",
+          "media distribution",
+          "transcript distribution",
+          "endorsement claim",
+          "inferred permission"
+        ]
+      }
+    },
+    {
+      "manifestRecordId": "generative-ai-explained-evidence-record-v3",
+      "evidenceId": "commons-generative-ai-explained-in-2-minutes-v1",
+      "bindings": {
+        "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+        "videoId": "video-generative-ai-explained",
+        "rightsGrantId": "rights-commons-generative-ai-explained"
+      },
+      "moments": [
+        {
+          "momentId": "moment-generative-ai-interface",
+          "cueId": "annotation-generative-ai-18",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 18,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 18 seconds, an AI Campus animation shows a seated person beside a large smartphone displaying a bot face and chat bubbles.",
+            "sha256": "4ff3be6d42965ecebce82df2354177a313ef5a03ea0b47ac841f32618e8498ba"
+          }
+        }
+      ],
+      "workTitle": "Generative AI explained in 2 minutes",
+      "roles": {
+        "publisher": { "id": "ki-campus", "name": "KI-Campus" },
+        "uploader": {
+          "id": "prototyperspective",
+          "name": "Prototyperspective"
+        },
+        "attributedCreator": { "id": "ki-campus", "name": "KI-Campus" },
+        "rightsAuthority": {
+          "id": "ki-campus",
+          "name": "KI-Campus",
+          "relationship": "named-licensor"
+        },
+        "evidenceIssuer": {
+          "id": "wikimedia-commons",
+          "name": "Wikimedia Commons"
+        }
+      },
+      "canonicalSourceEvidenceUrl": "https://commons.wikimedia.org/wiki/File:Generative_AI_explained_in_2_minutes.webm",
+      "immutableSourceEvidenceUrl": "https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071",
+      "license": {
+        "name": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "delivery": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm",
+        "mediaType": "video/webm",
+        "byteLength": 26848205,
+        "acceptRanges": "bytes",
+        "durationSeconds": 122.081
+      },
+      "historicalLicenseReview": {
+        "issuer": "Wikimedia Commons",
+        "reviewer": "Speravir",
+        "reviewedOn": "2024-08-06",
+        "finding": "Speravir recorded Creative Commons Attribution-ShareAlike 4.0 International for the immutable Commons source record on 2024-08-06."
+      },
+      "observedStatus": {
+        "status": "source-record-observed",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
+        "expiresAt": "2026-09-30T00:00:00.000Z",
+        "sourcePageRevisionId": "1145693071",
+        "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071",
+        "sourcePageRevisionAt": "2026-01-10T22:07:20.000Z"
+      },
+      "productBoundary": {
+        "included": ["timestamp link", "original editorial annotation"],
+        "excluded": [
+          "hosting",
+          "embedding",
+          "media distribution",
+          "transcript distribution",
+          "endorsement claim",
+          "inferred permission"
+        ]
+      }
+    },
+    {
+      "manifestRecordId": "davos-ai-panel-evidence-record-v3",
+      "evidenceId": "commons-davos-2016-state-of-artificial-intelligence-v1",
+      "bindings": {
+        "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+        "videoId": "video-davos-state-of-ai",
+        "rightsGrantId": "rights-commons-davos-ai-panel"
+      },
+      "moments": [
+        {
+          "momentId": "moment-ai-industry-society-panel",
+          "cueId": "annotation-davos-ai-panel-75",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 75,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 75 seconds, a World Economic Forum panel sits around the moderator in a blue-lit room.",
+            "sha256": "afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531"
+          }
+        }
+      ],
+      "workTitle": "Davos 2016 - The State of Artificial Intelligence",
+      "roles": {
+        "publisher": {
+          "id": "world-economic-forum",
+          "name": "World Economic Forum"
+        },
+        "uploader": {
+          "id": "vanished-account-byeznhpyxeuztibuo",
+          "name": "Vanished Account Byeznhpyxeuztibuo"
+        },
+        "attributedCreator": {
+          "id": "world-economic-forum",
+          "name": "World Economic Forum"
+        },
+        "rightsAuthority": {
+          "id": "world-economic-forum",
+          "name": "World Economic Forum",
+          "relationship": "named-licensor"
+        },
+        "evidenceIssuer": {
+          "id": "wikimedia-commons",
+          "name": "Wikimedia Commons"
+        }
+      },
+      "canonicalSourceEvidenceUrl": "https://commons.wikimedia.org/wiki/File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm",
+      "immutableSourceEvidenceUrl": "https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664",
+      "license": {
+        "name": "Creative Commons Attribution 3.0 Unported (CC BY 3.0)",
+        "url": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "delivery": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm",
+        "mediaType": "video/webm",
+        "byteLength": 363432763,
+        "acceptRanges": "bytes",
+        "durationSeconds": 3308.545
+      },
+      "historicalLicenseReview": {
+        "issuer": "Wikimedia Commons",
+        "reviewer": "INeverCry",
+        "reviewedOn": "2016-12-21",
+        "finding": "INeverCry recorded Creative Commons Attribution 3.0 Unported for the immutable Commons source record on 2016-12-21."
+      },
+      "observedStatus": {
+        "status": "source-record-observed",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
+        "expiresAt": "2026-09-30T00:00:00.000Z",
+        "sourcePageRevisionId": "1159390664",
+        "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664",
+        "sourcePageRevisionAt": "2026-02-04T14:54:21.000Z"
+      },
+      "productBoundary": {
+        "included": ["timestamp link", "original editorial annotation"],
+        "excluded": [
+          "hosting",
+          "embedding",
+          "media distribution",
+          "transcript distribution",
+          "endorsement claim",
+          "inferred permission"
+        ]
+      }
+    },
+    {
+      "manifestRecordId": "will-robots-outsmart-us-evidence-record-v3",
+      "evidenceId": "commons-will-robots-outsmart-us-v1",
+      "bindings": {
+        "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+        "videoId": "video-will-robots-outsmart-us",
+        "rightsGrantId": "rights-commons-will-robots-outsmart-us"
+      },
+      "moments": [
+        {
+          "momentId": "moment-robots-outsmart-question",
+          "cueId": "annotation-robots-outsmart-question-20",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 20,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=20"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 20 seconds, the presenter stands between a blue display reading “Will robots outsmart us?” and an image of two animated robots.",
+            "sha256": "029af0ff0403cc90bb40ef5a9077526c0b76e89c25baaa54a35017464469a004"
+          }
+        },
+        {
+          "momentId": "moment-robot-visual-learning",
+          "cueId": "annotation-robot-visual-learning-300",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 300,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=300"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 300 seconds, the presenter stands beside an illustration of a brain mapping colored points before a projected spider image.",
+            "sha256": "dc054ffd1c0b8af1e69805a25502433b2f80faabd802d8e5b894d7ac3841a549"
+          }
+        },
+        {
+          "momentId": "moment-robot-reward-example",
+          "cueId": "annotation-robot-reward-example-435",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 435,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm#t=435"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 435 seconds, the presenter stands beside a humanoid robot while a screen pairs a dog with a piece of meat as a robot-learning example.",
+            "sha256": "f218b80bf7de026ffa6ab1897ce63d6c528372c00f56292bc30a96c3c002955d"
+          }
+        }
+      ],
+      "workTitle": "Will robots outsmart us?",
+      "roles": {
+        "publisher": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands"
+        },
+        "uploader": { "id": "pj-geest", "name": "PJ Geest" },
+        "attributedCreator": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands"
+        },
+        "rightsAuthority": {
+          "id": "university-of-the-netherlands",
+          "name": "University of the Netherlands",
+          "relationship": "named-licensor"
+        },
+        "evidenceIssuer": {
+          "id": "wikimedia-commons",
+          "name": "Wikimedia Commons"
+        }
+      },
+      "canonicalSourceEvidenceUrl": "https://commons.wikimedia.org/wiki/File:Will_robots_outsmart_us.webm",
+      "immutableSourceEvidenceUrl": "https://commons.wikimedia.org/w/index.php?title=File:Will_robots_outsmart_us.webm&oldid=622571804",
+      "license": {
+        "name": "CC BY-SA 4.0 International",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "delivery": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm",
+        "mediaType": "video/webm",
+        "byteLength": 34920602,
+        "acceptRanges": "bytes",
+        "durationSeconds": 977.23
+      },
+      "historicalLicenseReview": {
+        "issuer": "Wikimedia Commons",
+        "reviewer": "LicenseReviewerBot",
+        "reviewedOn": "2022-01-18",
+        "finding": "LicenseReviewerBot recorded CC BY-SA 4.0 International for the immutable source record on 2022-01-18."
+      },
+      "observedStatus": {
+        "status": "source-record-observed",
+        "precision": "date",
+        "observedOn": "2026-09-01",
+        "normalizedAt": "2026-09-01T00:00:00.000Z",
+        "expiresAt": "2026-10-01T00:00:00.000Z",
+        "sourcePageRevisionId": "1092595730",
+        "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Will_robots_outsmart_us.webm&oldid=1092595730",
+        "sourcePageRevisionAt": "2025-09-29T14:11:18.000Z"
+      },
+      "productBoundary": {
+        "included": ["timestamp link", "original editorial annotation"],
+        "excluded": [
+          "hosting",
+          "embedding",
+          "media distribution",
+          "transcript distribution",
+          "endorsement claim",
+          "inferred permission"
+        ]
+      }
+    },
+    {
+      "manifestRecordId": "ethics-ai-digital-medicine-evidence-record-v3",
+      "evidenceId": "commons-ethics-ai-digital-medicine-v1",
+      "bindings": {
+        "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
+        "videoId": "video-ethics-ai-digital-medicine",
+        "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
+      },
+      "moments": [
+        {
+          "momentId": "moment-medical-ai-hospital-setting",
+          "cueId": "annotation-medical-ai-hospital-setting-5",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 5,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=5"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 5 seconds, an AI Campus animation places the Charité hospital above a city block.",
+            "sha256": "c520b7d6fb4150f8f2f0a4e2dcb7322904c57eef4aa4a7f00787b1e00d851b60"
+          }
+        },
+        {
+          "momentId": "moment-medical-ai-symptom-inputs",
+          "cueId": "annotation-medical-ai-symptom-inputs-25",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 25,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=25"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 25 seconds, a hand completes a health-symptom checklist illustrated with faces, a thermometer, and heart icons.",
+            "sha256": "d97945fad4840be978f8b7e1fa4932349786a7e2021306afdd7a496810b99f83"
+          }
+        },
+        {
+          "momentId": "moment-medical-ai-decision-paths",
+          "cueId": "annotation-medical-ai-decision-paths-50",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 50,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=50"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 50 seconds, illustrated health signs flow into a central decision system and branch toward patient-specific result paths.",
+            "sha256": "818b9cb693329de30b28b89b1f347d0ac10a3fa92a9e89611531992525e94f8a"
+          }
+        },
+        {
+          "momentId": "moment-medical-ai-clinician-patient",
+          "cueId": "annotation-medical-ai-clinician-patient-80",
+          "timestamp": {
+            "strategy": "media-fragment",
+            "seconds": 80,
+            "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm#t=80"
+          },
+          "annotation": {
+            "kind": "original-editorial",
+            "text": "At 80 seconds, a patient sits up in a hospital bed while two clinicians compare tablets at the bedside.",
+            "sha256": "cfe835da751723de90ba9c8c82ef19da771482c379d88da42adc5458dd06116c"
+          }
+        }
+      ],
+      "workTitle": "Ethics of AI in Digital Medicine – Explanation why transparent explainable AI is important",
+      "roles": {
+        "publisher": { "id": "ki-campus", "name": "KI-Campus" },
+        "uploader": {
+          "id": "prototyperspective",
+          "name": "Prototyperspective"
+        },
+        "attributedCreator": { "id": "ki-campus", "name": "KI-Campus" },
+        "rightsAuthority": {
+          "id": "ki-campus",
+          "name": "KI-Campus",
+          "relationship": "named-licensor"
+        },
+        "evidenceIssuer": {
+          "id": "wikimedia-commons",
+          "name": "Wikimedia Commons"
+        }
+      },
+      "canonicalSourceEvidenceUrl": "https://commons.wikimedia.org/wiki/File:Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm",
+      "immutableSourceEvidenceUrl": "https://commons.wikimedia.org/w/index.php?title=File:Ethics_of_AI_in_Digital_Medicine_–_Explanation_why_transparent_explainable_AI_is_important.webm&oldid=1145693057",
+      "license": {
+        "name": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "delivery": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm",
+        "mediaType": "video/webm",
+        "byteLength": 29066683,
+        "acceptRanges": "bytes",
+        "durationSeconds": 96.561
+      },
+      "historicalLicenseReview": {
+        "issuer": "Wikimedia Commons",
+        "reviewer": "Speravir",
+        "reviewedOn": "2024-07-17",
+        "finding": "Speravir recorded Creative Commons Attribution-ShareAlike 4.0 International for the immutable Commons source record on 2024-07-17."
+      },
+      "observedStatus": {
+        "status": "source-record-observed",
+        "precision": "date",
+        "observedOn": "2026-09-01",
+        "normalizedAt": "2026-09-01T00:00:00.000Z",
+        "expiresAt": "2026-10-01T00:00:00.000Z",
+        "sourcePageRevisionId": "1145693057",
+        "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Ethics_of_AI_in_Digital_Medicine_–_Explanation_why_transparent_explainable_AI_is_important.webm&oldid=1145693057",
+        "sourcePageRevisionAt": "2026-01-10T22:07:18.000Z"
+      },
+      "productBoundary": {
+        "included": ["timestamp link", "original editorial annotation"],
+        "excluded": [
+          "hosting",
+          "embedding",
+          "media distribution",
+          "transcript distribution",
+          "endorsement claim",
+          "inferred permission"
+        ]
+      }
+    }
+  ]
+}

@@ -34,6 +34,28 @@
       "durationSeconds": 3309,
       "timestampStrategy": "media-fragment",
       "reviewEvidenceId": "commons-davos-2016-state-of-artificial-intelligence-v1"
+    },
+    {
+      "id": "video-will-robots-outsmart-us",
+      "slug": "will-robots-outsmart-us",
+      "title": "Will robots outsmart us?",
+      "creatorId": "university-of-the-netherlands",
+      "creatorName": "University of the Netherlands",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm",
+      "durationSeconds": 978,
+      "timestampStrategy": "media-fragment",
+      "reviewEvidenceId": "commons-will-robots-outsmart-us-v1"
+    },
+    {
+      "id": "video-ethics-ai-digital-medicine",
+      "slug": "ethics-ai-digital-medicine",
+      "title": "Ethics of AI in Digital Medicine – Explanation why transparent explainable AI is important",
+      "creatorId": "ki-campus",
+      "creatorName": "KI-Campus",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm",
+      "durationSeconds": 97,
+      "timestampStrategy": "media-fragment",
+      "reviewEvidenceId": "commons-ethics-ai-digital-medicine-v1"
     }
   ],
   "rights": [
@@ -168,6 +190,99 @@
           ]
         }
       }
+    },
+    {
+      "id": "rights-commons-will-robots-outsmart-us",
+      "creatorId": "university-of-the-netherlands",
+      "basis": "explicit-license",
+      "coveredVideoIds": ["video-will-robots-outsmart-us"],
+      "coveredSourceUrls": [
+        "https://upload.wikimedia.org/wikipedia/commons/transcoded/1/17/Will_robots_outsmart_us.webm/Will_robots_outsmart_us.webm.240p.vp9.webm"
+      ],
+      "coveredCaptionHashes": [],
+      "coveredAnnotationHashes": [
+        "029af0ff0403cc90bb40ef5a9077526c0b76e89c25baaa54a35017464469a004",
+        "dc054ffd1c0b8af1e69805a25502433b2f80faabd802d8e5b894d7ac3841a549",
+        "f218b80bf7de026ffa6ab1897ce63d6c528372c00f56292bc30a96c3c002955d"
+      ],
+      "allowedUses": {
+        "commercialUse": true,
+        "excerpts": true,
+        "timestampLinks": true
+      },
+      "maxExcerptCharacters": 280,
+      "licenseNote": "CC BY-SA 4.0 International; timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
+      "permissionVerifiedAt": "2022-01-18T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:Will_robots_outsmart_us.webm",
+      "reviewEvidence": {
+        "classification": "reviewed-public-source",
+        "evidenceId": "commons-will-robots-outsmart-us-v1",
+        "licenseIdentifier": "CC BY-SA 4.0 International",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:Will_robots_outsmart_us.webm",
+        "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Will_robots_outsmart_us.webm&oldid=622571804",
+        "reviewer": "LicenseReviewerBot",
+        "reviewedOn": "2022-01-18",
+        "productBoundary": {
+          "included": ["timestamp link", "original editorial annotation"],
+          "excluded": [
+            "hosting",
+            "embedding",
+            "media distribution",
+            "transcript distribution",
+            "endorsement claim",
+            "inferred permission"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rights-commons-ethics-ai-digital-medicine",
+      "creatorId": "ki-campus",
+      "basis": "explicit-license",
+      "coveredVideoIds": ["video-ethics-ai-digital-medicine"],
+      "coveredSourceUrls": [
+        "https://upload.wikimedia.org/wikipedia/commons/0/08/Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm"
+      ],
+      "coveredCaptionHashes": [],
+      "coveredAnnotationHashes": [
+        "c520b7d6fb4150f8f2f0a4e2dcb7322904c57eef4aa4a7f00787b1e00d851b60",
+        "d97945fad4840be978f8b7e1fa4932349786a7e2021306afdd7a496810b99f83",
+        "818b9cb693329de30b28b89b1f347d0ac10a3fa92a9e89611531992525e94f8a",
+        "cfe835da751723de90ba9c8c82ef19da771482c379d88da42adc5458dd06116c"
+      ],
+      "allowedUses": {
+        "commercialUse": true,
+        "excerpts": true,
+        "timestampLinks": true
+      },
+      "maxExcerptCharacters": 280,
+      "licenseNote": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0); timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
+      "permissionVerifiedAt": "2024-07-17T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm",
+      "reviewEvidence": {
+        "classification": "reviewed-public-source",
+        "evidenceId": "commons-ethics-ai-digital-medicine-v1",
+        "licenseIdentifier": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:Ethics_of_AI_in_Digital_Medicine_%E2%80%93_Explanation_why_transparent_explainable_AI_is_important.webm",
+        "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Ethics_of_AI_in_Digital_Medicine_–_Explanation_why_transparent_explainable_AI_is_important.webm&oldid=1145693057",
+        "reviewer": "Speravir",
+        "reviewedOn": "2024-07-17",
+        "productBoundary": {
+          "included": ["timestamp link", "original editorial annotation"],
+          "excluded": [
+            "hosting",
+            "embedding",
+            "media distribution",
+            "transcript distribution",
+            "endorsement claim",
+            "inferred permission"
+          ]
+        }
+      }
     }
   ],
   "cues": [
@@ -197,6 +312,69 @@
       "text": "At 75 seconds, a World Economic Forum panel sits around the moderator in a blue-lit room.",
       "evidenceKind": "editorial-annotation",
       "contentSha256": "afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531"
+    },
+    {
+      "id": "annotation-robots-outsmart-question-20",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 20,
+      "endSeconds": 21,
+      "text": "At 20 seconds, the presenter stands between a blue display reading “Will robots outsmart us?” and an image of two animated robots.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "029af0ff0403cc90bb40ef5a9077526c0b76e89c25baaa54a35017464469a004"
+    },
+    {
+      "id": "annotation-robot-visual-learning-300",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 300,
+      "endSeconds": 301,
+      "text": "At 300 seconds, the presenter stands beside an illustration of a brain mapping colored points before a projected spider image.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "dc054ffd1c0b8af1e69805a25502433b2f80faabd802d8e5b894d7ac3841a549"
+    },
+    {
+      "id": "annotation-robot-reward-example-435",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 435,
+      "endSeconds": 436,
+      "text": "At 435 seconds, the presenter stands beside a humanoid robot while a screen pairs a dog with a piece of meat as a robot-learning example.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "f218b80bf7de026ffa6ab1897ce63d6c528372c00f56292bc30a96c3c002955d"
+    },
+    {
+      "id": "annotation-medical-ai-hospital-setting-5",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 5,
+      "endSeconds": 6,
+      "text": "At 5 seconds, an AI Campus animation places the Charité hospital above a city block.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "c520b7d6fb4150f8f2f0a4e2dcb7322904c57eef4aa4a7f00787b1e00d851b60"
+    },
+    {
+      "id": "annotation-medical-ai-symptom-inputs-25",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 25,
+      "endSeconds": 26,
+      "text": "At 25 seconds, a hand completes a health-symptom checklist illustrated with faces, a thermometer, and heart icons.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "d97945fad4840be978f8b7e1fa4932349786a7e2021306afdd7a496810b99f83"
+    },
+    {
+      "id": "annotation-medical-ai-decision-paths-50",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 50,
+      "endSeconds": 51,
+      "text": "At 50 seconds, illustrated health signs flow into a central decision system and branch toward patient-specific result paths.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "818b9cb693329de30b28b89b1f347d0ac10a3fa92a9e89611531992525e94f8a"
+    },
+    {
+      "id": "annotation-medical-ai-clinician-patient-80",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 80,
+      "endSeconds": 81,
+      "text": "At 80 seconds, a patient sits up in a hospital bed while two clinicians compare tablets at the bedside.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "cfe835da751723de90ba9c8c82ef19da771482c379d88da42adc5458dd06116c"
     }
   ],
   "moments": [
@@ -233,6 +411,105 @@
       "topicSlugs": ["ai-industry-society", "multi-stakeholder-panel"],
       "state": "active",
       "rightsGrantId": "rights-commons-davos-ai-panel"
+    },
+    {
+      "id": "moment-robots-outsmart-question",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 20,
+      "endSeconds": 21,
+      "excerpt": "At 20 seconds, the presenter stands between a blue display reading “Will robots outsmart us?” and an image of two animated robots.",
+      "topicSlugs": [
+        "robots-outsmart-humans",
+        "human-oversight",
+        "robot-intelligence"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-will-robots-outsmart-us"
+    },
+    {
+      "id": "moment-robot-visual-learning",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 300,
+      "endSeconds": 301,
+      "excerpt": "At 300 seconds, the presenter stands beside an illustration of a brain mapping colored points before a projected spider image.",
+      "topicSlugs": [
+        "robot-visual-learning",
+        "artificial-intelligence-perception",
+        "pattern-recognition"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-will-robots-outsmart-us"
+    },
+    {
+      "id": "moment-robot-reward-example",
+      "videoId": "video-will-robots-outsmart-us",
+      "startSeconds": 435,
+      "endSeconds": 436,
+      "excerpt": "At 435 seconds, the presenter stands beside a humanoid robot while a screen pairs a dog with a piece of meat as a robot-learning example.",
+      "topicSlugs": [
+        "robot-reward-learning",
+        "robot-training",
+        "artificial-intelligence"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-will-robots-outsmart-us"
+    },
+    {
+      "id": "moment-medical-ai-hospital-setting",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 5,
+      "endSeconds": 6,
+      "excerpt": "At 5 seconds, an AI Campus animation places the Charité hospital above a city block.",
+      "topicSlugs": [
+        "medical-ai",
+        "hospital-ai",
+        "healthcare-ai",
+        "medical-artificial-intelligence"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
+    },
+    {
+      "id": "moment-medical-ai-symptom-inputs",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 25,
+      "endSeconds": 26,
+      "excerpt": "At 25 seconds, a hand completes a health-symptom checklist illustrated with faces, a thermometer, and heart icons.",
+      "topicSlugs": [
+        "clinical-symptom-inputs",
+        "medical-ai-data",
+        "patient-assessment"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
+    },
+    {
+      "id": "moment-medical-ai-decision-paths",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 50,
+      "endSeconds": 51,
+      "excerpt": "At 50 seconds, illustrated health signs flow into a central decision system and branch toward patient-specific result paths.",
+      "topicSlugs": [
+        "medical-ai-decision-paths",
+        "patient-specific-results",
+        "explainable-ai"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
+    },
+    {
+      "id": "moment-medical-ai-clinician-patient",
+      "videoId": "video-ethics-ai-digital-medicine",
+      "startSeconds": 80,
+      "endSeconds": 81,
+      "excerpt": "At 80 seconds, a patient sits up in a hospital bed while two clinicians compare tablets at the bedside.",
+      "topicSlugs": [
+        "clinician-patient-communication",
+        "doctor-patient-relationship",
+        "human-oversight"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-ethics-ai-digital-medicine"
     }
   ]
 }

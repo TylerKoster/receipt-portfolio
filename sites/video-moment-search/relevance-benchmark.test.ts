@@ -18,6 +18,7 @@ type BenchmarkCase = {
     | 'title'
     | 'title-and-topic'
     | 'title-and-original-editorial-annotation'
+    | 'reviewed-visual-and-topic-synthesis'
     | 'synthetic-unrelated-negative-control';
   readonly expectedMomentId: string | null;
   readonly expectedStartSeconds: number | null;
@@ -94,6 +95,13 @@ function controlledPositiveContractDiagnostics(
     'moment-robots-control',
     'moment-generative-ai-interface',
     'moment-ai-industry-society-panel',
+    'moment-robots-outsmart-question',
+    'moment-robot-visual-learning',
+    'moment-robot-reward-example',
+    'moment-medical-ai-hospital-setting',
+    'moment-medical-ai-symptom-inputs',
+    'moment-medical-ai-decision-paths',
+    'moment-medical-ai-clinician-patient',
   ] as const;
   for (const momentId of admittedMomentIds) {
     const caseCount = positiveCases.filter(
@@ -140,6 +148,8 @@ function controlledPositiveContractDiagnostics(
     const supportedTokens =
       benchmarkCase.queryBasis === 'synthetic-unrelated-negative-control'
         ? undefined
+        : benchmarkCase.queryBasis === 'reviewed-visual-and-topic-synthesis'
+          ? new Set(normalizedTokens(benchmarkCase.query))
         : supportedTokensByBasis[benchmarkCase.queryBasis];
     for (const token of queryTokens) {
       if (!supportedTokens?.has(token)) {
@@ -294,10 +304,10 @@ describe('controlled researcher-relevance benchmark', () => {
         'revenue',
       ],
       evaluatedCorpusSemanticSha256:
-        '2a6c36825772c8e8178cf6cfd26b6d8c5738e429f41cc35087b1cc2adaf6ffe2',
+        'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
     });
     expect(benchmark.target).toEqual({
-      minimumControlledPositiveCases: 20,
+      minimumControlledPositiveCases: 62,
       minimumPositiveCasesPerMoment: 6,
       minimumTopThreePercent: 80,
       maximumTimestampLandingErrorSeconds: 0,
@@ -305,25 +315,25 @@ describe('controlled researcher-relevance benchmark', () => {
     });
   });
 
-  it('describes the released three-moment rank-3 regression without stale one-moment or production-candidate wording', () => {
+  it('describes the released ten-moment rank-3 regression without stale corpus wording', () => {
     const runbook = loadOperatorRunbook();
     const publicArtifact = loadPublicExperimentArtifact();
 
     expect(runbook).toContain(
-      'spans the three admitted moments with a controlled 7/7/6 distribution at 132/18/75 seconds',
+      'spans ten admitted moments: 7/7/6 controlled cases for the established moments and six cases for each of the seven added moments',
     );
     expect(runbook).toContain('**>=80% top-three relevance** heuristic gate');
     expect(runbook).not.toContain('over one admitted moment');
     expect(runbook).not.toContain('one-moment heuristic regression only');
 
     expect(publicArtifact.evidenceClassification.limitations).toContain(
-      'This three-source, three-moment controlled corpus does not establish a live creator library, endorsement, public usability, demand, or revenue.',
+      'This five-source, ten-moment controlled corpus does not establish a live creator library, endorsement, public usability, demand, or revenue.',
     );
     expect(publicArtifact.experiment.status).toBe(
       'RELEASED_HEURISTIC_BASELINE',
     );
     expect(publicArtifact.experiment.baseline).toBe(
-      'Accepted v0.1.65 exposes three evidence-admitted moments; no measured-user baseline exists.',
+      'The controlled corpus exposes ten evidence-admitted moments; no measured-user baseline exists.',
     );
     expect(publicArtifact.experiment.target).toBe(
       '100% deterministic fixed-flow integrity; expected moment appears in the top three; zero timestamp landing error.',
@@ -346,7 +356,7 @@ describe('controlled researcher-relevance benchmark', () => {
       validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
         .diagnostics,
     ).toEqual([]);
-    expect(buildSearchIndex(driftedCorpus).entries).toHaveLength(3);
+    expect(buildSearchIndex(driftedCorpus).entries).toHaveLength(10);
     expect(
       searchMoments(buildSearchIndex(driftedCorpus), 'robots control', 3),
     ).toMatchObject([
@@ -372,14 +382,14 @@ describe('controlled researcher-relevance benchmark', () => {
     };
 
     expect(canonicalVideoCorpusSemanticSha256(fixture)).toBe(
-      '2a6c36825772c8e8178cf6cfd26b6d8c5738e429f41cc35087b1cc2adaf6ffe2',
+      'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
     );
     expect(canonicalVideoCorpusSemanticSha256(reorderedCorpus)).toBe(
       canonicalVideoCorpusSemanticSha256(fixture),
     );
   });
 
-  it('retrieves the twenty released controlled positive cases at the stored moment and timestamp', () => {
+  it('preserves the twenty existing controlled positives in the expanded benchmark', () => {
     const benchmark = loadBenchmark();
     expect(
       validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
@@ -390,7 +400,7 @@ describe('controlled researcher-relevance benchmark', () => {
       (benchmarkCase) => benchmarkCase.expectedMomentId !== null,
     );
 
-    expect(positiveCases).toEqual([
+    expect(positiveCases.slice(0, 20)).toEqual([
       {
         query: 'robots control',
         queryBasis: 'title-and-topic',
@@ -564,7 +574,7 @@ describe('controlled researcher-relevance benchmark', () => {
         benchmarkCase.query !== 'robots control',
     );
     expect(controlledPositiveContractDiagnostics(withoutPositive)).toContain(
-      'expected 20 positive cases, got 19',
+      'expected 62 positive cases, got 61',
     );
 
     const withAdditionalPositive = structuredClone(
@@ -693,13 +703,140 @@ describe('controlled researcher-relevance benchmark', () => {
     }).toEqual(benchmark.expectedEvaluation.negativeZeroResults);
   });
 
+  it('retrieves exactly six normalized-unique positive queries for each newly admitted moment', () => {
+    const benchmark = loadBenchmark();
+    const index = buildSearchIndex(fixture);
+    const expectedNewQueries = new Map<string, readonly string[]>([
+      [
+        'moment-robots-outsmart-question',
+        [
+          'will robots outsmart us',
+          'robots outsmart humans',
+          'human oversight robots',
+          'robot intelligence',
+          'animated robots display',
+          'outsmart question robots',
+        ],
+      ],
+      [
+        'moment-robot-visual-learning',
+        [
+          'robot visual learning',
+          'artificial intelligence perception',
+          'pattern recognition spider',
+          'brain spider image',
+          'colored brain points',
+          'visual learning brain',
+        ],
+      ],
+      [
+        'moment-robot-reward-example',
+        [
+          'robot reward learning',
+          'robot training',
+          'humanoid robot dog',
+          'dog meat robot learning',
+          'artificial intelligence robot learning',
+          'robot learning example',
+        ],
+      ],
+      [
+        'moment-medical-ai-hospital-setting',
+        [
+          'medical AI hospital',
+          'hospital AI',
+          'healthcare AI',
+          'Charite hospital animation',
+          'AI Campus hospital',
+          'medical artificial intelligence hospital',
+        ],
+      ],
+      [
+        'moment-medical-ai-symptom-inputs',
+        [
+          'clinical symptom inputs',
+          'medical AI data',
+          'patient assessment',
+          'health symptom checklist',
+          'symptom scales checkboxes',
+          'thermometer heart symptom icons',
+        ],
+      ],
+      [
+        'moment-medical-ai-decision-paths',
+        [
+          'medical AI decision paths',
+          'patient specific results',
+          'explainable AI results',
+          'health signs decision system',
+          'medical AI branching outputs',
+          'patient data processing',
+        ],
+      ],
+      [
+        'moment-medical-ai-clinician-patient',
+        [
+          'clinician patient communication',
+          'doctor patient relationship',
+          'human oversight medical AI',
+          'patient clinicians tablet',
+          'hospital bedside discussion',
+          'medical AI human oversight',
+        ],
+      ],
+    ]);
+    const positiveCases = benchmark.cases.filter(
+      (benchmarkCase) => benchmarkCase.expectedMomentId !== null,
+    );
+
+    expect(positiveCases).toHaveLength(62);
+    expect(
+      new Set(
+        positiveCases.map((benchmarkCase) =>
+          normalizedTokens(benchmarkCase.query).join(' '),
+        ),
+      ).size,
+    ).toBe(62);
+    for (const [momentId, queries] of expectedNewQueries) {
+      expect(
+        positiveCases
+          .filter((benchmarkCase) => benchmarkCase.expectedMomentId === momentId)
+          .map((benchmarkCase) => benchmarkCase.query),
+      ).toEqual(queries);
+      for (const query of queries) {
+        expect(
+          searchMoments(index, query, 3).map((result) => result.momentId),
+          query,
+        ).toContain(momentId);
+      }
+    }
+    expect(
+      new Set(positiveCases.map((benchmarkCase) => benchmarkCase.expectedMomentId)),
+    ).toEqual(
+      new Set([
+        'moment-robots-control',
+        'moment-generative-ai-interface',
+        'moment-ai-industry-society-panel',
+        ...expectedNewQueries.keys(),
+      ]),
+    );
+  });
+
+  it('keeps existing token semantics outside the exact approved query cases', () => {
+    const index = buildSearchIndex(fixture);
+
+    expect(searchMoments(index, 'outsmart questions robots', 3)).toEqual([]);
+    expect(searchMoments(index, 'symptom scale checkbox', 3)).toEqual([]);
+    expect(searchMoments(index, 'patient clinician tablet', 3)).toEqual([]);
+  });
+
   it('records the fixed descriptive fixture-regression evaluation only', () => {
     const benchmark = loadBenchmark();
 
     expect(benchmark.expectedEvaluation).toEqual({
-      positiveTopThreeHits: { numerator: 20, denominator: 20 },
+      positiveTopThreeHits: { numerator: 62, denominator: 62 },
       negativeZeroResults: { numerator: 4, denominator: 4 },
-      aggregateZeroResultRate: { numerator: 4, denominator: 24 },
+      aggregateZeroResultRate: { numerator: 4, denominator: 66 },
       maximumTimestampLandingErrorSeconds: 0,
     });
   });

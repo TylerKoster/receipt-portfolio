@@ -24,7 +24,7 @@ const fixture = JSON.parse(
 const evidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
       import.meta.url,
     ),
     'utf8',
@@ -315,7 +315,7 @@ describe('privacy-preserving measurement contract', () => {
       buildSearchIndex(fixture),
       'https://receipt-portfolio.example/',
       evidenceManifest,
-      new Date('2026-08-31T12:00:00.000Z'),
+      new Date('2026-09-01T12:00:00.000Z'),
     );
 
     expect(html).toContain('data-measurement-event="search"');
@@ -395,6 +395,15 @@ describe('privacy-preserving measurement contract', () => {
     );
     expect(runbook).toContain(
       'This fixed synthetic recovery gate is not user research or evidence of any user outcome.',
+    );
+  });
+
+  it('binds the controlled creator preview gate to all ten admitted moments', () => {
+    expect(ledger.controlledCreatorReviewGate.target.admittedReviewedMoments).toBe(
+      10,
+    );
+    expect(runbook).toContain(
+      'Target: **10 admitted reviewed moments; exact timestamp landing error 0;',
     );
   });
 

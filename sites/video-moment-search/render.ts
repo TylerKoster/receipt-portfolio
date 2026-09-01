@@ -17,6 +17,7 @@ import {
 import {
   parseVideoSourceEvidenceManifest,
   validateCommonsSourceEvidence,
+  type VideoSourceEvidenceRecord,
 } from './source-evidence.js';
 
 function routePath(baseUrl: string, suffix = ''): string {
@@ -173,9 +174,9 @@ export function serializePublicSearchIndex(
     }
   }
   assertSearchIndexMatchesCorpus(corpus, searchIndex);
-  const evidenceRecords =
+  const evidenceRecords: ReadonlyMap<string, VideoSourceEvidenceRecord> =
     sourceEvidence === undefined
-      ? new Map()
+      ? new Map<string, VideoSourceEvidenceRecord>()
       : new Map(
           parseVideoSourceEvidenceManifest(sourceEvidence).records.map(
             (record) => [record.evidenceId, record],
@@ -207,13 +208,18 @@ export function serializePublicSearchIndex(
       historicalReview === undefined
         ? undefined
         : evidenceRecords.get(historicalReview.evidenceId);
+    const momentEvidence = evidenceRecord?.moments.find(
+      (candidate) => candidate.momentId === entry.moment.id,
+    );
     const reviewEvidence =
-      historicalReview === undefined || evidenceRecord === undefined
+      historicalReview === undefined ||
+      evidenceRecord === undefined ||
+      momentEvidence === undefined
         ? undefined
         : {
             ...historicalReview,
             roles: evidenceRecord.roles,
-            annotationSha256: evidenceRecord.annotation.sha256,
+            annotationSha256: momentEvidence.annotation.sha256,
             observedStatus: evidenceRecord.observedStatus,
           };
     const cueIds = (cuesByVideo.get(entry.video.id) ?? [])
@@ -673,7 +679,7 @@ export function renderSearchShell(
     <p class="eyebrow">Current page only</p>
     <h2 id="creator-preview-heading">Controlled creator review preview</h2>
     <p>This preview uses only the admitted reviewed fixture in the current page. It does not submit a library, change published records, or prove creator onboarding. It sends and stores no review or referral data.</p>
-    <button type="button" data-creator-preview-start disabled>Inspect the three admitted reviewed moments</button>
+    <button type="button" data-creator-preview-start disabled>Inspect the ten admitted reviewed moments</button>
     <p class="search-status" role="status" aria-live="polite" tabindex="-1" data-creator-preview-status>Creator review preview is unavailable until the validated search index loads.</p>
     <div class="moment-list" data-creator-preview-results hidden inert></div>
     <p data-creator-preview-summary>No local preview decisions.</p>

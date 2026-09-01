@@ -39,7 +39,7 @@ const namedRole = z.object({ id: identifier, name: nonBlank }).strict();
 
 export const VideoSourceEvidenceManifestSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     manifestId: identifier,
     corpusId: identifier,
     records: z.array(
@@ -52,10 +52,32 @@ export const VideoSourceEvidenceManifestSchema = z
               corpusId: identifier,
               videoId: identifier,
               rightsGrantId: identifier,
-              momentId: identifier,
-              cueId: identifier,
             })
             .strict(),
+          moments: z
+            .array(
+              z
+                .object({
+                  momentId: identifier,
+                  cueId: identifier,
+                  timestamp: z
+                    .object({
+                      strategy: z.literal('media-fragment'),
+                      seconds: z.number().int().nonnegative(),
+                      url: httpsUrl,
+                    })
+                    .strict(),
+                  annotation: z
+                    .object({
+                      kind: z.literal('original-editorial'),
+                      text: nonBlank,
+                      sha256,
+                    })
+                    .strict(),
+                })
+                .strict(),
+            )
+            .min(1),
           workTitle: nonBlank,
           roles: z
             .object({
@@ -80,13 +102,6 @@ export const VideoSourceEvidenceManifestSchema = z
               durationSeconds: z.number().positive(),
             })
             .strict(),
-          timestamp: z
-            .object({
-              strategy: z.literal('media-fragment'),
-              seconds: z.number().int().nonnegative(),
-              url: httpsUrl,
-            })
-            .strict(),
           historicalLicenseReview: z
             .object({
               issuer: nonBlank,
@@ -105,13 +120,6 @@ export const VideoSourceEvidenceManifestSchema = z
               sourcePageRevisionId: z.string().regex(/^\d+$/u),
               sourcePageRevisionUrl: httpsUrl,
               sourcePageRevisionAt: canonicalInstant,
-            })
-            .strict(),
-          annotation: z
-            .object({
-              kind: z.literal('original-editorial'),
-              text: nonBlank,
-              sha256,
             })
             .strict(),
           productBoundary: z
@@ -177,6 +185,22 @@ const EXPECTED_REVIEWED_ROLE_CONTRACTS: Readonly<
       id: 'vanished-account-byeznhpyxeuztibuo',
       name: 'Vanished Account Byeznhpyxeuztibuo',
     },
+    evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
+  },
+  'commons-will-robots-outsmart-us-v1': {
+    publisherCreatorAndLicensor: {
+      id: 'university-of-the-netherlands',
+      name: 'University of the Netherlands',
+    },
+    uploader: { id: 'pj-geest', name: 'PJ Geest' },
+    evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
+  },
+  'commons-ethics-ai-digital-medicine-v1': {
+    publisherCreatorAndLicensor: {
+      id: 'ki-campus',
+      name: 'KI-Campus',
+    },
+    uploader: { id: 'prototyperspective', name: 'Prototyperspective' },
     evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
   },
 };
@@ -354,8 +378,6 @@ export function validateCommonsSourceEvidence(
       record.bindings.corpusId,
       record.bindings.videoId,
       record.bindings.rightsGrantId,
-      record.bindings.momentId,
-      record.bindings.cueId,
     ].join('|'),
   );
   const duplicateBindingKeys = new Set(duplicates(bindingKeys));
@@ -364,8 +386,6 @@ export function validateCommonsSourceEvidence(
       record.bindings.corpusId,
       record.bindings.videoId,
       record.bindings.rightsGrantId,
-      record.bindings.momentId,
-      record.bindings.cueId,
     ].join('|');
     if (duplicateBindingKeys.has(bindingKey)) {
       diagnostics.push(
@@ -374,6 +394,43 @@ export function validateCommonsSourceEvidence(
     }
   }
   addSetDiagnostics(expectedEvidenceIds, actualEvidenceIds, diagnostics);
+
+  const reviewedMomentIds = corpus.moments.flatMap((moment) => {
+    const video = corpus.videos.find((candidate) => candidate.id === moment.videoId);
+    const grant = corpus.rights.find(
+      (candidate) => candidate.id === moment.rightsGrantId,
+    );
+    return video?.reviewEvidenceId !== undefined &&
+      grant?.reviewEvidence?.evidenceId === video.reviewEvidenceId &&
+      (moment.state === 'active' || moment.state === 'corrected')
+      ? [moment.id]
+      : [];
+  });
+  const manifestMomentBindings = manifest.records.flatMap((record) =>
+    record.moments.map((moment) => ({ record, moment })),
+  );
+  const manifestMomentIds = manifestMomentBindings.map(
+    ({ moment }) => moment.momentId,
+  );
+  const manifestCueIds = manifestMomentBindings.map(({ moment }) => moment.cueId);
+  for (const momentId of duplicates(manifestMomentIds)) {
+    diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_DUPLICATE:${momentId}`);
+  }
+  for (const cueId of duplicates(manifestCueIds)) {
+    diagnostics.push(`SOURCE_EVIDENCE_CUE_BINDING_DUPLICATE:${cueId}`);
+  }
+  const reviewedMomentSet = new Set(reviewedMomentIds);
+  const manifestMomentSet = new Set(manifestMomentIds);
+  for (const momentId of [...reviewedMomentSet].sort()) {
+    if (!manifestMomentSet.has(momentId)) {
+      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_MISSING:${momentId}`);
+    }
+  }
+  for (const momentId of [...manifestMomentSet].sort()) {
+    if (!reviewedMomentSet.has(momentId)) {
+      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_EXTRA:${momentId}`);
+    }
+  }
 
   for (const record of manifest.records) {
     const id = record.evidenceId;
@@ -441,12 +498,6 @@ export function validateCommonsSourceEvidence(
     const grant = corpus.rights.find(
       (candidate) => candidate.id === record.bindings.rightsGrantId,
     );
-    const moment = corpus.moments.find(
-      (candidate) => candidate.id === record.bindings.momentId,
-    );
-    const cue = corpus.cues.find(
-      (candidate) => candidate.id === record.bindings.cueId,
-    );
     const review = grant?.reviewEvidence;
 
     if (
@@ -465,22 +516,6 @@ export function validateCommonsSourceEvidence(
     ) {
       diagnostics.push(`SOURCE_EVIDENCE_GRANT_BINDING_MISMATCH:${id}`);
     }
-    if (
-      moment === undefined ||
-      moment.videoId !== record.bindings.videoId ||
-      moment.rightsGrantId !== record.bindings.rightsGrantId ||
-      (moment.state !== 'active' && moment.state !== 'corrected')
-    ) {
-      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_MISMATCH:${id}`);
-    }
-    if (
-      cue === undefined ||
-      cue.videoId !== record.bindings.videoId ||
-      cue.evidenceKind !== 'editorial-annotation'
-    ) {
-      diagnostics.push(`SOURCE_EVIDENCE_CUE_BINDING_MISMATCH:${id}`);
-    }
-
     if (video !== undefined) {
       if (video.title !== record.workTitle) {
         diagnostics.push(`SOURCE_EVIDENCE_WORK_TITLE_MISMATCH:${id}`);
@@ -499,7 +534,11 @@ export function validateCommonsSourceEvidence(
       ) {
         diagnostics.push(`SOURCE_EVIDENCE_MEDIA_DURATION_MISMATCH:${id}`);
       }
-      if (video.timestampStrategy !== record.timestamp.strategy) {
+      if (
+        record.moments.some(
+          (moment) => video.timestampStrategy !== moment.timestamp.strategy,
+        )
+      ) {
         diagnostics.push(`SOURCE_EVIDENCE_TIMESTAMP_STRATEGY_MISMATCH:${id}`);
       }
     }
@@ -508,9 +547,10 @@ export function validateCommonsSourceEvidence(
         grant.creatorId !== record.roles.rightsAuthority.id ||
         !sameStrings(grant.coveredVideoIds, [record.bindings.videoId]) ||
         !sameStrings(grant.coveredSourceUrls, [record.delivery.url]) ||
-        !sameStrings(grant.coveredAnnotationHashes ?? [], [
-          record.annotation.sha256,
-        ])
+        !sameStrings(
+          grant.coveredAnnotationHashes ?? [],
+          record.moments.map((moment) => moment.annotation.sha256),
+        )
       ) {
         diagnostics.push(`SOURCE_EVIDENCE_GRANT_RELATIONSHIP_MISMATCH:${id}`);
       }
@@ -551,30 +591,70 @@ export function validateCommonsSourceEvidence(
         diagnostics.push(`SOURCE_EVIDENCE_PRODUCT_BOUNDARY_MISMATCH:${id}`);
       }
     }
-    if (
-      moment === undefined ||
-      moment.startSeconds !== record.timestamp.seconds ||
-      moment.excerpt !== record.annotation.text
-    ) {
-      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_CONTENT_MISMATCH:${id}`);
-    }
-    if (
-      cue === undefined ||
-      cue.startSeconds !== record.timestamp.seconds ||
-      cue.endSeconds !== moment?.endSeconds ||
-      cue.text !== record.annotation.text ||
-      cue.contentSha256 !== record.annotation.sha256
-    ) {
-      diagnostics.push(`SOURCE_EVIDENCE_CUE_CONTENT_MISMATCH:${id}`);
-    }
-    if (sha256Utf8(record.annotation.text) !== record.annotation.sha256) {
-      diagnostics.push(`SOURCE_EVIDENCE_ANNOTATION_HASH_MISMATCH:${id}`);
-    }
-    if (
-      timestampUrl(record.delivery.url, record.timestamp.seconds) !==
-      record.timestamp.url
-    ) {
-      diagnostics.push(`SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:${id}`);
+    for (const momentBinding of record.moments) {
+      const moment = corpus.moments.find(
+        (candidate) => candidate.id === momentBinding.momentId,
+      );
+      const cue = corpus.cues.find(
+        (candidate) => candidate.id === momentBinding.cueId,
+      );
+      const diagnosticScope =
+        record.moments.length === 1 ? id : `${id}:${momentBinding.momentId}`;
+      if (
+        moment === undefined ||
+        moment.videoId !== record.bindings.videoId ||
+        moment.rightsGrantId !== record.bindings.rightsGrantId ||
+        (moment.state !== 'active' && moment.state !== 'corrected')
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_MOMENT_BINDING_MISMATCH:${diagnosticScope}`,
+        );
+      }
+      if (
+        cue === undefined ||
+        cue.videoId !== record.bindings.videoId ||
+        cue.evidenceKind !== 'editorial-annotation'
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_CUE_BINDING_MISMATCH:${diagnosticScope}`,
+        );
+      }
+      if (
+        moment === undefined ||
+        moment.startSeconds !== momentBinding.timestamp.seconds ||
+        moment.excerpt !== momentBinding.annotation.text
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_MOMENT_CONTENT_MISMATCH:${diagnosticScope}`,
+        );
+      }
+      if (
+        cue === undefined ||
+        cue.startSeconds !== momentBinding.timestamp.seconds ||
+        cue.endSeconds !== moment?.endSeconds ||
+        cue.text !== momentBinding.annotation.text ||
+        cue.contentSha256 !== momentBinding.annotation.sha256
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_CUE_CONTENT_MISMATCH:${diagnosticScope}`,
+        );
+      }
+      if (
+        sha256Utf8(momentBinding.annotation.text) !==
+        momentBinding.annotation.sha256
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_ANNOTATION_HASH_MISMATCH:${diagnosticScope}`,
+        );
+      }
+      if (
+        timestampUrl(record.delivery.url, momentBinding.timestamp.seconds) !==
+        momentBinding.timestamp.url
+      ) {
+        diagnostics.push(
+          `SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:${diagnosticScope}`,
+        );
+      }
     }
 
     const normalizedMs = new Date(record.observedStatus.normalizedAt).getTime();
@@ -609,7 +689,7 @@ export function validateCommonsSourceEvidence(
     const expectedRevision = new URL('/w/index.php', canonicalUrl);
     expectedRevision.searchParams.set(
       'title',
-      canonicalUrl.pathname.replace('/wiki/', ''),
+      decodeURIComponent(canonicalUrl.pathname.replace('/wiki/', '')),
     );
     expectedRevision.searchParams.set(
       'oldid',

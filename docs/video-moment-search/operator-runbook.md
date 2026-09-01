@@ -12,7 +12,7 @@ The released preview is a heuristic regression gate only. It does not establish 
 
 1. **Creator authorization (rank 1).** Verify source identity and authority attestation, covered URLs and content, rights, commercial/excerpt/expiry/revocation terms, and caption provenance. Quarantine any ambiguity. A creator preview must allow inspection, correction, and removal. Publication follows only passing evidence; attributable campaign evidence follows only approved measurement. The continuation gate is **3 authorized creators and 100 covered videos**.
 2. **Corpus growth (rank 2).** Admit only rights-validated moments with exact timestamp routing, correction/removal review, and source evidence. The continuation gate is **500 verified moments**.
-3. **Researcher relevance (rank 3).** The controlled benchmark at `researcher-relevance-benchmark.json` spans the three admitted moments with a controlled 7/7/6 distribution at 132/18/75 seconds: its 20 positive and four unrelated negative cases use synthetic benchmark strings rather than raw user queries, and check top-three retrieval, exact timestamp routing, and unrelated zero-result controls. Apply the **>=80% top-three relevance** heuristic gate and record the controlled 7/7/6 fixture-regression timestamp error and zero-result values only. It does not establish general relevance, usability, users, demand, task completion, time-to-value, creator/referral outcomes, conversion, or revenue.
+3. **Researcher relevance (rank 3).** The controlled benchmark at `researcher-relevance-benchmark.json` spans ten admitted moments: 7/7/6 controlled cases for the established moments and six cases for each of the seven added moments. Its 62 positive and four unrelated negative cases use synthetic benchmark strings rather than raw user queries, and check top-three retrieval, exact integer-second timestamp routing, and unrelated zero-result controls. Apply the **>=80% top-three relevance** heuristic gate and record the controlled fixture-regression timestamp error and zero-result values only. It does not establish general relevance, usability, users, demand, task completion, time-to-value, creator/referral outcomes, conversion, or revenue.
 4. **Exact-moment routing (rank 4).** After measurement is explicitly approved, evaluate **>=30% exact-moment click rate among successful searches**. A click is not task completion. Stop on an observed timestamp landing error or a rate below the gate.
 5. **Non-branded discovery (rank 5).** Only after approval, use the provisional bounded observation target of **100 non-branded impressions in 90 days**. This is not a demand claim.
 6. **Offer interest (rank 6).** Only after approval, use the provisional bounded observation target of **10 offer clicks in 90 days**. This is not revenue or demand proof.
@@ -40,15 +40,19 @@ This deterministic synthetic gate verifies only that dynamic search cards name t
 
 ## Controlled creator review preview gate
 
-This page-memory-only preview is a deterministic synthetic integrity gate for the three admitted reviewed fixture moments. It allows inspection of stored source, creator, interval, exact source timestamp, evidence, license, immutable rights revision, historical review/freshness wording, product boundary, and correction state. It does not submit a library, change a published record, prove creator onboarding, send or store review/referral data, or establish any user outcome.
+This page-memory-only preview is a deterministic synthetic integrity gate for the ten admitted reviewed fixture moments. It allows inspection of stored source, creator, interval, exact source timestamp, evidence, license, immutable rights revision, historical review/freshness wording, product boundary, and correction state. It does not submit a library, change a published record, prove creator onboarding, send or store review/referral data, or establish any user outcome.
 
 - Metric: **deterministic controlled creator review-flow integrity**.
 - Baseline: the creator persona was not yet preview-testable.
-- Target: **3 admitted reviewed moments; exact timestamp landing error 0; correction decisions previewed 1; removal decisions previewed 1; extra requests 0; retained or transmitted measurement records 0**.
+- Target: **10 admitted reviewed moments; exact timestamp landing error 0; correction decisions previewed 1; removal decisions previewed 1; extra requests 0; retained or transmitted measurement records 0**.
 - Stop: missing or ambiguous rights evidence, index mutation, wrong timestamp, persistence or transmission, extra network destination, broken search or fallback, or prohibited outcome claims.
 - Referral evidence: unavailable — measurement is not configured.
 
 The bounded creator onboarding sequence remains: authorized intake and authority attestation (not implemented), quarantine and operator review, creator inspection, correction/removal approval, publication only after passing evidence, and attributable referral reporting only after an explicitly approved endpoint. Real rights-cleared library submission, publication correction/removal, attributable referral evidence, measured task completion/time-to-value, usability, demand, conversion, and revenue remain blocked or unsupported.
+
+## Corpus expansion verification record
+
+The bounded expansion adds exactly 2 reviewed videos, 7 reviewed one-second moments, 42 controlled positive queries, and 9 indexable HTML routes, producing 19 Video Moment Search HTML routes in total. The same offline review cycle covers all 5 rights records and checks all 10 annotation/timestamp bindings. It adds no creator page: the two sources use existing creator identities. The 500-verified-moment continuation gate remains incomplete, and these deterministic fixture checks provide no real-user, usability, demand, creator-participation, conversion, or revenue evidence.
 
 ## Persona boundaries
 

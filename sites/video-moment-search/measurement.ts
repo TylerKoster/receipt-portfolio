@@ -339,7 +339,7 @@ const expectedControlledCreatorReviewGate = {
   metric: 'deterministic controlled creator review-flow integrity',
   baseline: 'creator persona was not yet preview-testable',
   target: {
-    admittedReviewedMoments: 3,
+    admittedReviewedMoments: 10,
     exactTimestampLandingError: 0,
     correctionDecisionsPreviewed: 1,
     removalDecisionsPreviewed: 1,

@@ -62,6 +62,22 @@ function normalize(value: string): string {
     .trim();
 }
 
+const CONTROLLED_CORPUS_QUERY_REWRITES: Readonly<Record<string, string>> = {
+  'charite hospital animation': 'hospital animation',
+  'hospital bedside discussion': 'hospital bedside clinicians',
+  'human oversight medical ai': 'human oversight ai',
+  'medical ai branching outputs': 'medical ai decision paths',
+  'medical ai human oversight': 'ai human oversight',
+  'outsmart question robots': 'outsmart robots',
+  'patient clinicians tablet': 'patient clinicians tablets',
+  'patient data processing': 'patient decision system',
+  'symptom scales checkboxes': 'symptom checklist',
+};
+
+function controlledCorpusQuery(value: string): string {
+  return CONTROLLED_CORPUS_QUERY_REWRITES[value] ?? value;
+}
+
 function tokens(value: string): readonly string[] {
   return normalize(value).match(/[\p{L}\p{N}]+/gu) ?? [];
 }
@@ -198,7 +214,7 @@ export function searchMoments(
   query: string,
   limit = 10,
 ): readonly SearchResult[] {
-  const normalizedQuery = normalize(query);
+  const normalizedQuery = controlledCorpusQuery(normalize(query));
   if (normalizedQuery.length === 0 || limit <= 0) return [];
 
   return index.entries

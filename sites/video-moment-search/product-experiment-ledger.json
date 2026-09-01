@@ -5,13 +5,13 @@
     "kind": "SIMULATED_HEURISTIC_REGRESSION_EVIDENCE",
     "limitations": [
       "Simulated-user results are heuristic regressions, not usability or demand evidence.",
-      "This three-source, three-moment controlled corpus does not establish a live creator library, endorsement, public usability, demand, or revenue."
+      "This five-source, ten-moment controlled corpus does not establish a live creator library, endorsement, public usability, demand, or revenue."
     ]
   },
   "experiment": {
     "id": "deterministic-moment-recovery-v1",
     "status": "RELEASED_HEURISTIC_BASELINE",
-    "baseline": "Accepted v0.1.65 exposes three evidence-admitted moments; no measured-user baseline exists.",
+    "baseline": "The controlled corpus exposes ten evidence-admitted moments; no measured-user baseline exists.",
     "target": "100% deterministic fixed-flow integrity; expected moment appears in the top three; zero timestamp landing error.",
     "stopRule": "Stop if any result lacks validated rights or exact source-time routing.",
     "fixedFlow": {

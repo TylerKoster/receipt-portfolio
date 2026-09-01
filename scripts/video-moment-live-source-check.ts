@@ -24,7 +24,7 @@ async function evidenceSourceUrl(): Promise<string> {
         projectRoot(),
         'fixtures',
         'video-moment-search',
-        'video-source-evidence-manifest-v2.json',
+        'video-source-evidence-manifest-v3.json',
       ),
       'utf8',
     ),

@@ -80,7 +80,7 @@ afterEach(async () => {
 
 describe('atomic AI Moment Index build', () => {
   it('rejects uploader and publisher conflation before staging and preserves prior output', async () => {
-    const validationNow = new Date('2026-08-31T12:00:00.000Z');
+    const validationNow = new Date('2026-09-01T12:00:00.000Z');
     await buildSites({
       evidenceDirectory,
       outputDirectory,
@@ -91,7 +91,7 @@ describe('atomic AI Moment Index build', () => {
     const manifest = JSON.parse(
       await readFile(
         new URL(
-          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
           import.meta.url,
         ),
         'utf8',
@@ -134,7 +134,7 @@ describe('atomic AI Moment Index build', () => {
     const [corpus, manifest] = await Promise.all(
       [
         '../../fixtures/video-moment-search/authorized-ai-video-v1.json',
-        '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+        '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
       ].map(async (path) =>
         JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8')),
       ),
@@ -175,7 +175,7 @@ describe('atomic AI Moment Index build', () => {
         includeVideoMomentSearch: true,
         videoMomentCorpusPath: corpusPath,
         videoMomentEvidenceManifestPath: manifestPath,
-        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+        videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
       }),
     ).rejects.toThrow(
       'SOURCE_EVIDENCE_CORPUS_PRODUCT_BOUNDARY_POLICY_MISMATCH:commons-how-can-we-keep-robots-under-control-v1, SOURCE_EVIDENCE_MANIFEST_PRODUCT_BOUNDARY_POLICY_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
@@ -194,7 +194,7 @@ describe('atomic AI Moment Index build', () => {
     const manifest = JSON.parse(
       await readFile(
         new URL(
-          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
           import.meta.url,
         ),
         'utf8',
@@ -202,17 +202,17 @@ describe('atomic AI Moment Index build', () => {
     ) as {
       records: Array<{
         evidenceId: string;
-        timestamp: { url: string };
+        moments: Array<{ timestamp: { url: string } }>;
       }>;
     };
-    expect(manifest.records).toHaveLength(3);
+    expect(manifest.records).toHaveLength(5);
     const wefRecord = manifest.records.find(
       ({ evidenceId }) =>
         evidenceId === 'commons-davos-2016-state-of-artificial-intelligence-v1',
     );
     expect(wefRecord).toBeDefined();
     if (wefRecord === undefined) return;
-    wefRecord.timestamp.url =
+    wefRecord.moments[0]!.timestamp.url =
       'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=76';
     const manifestPath = join(dirname(outputDirectory), 'invalid-wef.json');
     await writeFile(manifestPath, JSON.stringify(manifest));
@@ -223,7 +223,7 @@ describe('atomic AI Moment Index build', () => {
         outputDirectory,
         includeVideoMomentSearch: true,
         videoMomentEvidenceManifestPath: manifestPath,
-        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+        videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
       }),
     ).rejects.toThrow(
       'SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:commons-davos-2016-state-of-artificial-intelligence-v1',
@@ -243,7 +243,7 @@ describe('atomic AI Moment Index build', () => {
     await writeFile(
       manifestPath,
       JSON.stringify({
-        schemaVersion: 2,
+        schemaVersion: 3,
         manifestId: 'invalid-empty-manifest',
         corpusId: 'wikimedia-commons-ai-video-reviewed-v1',
         records: [],
@@ -256,7 +256,7 @@ describe('atomic AI Moment Index build', () => {
         outputDirectory,
         includeVideoMomentSearch: true,
         videoMomentEvidenceManifestPath: manifestPath,
-        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+        videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
       }),
     ).rejects.toThrow(
       /SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH.*SOURCE_EVIDENCE_RECORD_MISSING/iu,
@@ -305,7 +305,7 @@ describe('atomic AI Moment Index build', () => {
       evidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
-      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+      videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
     });
 
     const routeDirectory = join(outputDirectory, 'video-moment-search');
@@ -347,7 +347,7 @@ describe('atomic AI Moment Index build', () => {
     const results = searchPublicIndex(
       JSON.parse(indexJson),
       'robots control',
-      new Date('2026-08-31T12:00:00.000Z'),
+      new Date('2026-09-01T12:00:00.000Z'),
     );
     expect(results[0]).toMatchObject({
       momentId: 'moment-robots-control',
@@ -388,7 +388,7 @@ describe('atomic AI Moment Index build', () => {
       evidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
-      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+      videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
       publicBaseUrl: 'https://tylerkoster.github.io/receipt-portfolio/',
     });
 
@@ -477,5 +477,36 @@ describe('atomic AI Moment Index build', () => {
         code: 'ENOENT',
       },
     );
+  });
+
+  it('emits nineteen indexable AI Moment Index HTML routes with exactly nine corpus additions', async () => {
+    await buildSites({
+      evidenceDirectory,
+      outputDirectory,
+      includeVideoMomentSearch: true,
+      videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
+    });
+
+    const inventory = Object.keys(
+      await fileInventory(join(outputDirectory, 'video-moment-search')),
+    );
+    const htmlRoutes = inventory.filter((path) => path.endsWith('.html'));
+    expect(htmlRoutes).toHaveLength(19);
+    expect(htmlRoutes).toEqual(
+      expect.arrayContaining([
+        'videos/will-robots-outsmart-us/index.html',
+        'videos/ethics-ai-digital-medicine/index.html',
+        'moments/moment-robots-outsmart-question/index.html',
+        'moments/moment-robot-visual-learning/index.html',
+        'moments/moment-robot-reward-example/index.html',
+        'moments/moment-medical-ai-hospital-setting/index.html',
+        'moments/moment-medical-ai-symptom-inputs/index.html',
+        'moments/moment-medical-ai-decision-paths/index.html',
+        'moments/moment-medical-ai-clinician-patient/index.html',
+      ]),
+    );
+    expect(
+      htmlRoutes.filter((path) => path.startsWith('creators/')),
+    ).toHaveLength(3);
   });
 });
