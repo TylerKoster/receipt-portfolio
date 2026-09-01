@@ -2,6 +2,10 @@ import { lstat, readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson, sha256 } from '../packages/evidence-core/src/index.js';
+import {
+  loadProductBlogRegistries,
+  productBlogRoutes,
+} from '../sites/shared/blog.js';
 
 const PUBLIC_SITE_ROOTS = [
   'search-receipt',
@@ -93,9 +97,11 @@ async function requireRealDirectory(
 function allowedSiteFile(
   siteRoot: (typeof PUBLIC_SITE_ROOTS)[number],
   siteRelativePath: string,
+  admittedBlogPaths: ReadonlyMap<string, ReadonlySet<string>>,
 ): boolean {
   return (
     REQUIRED_SITE_FILES[siteRoot].includes(siteRelativePath) ||
+    (admittedBlogPaths.get(siteRoot)?.has(siteRelativePath) ?? false) ||
     (siteRoot === 'video-moment-search'
       ? /^(?:creators|moments|videos)\/[a-z0-9]+(?:-[a-z0-9]+)*\/index\.html$/.test(
           siteRelativePath,
@@ -107,7 +113,10 @@ function allowedSiteFile(
   );
 }
 
-async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
+async function strictPublicFiles(
+  outputDirectory: string,
+  admittedBlogPaths: ReadonlyMap<string, ReadonlySet<string>>,
+): Promise<string[]> {
   await requireRealDirectory(outputDirectory, 'Public output root');
   const roots = (await readdir(outputDirectory, { withFileTypes: true })).sort(
     (left, right) => compareText(left.name, right.name),
@@ -161,7 +170,7 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
       if (entry.isDirectory()) await visit(siteRoot, path);
       else if (
         !entry.isFile() ||
-        !allowedSiteFile(siteRoot, siteRelativePath)
+        !allowedSiteFile(siteRoot, siteRelativePath, admittedBlogPaths)
       ) {
         throw new Error(
           `Unexpected public output file: ${siteRoot}/${siteRelativePath}`,
@@ -183,6 +192,13 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
       if (!siteFiles.includes(fixed)) {
         throw new Error(
           `Incomplete public output: missing ${siteRoot}/${fixed}`,
+        );
+      }
+    }
+    for (const admittedBlogPath of admittedBlogPaths.get(siteRoot) ?? []) {
+      if (!siteFiles.includes(admittedBlogPath)) {
+        throw new Error(
+          `Incomplete public output: missing ${siteRoot}/${admittedBlogPath}`,
         );
       }
     }
@@ -222,9 +238,24 @@ async function strictPublicFiles(outputDirectory: string): Promise<string[]> {
 
 export async function hashPublicBuild(
   outputDirectory: string,
+  options: { readonly blogRegistryRoot?: string } = {},
 ): Promise<PublicBuildManifest> {
   const resolvedOutput = resolve(outputDirectory);
-  const files = await strictPublicFiles(resolvedOutput);
+  const blogValidation = await loadProductBlogRegistries(
+    options.blogRegistryRoot ?? projectRoot(),
+  );
+  if (!blogValidation.ok) {
+    throw new Error(
+      `Product blog registries are not admitted: ${blogValidation.diagnostics.join(', ')}`,
+    );
+  }
+  const admittedBlogPaths = new Map(
+    productBlogRoutes(blogValidation.registries).map((route) => [
+      route.siteId,
+      new Set(route.inventoryPaths),
+    ]),
+  );
+  const files = await strictPublicFiles(resolvedOutput, admittedBlogPaths);
   const inventory: PublicBuildInventoryEntry[] = [];
   for (const path of files) {
     inventory.push({

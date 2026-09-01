@@ -259,6 +259,7 @@ export function renderSitemap(
   corpus: VideoCorpus,
   origin: string,
   discoveryRoutes: DiscoveryRoutes = {},
+  additionalPaths: readonly string[] = [],
 ): string {
   assertValidCorpus(corpus);
   const publicMoments = corpus.moments.filter(isPublicMoment);
@@ -290,6 +291,9 @@ export function renderSitemap(
     ),
     ...discovery.guides.map((guide) =>
       canonicalUrl(origin, `guides/${guide.slug}/`),
+    ),
+    ...additionalPaths.map((path) =>
+      canonicalUrl(origin, path.replace(/^\/+/, '')),
     ),
   ].sort();
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locations.map((location) => `  <url><loc>${xml(location)}</loc></url>`).join('\n')}\n</urlset>\n`;

@@ -53,6 +53,14 @@ import { validateSourceBoundInvestigationWorksheet } from '../sites/search-recei
 import { validateSourceBoundInvestigationHandoff } from '../sites/search-receipt/source-bound-investigation-handoff.js';
 import { PORTFOLIO_FAVICON } from '../sites/shared/favicon.js';
 import {
+  loadProductBlogRegistries,
+  productBlogRoutes,
+  renderProductBlogAtom,
+  renderProductBlogIndex,
+  renderProductBlogPost,
+  type ProductBlogRegistry,
+} from '../sites/shared/blog.js';
+import {
   DEFAULT_PUBLIC_BASE_URL,
   normalizePublicBaseUrl,
   renderMethodology,
@@ -359,6 +367,7 @@ async function writeSiteTree(
   receipts: readonly Receipt[],
   publicBaseUrl: string,
   includeVideoMomentSearch: boolean,
+  blogRegistries: readonly ProductBlogRegistry[],
 ): Promise<void> {
   const [
     searchHandoff,
@@ -536,6 +545,40 @@ async function writeSiteTree(
   const includedSites = includeVideoMomentSearch
     ? [...SITE_DEFINITIONS, videoMomentSearchSite]
     : SITE_DEFINITIONS;
+  const blogBySite = new Map(
+    blogRegistries.map((registry) => [registry.siteId, registry]),
+  );
+  const blogRouteBySite = new Map(
+    productBlogRoutes(blogRegistries).map((route) => [route.siteId, route]),
+  );
+
+  async function emitProductBlog(
+    site: (typeof includedSites)[number],
+    directory: string,
+  ): Promise<void> {
+    const registry = blogBySite.get(site.siteId);
+    if (registry === undefined || registry.posts.length === 0) return;
+    const blogDirectory = join(directory, 'blog');
+    await mkdir(blogDirectory, { recursive: true });
+    await Promise.all([
+      writeFile(
+        join(blogDirectory, 'index.html'),
+        renderProductBlogIndex(site, registry, publicBaseUrl),
+      ),
+      writeFile(
+        join(blogDirectory, 'feed.xml'),
+        renderProductBlogAtom(site, registry, publicBaseUrl),
+      ),
+      ...registry.posts.map(async (post) => {
+        const postDirectory = join(blogDirectory, post.slug);
+        await mkdir(postDirectory, { recursive: true });
+        await writeFile(
+          join(postDirectory, 'index.html'),
+          renderProductBlogPost(site, post, publicBaseUrl),
+        );
+      }),
+    ]);
+  }
 
   await writeFile(join(outputDirectory, 'favicon.ico'), PORTFOLIO_FAVICON);
   await copyFile(
@@ -774,16 +817,14 @@ async function writeSiteTree(
     );
     await writeFile(
       join(directory, 'sitemap.xml'),
-      renderSitemap(
-        site,
-        visible,
-        publicBaseUrl,
-        site.siteId === 'search-receipt'
+      renderSitemap(site, visible, publicBaseUrl, [
+        ...(site.siteId === 'search-receipt'
           ? [decisionAidPath, guidePath, handoffPath, worksheetPath]
           : site.siteId === 'skill-ledger'
             ? ['/inventory/']
-            : [],
-      ),
+            : []),
+        ...(blogRouteBySite.get(site.siteId)?.sitemapPaths ?? []),
+      ]),
     );
     await writeFile(
       join(directory, 'robots.txt'),
@@ -809,6 +850,7 @@ async function writeSiteTree(
         renderTopic(site, topic, visible, publicBaseUrl),
       );
     }
+    await emitProductBlog(site, directory);
   }
   if (includeVideoMomentSearch) {
     const [fixture, sourceRightsEvidence] = await Promise.all([
@@ -882,7 +924,12 @@ async function writeSiteTree(
     await Promise.all([
       writeFile(
         join(directory, 'sitemap.xml'),
-        renderVideoMomentSitemap(fixture, publicBaseUrl),
+        renderVideoMomentSitemap(
+          fixture,
+          publicBaseUrl,
+          {},
+          blogRouteBySite.get(videoMomentSearchSite.siteId)?.sitemapPaths ?? [],
+        ),
       ),
       writeFile(
         join(directory, 'sitemap-index.xml'),
@@ -918,6 +965,7 @@ async function writeSiteTree(
         renderCreatorPage(fixture, index, creatorId, publicBaseUrl),
       );
     }
+    await emitProductBlog(videoMomentSearchSite, directory);
   }
 }
 
@@ -1015,11 +1063,20 @@ export async function buildSites(options: {
   publicBaseUrl?: string;
   trustedWorkspaceDirectory?: string;
   includeVideoMomentSearch?: boolean;
+  blogRegistryRoot?: string;
 }): Promise<void> {
   const publicBaseUrl = normalizePublicBaseUrl(
     options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
   );
   const receipts = await loadVerifiedReceipts(options.evidenceDirectory);
+  const blogValidation = await loadProductBlogRegistries(
+    options.blogRegistryRoot ?? projectRoot(),
+  );
+  if (!blogValidation.ok) {
+    throw new Error(
+      `Product blog registries are not admitted: ${blogValidation.diagnostics.join(', ')}`,
+    );
+  }
   const outputDirectory = resolve(options.outputDirectory);
   const trustedWorkspaceDirectory = await ensureTrustedRealDirectory(
     options.trustedWorkspaceDirectory ??
@@ -1064,6 +1121,7 @@ export async function buildSites(options: {
       receipts,
       publicBaseUrl,
       options.includeVideoMomentSearch ?? false,
+      blogValidation.registries,
     );
     await replaceOutput(stagingDirectory, outputDirectory, canonicalParentPath);
   } catch (error) {

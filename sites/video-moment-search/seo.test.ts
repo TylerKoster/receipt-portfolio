@@ -108,6 +108,23 @@ describe('video moment search SEO', () => {
     expect(renderAtomFeed(corpus, baseUrl)).toContain('#t=132');
   });
 
+  it('keeps validated shared additions inside the AI Moment Index namespace', () => {
+    const sitemap = renderSitemap(corpus, baseUrl, {}, [
+      '/blog/',
+      '/blog/evidence-bound-post/',
+    ]);
+
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/video-moment-search/blog/</loc>',
+    );
+    expect(sitemap).toContain(
+      '<loc>https://receipt-portfolio.example/video-moment-search/blog/evidence-bound-post/</loc>',
+    );
+    expect(sitemap).not.toContain(
+      '<loc>https://receipt-portfolio.example/blog/',
+    );
+  });
+
   it('includes only eligible project-original guides in the Atom feed', () => {
     const syntheticCorpus = twoSourceCorpus();
     const momentIds = syntheticCorpus.moments.map((moment) => moment.id);

@@ -128,6 +128,14 @@ describe('evidence-bound product blog contract', () => {
       'BLOG_LINK_NOT_ALLOWLISTED:0:0',
     ],
     [
+      'path-traversing internal link',
+      (candidate: ProductBlogRegistry) => {
+        candidate.posts[0]!.links[0]!.href =
+          '/search-receipt/../skill-ledger/inventory/';
+      },
+      'BLOG_LINK_NOT_ALLOWLISTED:0:0',
+    ],
+    [
       'missing author disclosure',
       (candidate: ProductBlogRegistry) => {
         candidate.posts[0]!.author.name = '';

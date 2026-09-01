@@ -139,13 +139,21 @@ function allowedExternalUrl(value: unknown, siteId: SiteId): boolean {
 function allowedLink(value: unknown, siteId: SiteId): boolean {
   if (!isRecord(value) || !nonEmpty(value.label)) return false;
   if (value.kind === 'external') return allowedExternalUrl(value.href, siteId);
+  if (value.kind !== 'internal' || typeof value.href !== 'string') return false;
+  const prefix = linkPolicies[siteId].internalPrefix;
+  if (
+    !value.href.startsWith(prefix) ||
+    !value.href.endsWith('/') ||
+    value.href.includes('?') ||
+    value.href.includes('#') ||
+    value.href.includes('\\') ||
+    value.href.includes('%')
+  ) {
+    return false;
+  }
+  const remainder = value.href.slice(prefix.length, -1);
   return (
-    value.kind === 'internal' &&
-    typeof value.href === 'string' &&
-    value.href.startsWith(linkPolicies[siteId].internalPrefix) &&
-    !value.href.includes('?') &&
-    !value.href.includes('#') &&
-    !value.href.includes('\\')
+    remainder === '' || remainder.split('/').every((segment) => slug(segment))
   );
 }
 

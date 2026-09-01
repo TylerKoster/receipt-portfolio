@@ -275,6 +275,19 @@ async function fileInventory(
   return inventory;
 }
 
+async function writeBlogRegistryRoot(
+  root: string,
+  siteId: string,
+  fixtureName: string,
+): Promise<void> {
+  const destination = join(root, 'sites', siteId, 'blog-registry.json');
+  await mkdir(dirname(destination), { recursive: true });
+  await writeFile(
+    destination,
+    await readFile(join(projectRoot, 'fixtures', 'shared', fixtureName)),
+  );
+}
+
 async function runProductionBuild(options?: {
   readonly executor?: ProductionBuildExecutor;
   readonly evidenceDirectory?: string;
@@ -336,6 +349,93 @@ afterEach(async () => {
 });
 
 describe('static receipt site build', () => {
+  it('emits blog routes only for the product-owned admitted registry', async () => {
+    const registryRoot = join(dirname(outputDirectory), 'blog-registry-root');
+    await writeBlogRegistryRoot(
+      registryRoot,
+      'search-receipt',
+      'controlled-blog-registry-v1.json',
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+      blogRegistryRoot: registryRoot,
+    });
+
+    const inventory = Object.keys(await fileInventory(outputDirectory));
+    expect(inventory).toEqual(
+      expect.arrayContaining([
+        'search-receipt/blog/index.html',
+        'search-receipt/blog/feed.xml',
+        'search-receipt/blog/controlled-search-handoff-checklist/index.html',
+      ]),
+    );
+    expect(
+      inventory.some((path) => path.startsWith('skill-ledger/blog/')),
+    ).toBe(false);
+    await expect(
+      readFile(join(outputDirectory, 'search-receipt', 'sitemap.xml'), 'utf8'),
+    ).resolves.toContain(
+      '/search-receipt/blog/controlled-search-handoff-checklist/',
+    );
+  });
+
+  it('rejects a cross-namespace product registry and preserves the published tree', async () => {
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    const before = await fileInventory(outputDirectory);
+    const registryRoot = join(dirname(outputDirectory), 'invalid-blog-root');
+    await writeBlogRegistryRoot(
+      registryRoot,
+      'skill-ledger',
+      'controlled-blog-registry-v1.json',
+    );
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+        blogRegistryRoot: registryRoot,
+      }),
+    ).rejects.toThrow(/namespace/i);
+    expect(await fileInventory(outputDirectory)).toEqual(before);
+  });
+
+  it('keeps missing and empty product registries byte-compatible', async () => {
+    const emptyOutput = join(dirname(outputDirectory), 'empty-registry-sites');
+    const emptyRegistryRoot = join(dirname(outputDirectory), 'empty-blog-root');
+    await mkdir(join(emptyRegistryRoot, 'sites', 'search-receipt'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(emptyRegistryRoot, 'sites', 'search-receipt', 'blog-registry.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        siteId: 'search-receipt',
+        title: 'Empty product-owned blog',
+        description: 'No posts have been admitted.',
+        posts: [],
+      }),
+    );
+
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory,
+    });
+    await buildSites({
+      evidenceDirectory: testEvidenceDirectory,
+      outputDirectory: emptyOutput,
+      blogRegistryRoot: emptyRegistryRoot,
+    });
+
+    expect(await fileInventory(emptyOutput)).toEqual(
+      await fileInventory(outputDirectory),
+    );
+  });
+
   it('rejects the trusted workspace itself as an output root', async () => {
     const trustedWorkspaceDirectory = join(
       dirname(outputDirectory),
