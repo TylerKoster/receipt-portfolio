@@ -53,10 +53,15 @@ const STATUS_BYTES = Buffer.from(
   ]),
 );
 const FEED_BYTES = Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry><id>tag:google.com,2026:second</id><title type="html">Second &amp; newer</title><link rel="alternate" href="https://developers.google.com/search/blog/second" /><published>2026-08-31T12:00:00-05:00</published><updated>2026-08-31T12:30:00-05:00</updated></entry>
-  <entry><id>tag:google.com,2026:first</id><title>First</title><link href="https://developers.google.com/search/blog/first" rel="alternate" /><published>2026-08-30T10:00:00Z</published><updated>2026-08-30T10:00:00Z</updated></entry>
-</feed>`);
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Google Search Central Blog</title>
+    <link>https://developers.google.com/search/blog</link>
+    <description>Official Search Central articles.</description>
+    <item><title>Second &amp; newer</title><link>https://developers.google.com/search/blog/second</link><description><![CDATA[<p>Untrusted article body.</p>]]></description><pubDate>Mon, 31 Aug 2026 17:00:00 +0000</pubDate><guid isPermaLink="false">tag:google.com,2026:second</guid></item>
+    <item><title>First</title><link>https://developers.google.com/search/blog/first</link><description><![CDATA[This body is not a published fact.]]></description><pubDate>Sun, 30 Aug 2026 10:00:00 GMT</pubDate><guid isPermaLink="false">tag:google.com,2026:first</guid></item>
+  </channel>
+</rss>`);
 
 function rawFetch(manifest: SourceManifest): RawFetch {
   const bytes =
@@ -225,7 +230,7 @@ describe('bounded Search Receipt live collection', () => {
           title: 'Second & newer',
           url: 'https://developers.google.com/search/blog/second',
           publishedAt: '2026-08-31T17:00:00.000Z',
-          updatedAt: '2026-08-31T17:30:00.000Z',
+          updatedAt: '2026-08-31T17:00:00.000Z',
         },
         {
           entryId: 'tag:google.com,2026:first',
@@ -236,6 +241,210 @@ describe('bounded Search Receipt live collection', () => {
         },
       ],
     });
+  });
+
+  it('retains deterministic Atom support under the existing feed contract', async () => {
+    const bytes = Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><id>tag:google.com,2026:atom</id><title>Atom entry</title><link rel="alternate" href="https://developers.google.com/search/blog/atom-entry"/><published>2026-08-31T17:00:00Z</published><updated>2026-08-31T17:30:00Z</updated></entry>
+</feed>`);
+    const result = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory: await newEvidenceDirectory('search-feed-atom-'),
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        byteCount: bytes.byteLength,
+        rawSha256: sha256(bytes),
+        bytes,
+      }),
+    });
+    expect(result.receipt.payload.publicFacts).toMatchObject({
+      kind: 'search-feed',
+      entries: [
+        {
+          entryId: 'tag:google.com,2026:atom',
+          title: 'Atom entry',
+          url: 'https://developers.google.com/search/blog/atom-entry',
+          publishedAt: '2026-08-31T17:00:00.000Z',
+          updatedAt: '2026-08-31T17:30:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('never promotes RSS descriptions or CDATA bodies into public facts', async () => {
+    const result = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory: await newEvidenceDirectory('search-feed-body-'),
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const serializedFacts = canonicalJson(result.receipt.payload.publicFacts);
+    expect(serializedFacts).not.toContain('Untrusted article body');
+    expect(serializedFacts).not.toContain('not a published fact');
+  });
+
+  it.each([
+    [
+      'wrong RSS version',
+      FEED_BYTES.toString('utf8').replace('version="2.0"', 'version="2.1"'),
+    ],
+    ['missing channel', '<rss version="2.0"></rss>'],
+    [
+      'missing channel title',
+      FEED_BYTES.toString('utf8').replace(
+        '<title>Google Search Central Blog</title>',
+        '',
+      ),
+    ],
+    [
+      'duplicate channel description',
+      FEED_BYTES.toString('utf8').replace(
+        '<description>Official Search Central articles.</description>',
+        '<description>Official Search Central articles.</description><description>Impersonator</description>',
+      ),
+    ],
+    [
+      'duplicate channel',
+      '<rss version="2.0"><channel><item/></channel><channel><item/></channel></rss>',
+    ],
+    [
+      'prefixed RSS root',
+      '<x:rss xmlns:x="urn:rss" version="2.0"><x:channel/></x:rss>',
+    ],
+    [
+      'foreign namespace item',
+      '<rss version="2.0"><channel><x:item xmlns:x="urn:not-rss"><x:title>X</x:title></x:item></channel></rss>',
+    ],
+    [
+      'nested fake item',
+      '<rss version="2.0"><channel><wrapper><item><title>X</title><link>https://developers.google.com/search/blog/x</link><pubDate>Mon, 31 Aug 2026 00:00:00 GMT</pubDate><guid isPermaLink="false">x</guid></item></wrapper></channel></rss>',
+    ],
+    [
+      'duplicate item title',
+      FEED_BYTES.toString('utf8').replace(
+        '<title>Second &amp; newer</title>',
+        '<title>Second</title><title>Impersonator</title>',
+      ),
+    ],
+    [
+      'missing item GUID',
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '',
+      ),
+    ],
+    [
+      'foreign namespace title impersonation',
+      FEED_BYTES.toString('utf8').replace(
+        '<title>Second &amp; newer</title>',
+        '<evil:title xmlns:evil="urn:not-rss">Second</evil:title>',
+      ),
+    ],
+    [
+      'nested title extension',
+      FEED_BYTES.toString('utf8').replace(
+        '<title>Second &amp; newer</title>',
+        '<title><evil:value xmlns:evil="urn:x">Second</evil:value></title>',
+      ),
+    ],
+    [
+      'invalid RFC822 date',
+      FEED_BYTES.toString('utf8').replace(
+        'Mon, 31 Aug 2026 17:00:00 +0000',
+        'Mon, 31 Feb 2026 17:00:00 +0000',
+      ),
+    ],
+    [
+      'incorrect RFC822 weekday',
+      FEED_BYTES.toString('utf8').replace(
+        'Mon, 31 Aug 2026 17:00:00 +0000',
+        'Sun, 31 Aug 2026 17:00:00 +0000',
+      ),
+    ],
+    [
+      'query-bearing item URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com/search/blog/second?view=1</link>',
+      ),
+    ],
+    [
+      'fragment-bearing item URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com/search/blog/second#details</link>',
+      ),
+    ],
+    [
+      'explicit default port URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com:443/search/blog/second</link>',
+      ),
+    ],
+    [
+      'encoded noncanonical URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com/search/blog/%73econd</link>',
+      ),
+    ],
+    [
+      'DTD declaration',
+      '<!DOCTYPE rss [<!ENTITY x "unsafe">]><rss version="2.0"><channel><item><title>&x;</title></item></channel></rss>',
+    ],
+  ] as const)(
+    'rejects RSS 2.0 with a %s without writing evidence',
+    async (_label, xml) => {
+      const bytes = Buffer.from(xml);
+      const evidenceDirectory = await newEvidenceDirectory(
+        'search-rss-invalid-',
+      );
+      await expect(
+        collectSearchSource('google-search-central-blog', {
+          evidenceDirectory,
+          fetchSource: async (manifest) => ({
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          }),
+        }),
+      ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+      await expectNoEvidenceWrites(evidenceDirectory);
+    },
+  );
+
+  it('preserves all prior evidence when a structurally valid RSS response fails field admission under --all', async () => {
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-all-rss-field-fail-',
+    );
+    await collectAllSearchSources({
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const before = await evidenceSnapshot(evidenceDirectory);
+    const invalidFeed = Buffer.from(
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '',
+      ),
+    );
+    await expect(
+      runCli(['collect-search', '--all'], {
+        projectDirectory: join(evidenceDirectory, '..'),
+        fetchSource: async (manifest) =>
+          manifest.sourceId === 'google-search-status'
+            ? rawFetch(manifest)
+            : {
+                ...rawFetch(manifest),
+                observedAt: '2026-09-01T00:00:00.000Z',
+                byteCount: invalidFeed.byteLength,
+                rawSha256: sha256(invalidFeed),
+                bytes: invalidFeed,
+              },
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
+    await verifyEvidenceTree(evidenceDirectory);
   });
 
   it('rejects arbitrary source or manifest injection before fetch or writes', async () => {

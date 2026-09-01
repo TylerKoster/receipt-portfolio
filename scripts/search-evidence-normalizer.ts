@@ -236,6 +236,21 @@ const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
 const ATOM_NAMESPACE = 'http://www.w3.org/2005/Atom';
 const NC_NAME = /^[A-Za-z_][\w.-]*$/;
+const RSS_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const RSS_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
 function qualifiedName(
   name: string,
@@ -476,13 +491,8 @@ function parseXml(xml: string): XmlNode {
     }
     offset = end + 1;
   }
-  if (
-    stack.length > 0 ||
-    roots.length !== 1 ||
-    localName(roots[0]!.name) !== 'feed' ||
-    roots[0]!.namespaceUri !== ATOM_NAMESPACE
-  ) {
-    return notAdmitted('feed response is not one well-formed Atom document');
+  if (stack.length > 0 || roots.length !== 1) {
+    return notAdmitted('feed response is not one well-formed XML document');
   }
   return roots[0]!;
 }
@@ -506,6 +516,52 @@ function childText(node: XmlNode, name: string, label: string): string {
   return requiredString(nodeText(child(node, name, label)), label, true);
 }
 
+function exactLeafText(node: XmlNode, name: string, label: string): string {
+  const selected = child(node, name, label);
+  if (
+    selected.children.length > 0 ||
+    Object.keys(nonNamespaceAttributes(selected)).length > 0
+  ) {
+    return notAdmitted(`${label} must contain unextended text only`);
+  }
+  return requiredString(selected.text.join(' '), label, true);
+}
+
+function nonNamespaceAttributes(
+  node: XmlNode,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(node.attributes).filter(
+      ([name]) => name !== 'xmlns' && !name.startsWith('xmlns:'),
+    ),
+  );
+}
+
+function exactSearchBlogUrl(value: unknown, name: string): string {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    return notAdmitted(`${name} must be a canonical URL string`);
+  }
+  const url = httpsUrl(value, name);
+  const parsed = new URL(url);
+  const segments = parsed.pathname.split('/').slice(1);
+  if (
+    value !== url ||
+    parsed.origin !== 'https://developers.google.com' ||
+    parsed.port !== '' ||
+    parsed.search !== '' ||
+    parsed.hash !== '' ||
+    !parsed.pathname.startsWith('/search/blog/') ||
+    parsed.pathname.includes('\\') ||
+    parsed.pathname.includes('%') ||
+    segments.some(
+      (segment) => segment.length === 0 || segment === '.' || segment === '..',
+    )
+  ) {
+    return notAdmitted(`${name} destination is not admitted`);
+  }
+  return url;
+}
+
 function entryUrl(entry: XmlNode, name: string): string {
   const links = entry.children.filter(
     (node) =>
@@ -518,22 +574,14 @@ function entryUrl(entry: XmlNode, name: string): string {
     ) ?? links[0];
   const href = selected?.attributes.href;
   if (href === undefined) return notAdmitted(`${name} is missing`);
-  const url = httpsUrl(href, name);
-  const parsed = new URL(url);
-  if (
-    parsed.hostname !== 'developers.google.com' ||
-    parsed.port !== '' ||
-    !parsed.pathname.startsWith('/search/blog/')
-  ) {
-    return notAdmitted(`${name} destination is not admitted`);
-  }
-  return url;
+  return exactSearchBlogUrl(href, name);
 }
 
-function normalizeFeed(fetched: RawFetch): ReceiptPublicFacts {
-  const xml = decodeUtf8(fetched.bytes, 'feed response');
-  const feed = parseXml(xml);
-  const entries = feed.children
+function atomEntries(feed: XmlNode) {
+  if (localName(feed.name) !== 'feed' || feed.namespaceUri !== ATOM_NAMESPACE) {
+    return notAdmitted('feed response is not an admitted Atom document');
+  }
+  return feed.children
     .filter(
       (node) =>
         localName(node.name) === 'entry' &&
@@ -554,6 +602,127 @@ function normalizeFeed(fetched: RawFetch): ReceiptPublicFacts {
         ),
       };
     });
+}
+
+function rssTimestamp(value: string, name: string): string {
+  const match = value.match(
+    /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) (GMT|[+-]\d{4})$/,
+  );
+  if (match === null)
+    return notAdmitted(`${name} is not a canonical RFC822 date`);
+  const [
+    ,
+    weekday,
+    dayText,
+    monthText,
+    yearText,
+    hourText,
+    minuteText,
+    secondText,
+    zone,
+  ] = match;
+  const day = Number(dayText);
+  const month = RSS_MONTHS.indexOf(monthText as (typeof RSS_MONTHS)[number]);
+  const year = Number(yearText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const localMillis = Date.UTC(year, month, day, hour, minute, second);
+  const local = new Date(localMillis);
+  if (
+    local.getUTCFullYear() !== year ||
+    local.getUTCMonth() !== month ||
+    local.getUTCDate() !== day ||
+    local.getUTCHours() !== hour ||
+    local.getUTCMinutes() !== minute ||
+    local.getUTCSeconds() !== second ||
+    RSS_WEEKDAYS[local.getUTCDay()] !== weekday
+  ) {
+    return notAdmitted(`${name} is not a valid RFC822 date`);
+  }
+  let offsetMinutes = 0;
+  if (zone !== 'GMT') {
+    const zoneHour = Number(zone.slice(1, 3));
+    const zoneMinute = Number(zone.slice(3, 5));
+    if (zoneHour > 23 || zoneMinute > 59) {
+      return notAdmitted(`${name} has an invalid RFC822 offset`);
+    }
+    offsetMinutes = (zone[0] === '+' ? 1 : -1) * (zoneHour * 60 + zoneMinute);
+  }
+  return new Date(localMillis - offsetMinutes * 60_000).toISOString();
+}
+
+function rssEntries(root: XmlNode) {
+  if (
+    root.name !== 'rss' ||
+    root.namespaceUri !== '' ||
+    canonicalJson(nonNamespaceAttributes(root)) !==
+      canonicalJson({ version: '2.0' })
+  ) {
+    return notAdmitted('feed response is not an admitted RSS 2.0 document');
+  }
+  const channel = child(root, 'channel', 'RSS channel');
+  if (
+    channel.name !== 'channel' ||
+    channel.namespaceUri !== '' ||
+    Object.keys(nonNamespaceAttributes(channel)).length > 0
+  ) {
+    return notAdmitted('RSS channel must be unqualified');
+  }
+  exactLeafText(channel, 'title', 'RSS channel title');
+  const channelLink = exactLeafText(channel, 'link', 'RSS channel link');
+  if (channelLink !== 'https://developers.google.com/search/blog') {
+    return notAdmitted('RSS channel link is not admitted');
+  }
+  exactLeafText(channel, 'description', 'RSS channel description');
+  const items = channel.children.filter(
+    (node) => node.name === 'item' && node.namespaceUri === '',
+  );
+  if (items.length === 0)
+    return notAdmitted('RSS channel must contain direct items');
+  return items.map((item, index) => {
+    if (Object.keys(nonNamespaceAttributes(item)).length > 0) {
+      return notAdmitted(`item[${index}] attributes are not admitted`);
+    }
+    const title = exactLeafText(item, 'title', `item[${index}].title`);
+    const link = exactLeafText(item, 'link', `item[${index}].link`);
+    const publishedAt = rssTimestamp(
+      exactLeafText(item, 'pubDate', `item[${index}].pubDate`),
+      `item[${index}].pubDate`,
+    );
+    const guidNode = child(item, 'guid', `item[${index}].guid`);
+    if (guidNode.children.length > 0) {
+      return notAdmitted(`item[${index}].guid must contain text only`);
+    }
+    const guidAttributes = nonNamespaceAttributes(guidNode);
+    if (
+      Object.keys(guidAttributes).length > 1 ||
+      (guidAttributes.isPermaLink !== undefined &&
+        guidAttributes.isPermaLink !== 'false')
+    ) {
+      return notAdmitted(`item[${index}].guid attributes are not admitted`);
+    }
+    return {
+      entryId: requiredString(
+        guidNode.text.join(' '),
+        `item[${index}].guid`,
+        true,
+      ),
+      title,
+      url: exactSearchBlogUrl(link, `item[${index}].link`),
+      publishedAt,
+      updatedAt: publishedAt,
+    };
+  });
+}
+
+function normalizeFeed(fetched: RawFetch): ReceiptPublicFacts {
+  const xml = decodeUtf8(fetched.bytes, 'feed response');
+  const root = parseXml(xml);
+  const entries =
+    root.name === 'rss' && root.namespaceUri === ''
+      ? rssEntries(root)
+      : atomEntries(root);
   if (new Set(entries.map((entry) => entry.entryId)).size !== entries.length) {
     return notAdmitted('feed response contains duplicate entry IDs');
   }
