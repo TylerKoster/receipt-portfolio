@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { type VideoCorpus } from '../../packages/video-moment-core/src/index.js';
 import {
   isDiscoveryPageEligible,
-  renderAtomFeed,
-  renderSitemap,
+  renderAtomFeed as renderAtomFeedRaw,
+  renderSitemap as renderSitemapRaw,
   renderSitemapIndex,
   validateUniqueSeoDocuments,
 } from './seo.js';
+import type { VideoSourceEvidenceManifest } from './source-evidence.js';
 
 const corpus = JSON.parse(
   readFileSync(
@@ -18,7 +19,39 @@ const corpus = JSON.parse(
     'utf8',
   ),
 ) as VideoCorpus;
+const evidenceManifest = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+) as VideoSourceEvidenceManifest;
 const baseUrl = 'https://receipt-portfolio.example/';
+
+function manifestFor(candidate: VideoCorpus): VideoSourceEvidenceManifest {
+  const manifest = structuredClone(evidenceManifest);
+  manifest.corpusId = candidate.corpusId;
+  for (const record of manifest.records) {
+    record.bindings.corpusId = candidate.corpusId;
+  }
+  return manifest;
+}
+
+function renderSitemap(
+  ...args: Parameters<typeof renderSitemapRaw>
+): ReturnType<typeof renderSitemapRaw> {
+  args[4] ??= manifestFor(args[0]);
+  return renderSitemapRaw(...args);
+}
+
+function renderAtomFeed(
+  ...args: Parameters<typeof renderAtomFeedRaw>
+): ReturnType<typeof renderAtomFeedRaw> {
+  args[3] ??= manifestFor(args[0]);
+  return renderAtomFeedRaw(...args);
+}
 
 function twoSourceCorpus(): VideoCorpus {
   const firstVideo = corpus.videos[0]!;
@@ -105,7 +138,10 @@ describe('video moment search SEO', () => {
     expect(sitemap).not.toContain('video-sitemap.xml');
     expect(sitemap).not.toContain('thumbnail');
     expect(sitemap).not.toContain('player');
-    expect(renderAtomFeed(corpus, baseUrl)).toContain('#t=132');
+    const feed = renderAtomFeed(corpus, baseUrl);
+    expect(feed).toContain('#t=132');
+    expect(feed).toContain('<updated>2026-08-31T00:00:00.000Z</updated>');
+    expect(feed).not.toContain('<updated>2022-01-18T00:00:00.000Z</updated>');
   });
 
   it('keeps validated shared additions inside the AI Moment Index namespace', () => {

@@ -110,6 +110,27 @@ describe('rights-bound video corpus contracts', () => {
     });
   });
 
+  it('rejects duplicate reviewed evidence identities before manifest binding', () => {
+    const reviewed = cloneReviewedCorpus();
+    reviewed.videos.push({
+      ...structuredClone(reviewed.videos[0]!),
+      id: 'video-second-reviewed',
+      slug: 'second-reviewed',
+    });
+    reviewed.rights.push({
+      ...structuredClone(reviewed.rights[0]!),
+      id: 'rights-second-reviewed',
+      coveredVideoIds: ['video-second-reviewed'],
+    });
+
+    expect(validateVideoCorpus(reviewed).diagnostics).toEqual(
+      expect.arrayContaining([
+        'VIDEO_REVIEW_EVIDENCE_ID_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
+        'RIGHTS_REVIEW_EVIDENCE_ID_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
+      ]),
+    );
+  });
+
   it('rejects semantically blank or impossible reviewed-source evidence', () => {
     const invalidEvidence: readonly [
       string,

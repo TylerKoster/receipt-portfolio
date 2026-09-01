@@ -24,15 +24,16 @@ async function evidenceSourceUrl(): Promise<string> {
         projectRoot(),
         'fixtures',
         'video-moment-search',
-        'commons-source-rights-v1.json',
+        'video-source-evidence-manifest-v2.json',
       ),
       'utf8',
     ),
-  ) as { delivery?: { url?: unknown } };
-  if (evidence.delivery?.url !== VIDEO_MOMENT_SOURCE_URL) {
+  ) as { records?: readonly { delivery?: { url?: unknown } }[] };
+  const sourceUrl = evidence.records?.[0]?.delivery?.url;
+  if (sourceUrl !== VIDEO_MOMENT_SOURCE_URL) {
     throw new Error('LIVE_SOURCE_EVIDENCE_URL_MISMATCH');
   }
-  return evidence.delivery.url;
+  return sourceUrl;
 }
 
 export async function checkVideoMomentLiveSource(

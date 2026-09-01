@@ -1,5 +1,4 @@
 import {
-  isReviewedSourceEvidenceSubstantive,
   searchMoments,
   validateVideoCorpus,
   type SearchIndex,
@@ -15,7 +14,10 @@ import {
   type FeedGuide,
   type OriginalSynthesis,
 } from './seo.js';
-import { validateCommonsSourceEvidence } from './source-evidence.js';
+import {
+  parseVideoSourceEvidenceManifest,
+  validateCommonsSourceEvidence,
+} from './source-evidence.js';
 
 function routePath(baseUrl: string, suffix = ''): string {
   const path = new URL(normalizePublicBaseUrl(baseUrl)).pathname;
@@ -59,24 +61,43 @@ export function serializePublicSearchIndex(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
   sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): PublicSearchIndex {
-  const validation = validateVideoCorpus(corpus);
-  if (!validation.ok) {
+  const containsReviewedRecords =
+    corpus.videos.some((video) => video.reviewEvidenceId !== undefined) ||
+    corpus.rights.some((grant) => grant.reviewEvidence !== undefined);
+  if (containsReviewedRecords && sourceEvidence === undefined) {
     throw new Error(
-      `Invalid video corpus: ${validation.diagnostics.join(', ')}`,
+      'Evidence manifest is required for reviewed corpus records',
     );
   }
-  if (sourceEvidence !== undefined) {
+  if (containsReviewedRecords) {
     const evidenceValidation = validateCommonsSourceEvidence(
       corpus,
       sourceEvidence,
+      validationNow,
     );
     if (!evidenceValidation.ok) {
       throw new Error(
-        `Invalid Commons source evidence: ${evidenceValidation.diagnostics.join(', ')}`,
+        `Invalid evidence manifest: ${evidenceValidation.diagnostics.join(', ')}`,
+      );
+    }
+  } else {
+    const validation = validateVideoCorpus(corpus);
+    if (!validation.ok) {
+      throw new Error(
+        `Invalid video corpus: ${validation.diagnostics.join(', ')}`,
       );
     }
   }
+  const evidenceRecords =
+    sourceEvidence === undefined
+      ? new Map()
+      : new Map(
+          parseVideoSourceEvidenceManifest(sourceEvidence).records.map(
+            (record) => [record.evidenceId, record],
+          ),
+        );
   const grants = new Map(corpus.rights.map((grant) => [grant.id, grant]));
   const cuesByVideo = new Map(
     corpus.videos.map((video) => [
@@ -98,15 +119,20 @@ export function serializePublicSearchIndex(
     if (timestampUrl === null) {
       throw new Error(`Invalid exact timestamp URL for ${entry.moment.id}`);
     }
-    const reviewEvidence = grant.reviewEvidence;
-    if (
-      reviewEvidence !== undefined &&
-      !isReviewedSourceEvidenceSubstantive(reviewEvidence)
-    ) {
-      throw new Error(
-        `Invalid reviewed-source evidence for ${entry.moment.id}`,
-      );
-    }
+    const historicalReview = grant.reviewEvidence;
+    const evidenceRecord =
+      historicalReview === undefined
+        ? undefined
+        : evidenceRecords.get(historicalReview.evidenceId);
+    const reviewEvidence =
+      historicalReview === undefined || evidenceRecord === undefined
+        ? undefined
+        : {
+            ...historicalReview,
+            roles: evidenceRecord.roles,
+            annotationSha256: evidenceRecord.annotation.sha256,
+            observedStatus: evidenceRecord.observedStatus,
+          };
     const cueIds = (cuesByVideo.get(entry.video.id) ?? [])
       .filter(
         (cue) =>
@@ -139,7 +165,8 @@ export function serializePublicSearchIndex(
           ? grant.licenseNote
           : `${reviewEvidence.licenseIdentifier}; ${reviewEvidence.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`,
       verificationDate:
-        reviewEvidence?.reviewedOn ?? grant.permissionVerifiedAt.slice(0, 10),
+        reviewEvidence?.observedStatus.observedAt ??
+        grant.permissionVerifiedAt.slice(0, 10),
       provenance:
         reviewEvidence === undefined
           ? `Corpus ${corpus.corpusId}; rights grant ${grant.id}; cue ${cueIds.join(', ')}`
@@ -169,7 +196,10 @@ function detailRows(entry: PublicSearchEntry): string {
     ['Topics', entry.topicSlugs.join(', ')],
     ['Confidence class', entry.confidenceClass],
     ['Rights status', entry.rightsStatus],
-    ['Verification date', entry.verificationDate],
+    [
+      entry.reviewEvidence === undefined ? 'Verification date' : 'Observed at',
+      entry.verificationDate,
+    ],
     ['Provenance', entry.provenance],
   ];
   if (entry.reviewEvidence !== undefined) {
@@ -183,9 +213,21 @@ function detailRows(entry: PublicSearchEntry): string {
         entry.reviewEvidence.immutableRightsRevisionUrl,
       ],
       [
-        'Review record',
+        'Historical license review',
         `${entry.reviewEvidence.reviewer} · ${entry.reviewEvidence.reviewedOn}`,
       ],
+      [
+        'Observed source record',
+        `${entry.reviewEvidence.observedStatus.observedAt} · expires ${entry.reviewEvidence.observedStatus.expiresAt}`,
+      ],
+      ['Publisher', entry.reviewEvidence.roles.publisher.name],
+      ['Uploader', entry.reviewEvidence.roles.uploader.name],
+      ['Attributed creator', entry.reviewEvidence.roles.attributedCreator.name],
+      [
+        'Rights authority / licensor',
+        entry.reviewEvidence.roles.rightsAuthority.name,
+      ],
+      ['Evidence issuer', entry.reviewEvidence.roles.evidenceIssuer.name],
       [
         'Product boundary',
         `Included: ${entry.reviewEvidence.productBoundary.included.join(', ')}; excluded: ${entry.reviewEvidence.productBoundary.excluded.join(', ')}`,
@@ -311,11 +353,18 @@ export function renderSearchResults(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
   query: string,
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
+  const publicIndex = serializePublicSearchIndex(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  );
   if (query.trim().length === 0) {
     return '<p class="guidance">Enter a phrase such as “robots control”.</p>';
   }
-  const publicIndex = serializePublicSearchIndex(corpus, searchIndex);
   const byMomentId = new Map(
     publicIndex.entries.map((entry) => [entry.momentId, entry]),
   );
@@ -406,8 +455,15 @@ function page(
 function initialResults(
   corpus: VideoCorpus,
   searchIndex: SearchIndex,
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): readonly PublicSearchEntry[] {
-  return serializePublicSearchIndex(corpus, searchIndex).entries;
+  return serializePublicSearchIndex(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  ).entries;
 }
 
 export function renderSearchShell(
@@ -415,11 +471,14 @@ export function renderSearchShell(
   searchIndex: SearchIndex,
   baseUrl: string,
   sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  const initial =
-    sourceEvidence === undefined
-      ? initialResults(corpus, searchIndex)
-      : serializePublicSearchIndex(corpus, searchIndex, sourceEvidence).entries;
+  const initial = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  );
   const allInitialEntriesReviewed =
     initial.length > 0 &&
     initial.every((entry) => entry.reviewEvidence !== undefined);
@@ -438,8 +497,19 @@ export function renderSearchShell(
       ),
     ),
   ].sort();
+  const observedWindows = [
+    ...new Set(
+      initial.flatMap((entry) =>
+        entry.reviewEvidence === undefined
+          ? []
+          : [
+              `${entry.reviewEvidence.observedStatus.observedAt} through ${entry.reviewEvidence.observedStatus.expiresAt}`,
+            ],
+      ),
+    ),
+  ].sort();
   const historicalReviewBoundary = allInitialEntriesReviewed
-    ? ` Source and license availability was reviewed on ${reviewedOnDates.join(', ')}; this is historical evidence, not current verification.`
+    ? ` Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record observation windows: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`
     : '';
   const rightsBoundary = allInitialEntriesReviewed
     ? `This reviewed Commons source provides a timestamp link plus an original editorial annotation only.${historicalReviewBoundary} It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.`
@@ -492,8 +562,15 @@ export function renderVideoMomentHome(
   searchIndex: SearchIndex,
   baseUrl: string,
   sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  return renderSearchShell(corpus, searchIndex, baseUrl, sourceEvidence);
+  return renderSearchShell(
+    corpus,
+    searchIndex,
+    baseUrl,
+    sourceEvidence,
+    validationNow,
+  );
 }
 
 function breadcrumbs(
@@ -546,10 +623,21 @@ function filteredPage(
       ),
     ),
   ].sort();
+  const observedWindows = [
+    ...new Set(
+      entries.flatMap((entry) =>
+        entry.reviewEvidence === undefined
+          ? []
+          : [
+              `${entry.reviewEvidence.observedStatus.observedAt} through ${entry.reviewEvidence.observedStatus.expiresAt}`,
+            ],
+      ),
+    ),
+  ].sort();
   const currentnessBoundary =
     reviewedOnDates.length === 0
       ? 'Review status is unavailable for this controlled page.'
-      : `Source and license availability was reviewed on ${reviewedOnDates.join(', ')}; this is historical evidence, not current verification.`;
+      : `Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record observation windows: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`;
   const directPageHowTo = [
     'Review the excerpt and evidence details.',
     'Inspect the rights, provenance, and correction state.',
@@ -577,13 +665,18 @@ export function renderVideoPage(
   videoId: string,
   baseUrl: string,
   discoveryRoutes: DiscoveryRoutes = {},
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
   const video = corpus.videos.find(
     (candidate) => candidate.id === videoId || candidate.slug === videoId,
   );
-  const entries = initialResults(corpus, searchIndex).filter(
-    (entry) => entry.videoId === video?.id,
-  );
+  const entries = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  ).filter((entry) => entry.videoId === video?.id);
   if (video === undefined) {
     return filteredPage(
       'Video unavailable | AI Moment Index',
@@ -615,10 +708,15 @@ export function renderMomentPage(
   momentId: string,
   baseUrl: string,
   discoveryRoutes: DiscoveryRoutes = {},
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  const entry = initialResults(corpus, searchIndex).find(
-    (candidate) => candidate.momentId === momentId,
-  );
+  const entry = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  ).find((candidate) => candidate.momentId === momentId);
   const title =
     entry === undefined
       ? 'Moment unavailable | AI Moment Index'
@@ -647,10 +745,15 @@ export function renderTopicPage(
   baseUrl: string,
   synthesis?: OriginalSynthesis,
   discoveryRoutes: DiscoveryRoutes = {},
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string | null {
-  const entries = initialResults(corpus, searchIndex).filter((entry) =>
-    entry.topicSlugs.includes(topicSlug),
-  );
+  const entries = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  ).filter((entry) => entry.topicSlugs.includes(topicSlug));
   const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, {
     topics:
       synthesis === undefined
@@ -693,10 +796,15 @@ export function renderCreatorPage(
   creatorId: string,
   baseUrl: string,
   discoveryRoutes: DiscoveryRoutes = {},
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  const entries = initialResults(corpus, searchIndex).filter(
-    (entry) => entry.creatorId === creatorId,
-  );
+  const entries = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  ).filter((entry) => entry.creatorId === creatorId);
   const creatorName = entries[0]?.creatorName ?? creatorId;
   const title = `${creatorName} video moments | AI Moment Index`;
   const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, discoveryRoutes);
@@ -719,7 +827,15 @@ export function renderGuidePage(
   baseUrl: string,
   guide?: FeedGuide,
   discoveryRoutes: DiscoveryRoutes = {},
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string | null {
+  const publicationEntries = initialResults(
+    corpus,
+    searchIndex,
+    sourceEvidence,
+    validationNow,
+  );
   if (guide === undefined) return null;
   const discovery = eligibleDiscoveryRoutes(corpus, baseUrl, {
     topics: discoveryRoutes.topics,
@@ -736,7 +852,7 @@ export function renderGuidePage(
   if (admittedGuide === undefined) {
     return null;
   }
-  const entries = initialResults(corpus, searchIndex).filter((entry) =>
+  const entries = publicationEntries.filter((entry) =>
     admittedGuide.sourceMomentIds.includes(entry.momentId),
   );
   const title = `${admittedGuide.title} | AI Moment Index`;

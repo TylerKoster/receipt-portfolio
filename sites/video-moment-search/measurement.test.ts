@@ -10,6 +10,7 @@ import {
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
 import { renderSearchShell } from './render.js';
+import type { VideoSourceEvidenceManifest } from './source-evidence.js';
 
 const fixture = JSON.parse(
   readFileSync(
@@ -20,6 +21,15 @@ const fixture = JSON.parse(
     'utf8',
   ),
 ) as VideoCorpus;
+const evidenceManifest = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+) as VideoSourceEvidenceManifest;
 const ledger = JSON.parse(
   readFileSync(
     new URL(
@@ -286,6 +296,7 @@ describe('privacy-preserving measurement contract', () => {
       fixture,
       buildSearchIndex(fixture),
       'https://receipt-portfolio.example/',
+      evidenceManifest,
     );
 
     expect(html).toContain('data-measurement-event="search"');

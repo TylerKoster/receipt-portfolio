@@ -331,6 +331,24 @@ export function validateVideoCorpus(value: unknown): VideoCorpusValidation {
     diagnostics,
   );
   addDuplicateDiagnostic(corpus.rights, 'RIGHTS_ID_DUPLICATE', diagnostics);
+  addDuplicateDiagnostic(
+    corpus.videos.flatMap((video) =>
+      video.reviewEvidenceId === undefined
+        ? []
+        : [{ id: video.reviewEvidenceId }],
+    ),
+    'VIDEO_REVIEW_EVIDENCE_ID_DUPLICATE',
+    diagnostics,
+  );
+  addDuplicateDiagnostic(
+    corpus.rights.flatMap((grant) =>
+      grant.reviewEvidence === undefined
+        ? []
+        : [{ id: grant.reviewEvidence.evidenceId }],
+    ),
+    'RIGHTS_REVIEW_EVIDENCE_ID_DUPLICATE',
+    diagnostics,
+  );
   addDuplicateDiagnostic(corpus.cues, 'CUE_ID_DUPLICATE', diagnostics);
   addDuplicateDiagnostic(corpus.moments, 'MOMENT_ID_DUPLICATE', diagnostics);
 

@@ -9,6 +9,26 @@ export interface PublicReviewEvidence {
   readonly immutableRightsRevisionUrl: string;
   readonly reviewer: string;
   readonly reviewedOn: string;
+  readonly roles: {
+    readonly publisher: { readonly id: string; readonly name: string };
+    readonly uploader: { readonly id: string; readonly name: string };
+    readonly attributedCreator: { readonly id: string; readonly name: string };
+    readonly rightsAuthority: {
+      readonly id: string;
+      readonly name: string;
+      readonly relationship: 'named-licensor';
+    };
+    readonly evidenceIssuer: { readonly id: string; readonly name: string };
+  };
+  readonly annotationSha256: string;
+  readonly observedStatus: {
+    readonly status: 'source-record-observed';
+    readonly observedAt: string;
+    readonly expiresAt: string;
+    readonly sourcePageRevisionId: string;
+    readonly sourcePageRevisionUrl: string;
+    readonly sourcePageRevisionAt: string;
+  };
   readonly productBoundary: {
     readonly included: readonly string[];
     readonly excluded: readonly string[];
@@ -77,16 +97,78 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function safeNamedRole(value: unknown): value is {
+  readonly id: string;
+  readonly name: string;
+} {
+  if (typeof value !== 'object' || value === null) return false;
+  const role = value as { readonly id?: unknown; readonly name?: unknown };
+  return (
+    typeof role.id === 'string' &&
+    role.id.trim().length > 0 &&
+    typeof role.name === 'string' &&
+    role.name.trim().length > 0
+  );
+}
+
+function canonicalInstant(value: unknown): value is string {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)
+  ) {
+    return false;
+  }
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
+
 function safeReviewEvidence(value: unknown): value is PublicReviewEvidence {
   if (!isReviewedSourceEvidenceSubstantive(value)) {
     return false;
   }
   const review = value as PublicReviewEvidence;
+  const roles = review.roles;
+  const observedStatus = review.observedStatus;
+  if (
+    typeof review.annotationSha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/u.test(review.annotationSha256) ||
+    typeof roles !== 'object' ||
+    roles === null ||
+    !safeNamedRole(roles.publisher) ||
+    !safeNamedRole(roles.uploader) ||
+    !safeNamedRole(roles.attributedCreator) ||
+    !safeNamedRole(roles.rightsAuthority) ||
+    roles.rightsAuthority.relationship !== 'named-licensor' ||
+    !safeNamedRole(roles.evidenceIssuer) ||
+    typeof observedStatus !== 'object' ||
+    observedStatus === null ||
+    observedStatus.status !== 'source-record-observed' ||
+    !canonicalInstant(observedStatus.observedAt) ||
+    !canonicalInstant(observedStatus.expiresAt) ||
+    !canonicalInstant(observedStatus.sourcePageRevisionAt) ||
+    typeof observedStatus.sourcePageRevisionId !== 'string' ||
+    !/^\d+$/u.test(observedStatus.sourcePageRevisionId) ||
+    typeof observedStatus.sourcePageRevisionUrl !== 'string'
+  ) {
+    return false;
+  }
+  const observedAt = new Date(observedStatus.observedAt).getTime();
+  const expiresAt = new Date(observedStatus.expiresAt).getTime();
+  const now = Date.now();
+  if (
+    observedAt > now ||
+    now >= expiresAt ||
+    expiresAt <= observedAt ||
+    expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000
+  ) {
+    return false;
+  }
   try {
     return [
       review.licenseUrl,
       review.canonicalRightsPageUrl,
       review.immutableRightsRevisionUrl,
+      review.observedStatus.sourcePageRevisionUrl,
     ].every((value) => {
       const url = new URL(value);
       return url.protocol === 'https:' && !url.username && !url.password;
@@ -132,7 +214,7 @@ function claimsMatchEvidence(entry: PublicSearchEntry): boolean {
   return (
     entry.confidenceClass === REVIEWED_CONFIDENCE &&
     entry.rightsStatus === expectedRightsStatus(review) &&
-    entry.verificationDate === review.reviewedOn &&
+    entry.verificationDate === review.observedStatus.observedAt &&
     entry.provenance === expectedProvenance(entry)
   );
 }
@@ -297,6 +379,14 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
   const reviewedConfidence = 'Reviewed public source; original editorial annotation, not transcript text';
   const controlledConfidence = 'Rights-validated controlled fixture match';
   const nonBlank = (value) => typeof value === 'string' && value.trim().length > 0;
+  const canonicalInstant = (value) => {
+    if (typeof value !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+  };
+  const namedRoleSafe = (role) => role && typeof role === 'object' &&
+    nonBlank(role.id) && nonBlank(role.name);
   const validReviewDate = (value) => {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const date = new Date(value + 'T00:00:00.000Z');
@@ -313,6 +403,22 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
           typeof review.immutableRightsRevisionUrl !== 'string' ||
           !nonBlank(review.reviewer) ||
           !validReviewDate(review.reviewedOn) ||
+          !review.roles || typeof review.roles !== 'object' ||
+          !namedRoleSafe(review.roles.publisher) ||
+          !namedRoleSafe(review.roles.uploader) ||
+          !namedRoleSafe(review.roles.attributedCreator) ||
+          !namedRoleSafe(review.roles.rightsAuthority) ||
+          review.roles.rightsAuthority.relationship !== 'named-licensor' ||
+          !namedRoleSafe(review.roles.evidenceIssuer) ||
+          !review.observedStatus || typeof review.observedStatus !== 'object' ||
+          review.observedStatus.status !== 'source-record-observed' ||
+          !canonicalInstant(review.observedStatus.observedAt) ||
+          !canonicalInstant(review.observedStatus.expiresAt) ||
+          !canonicalInstant(review.observedStatus.sourcePageRevisionAt) ||
+          !/^\d+$/.test(review.observedStatus.sourcePageRevisionId) ||
+          typeof review.observedStatus.sourcePageRevisionUrl !== 'string' ||
+          typeof review.annotationSha256 !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(review.annotationSha256) ||
           !review.productBoundary || typeof review.productBoundary !== 'object' ||
           !Array.isArray(review.productBoundary.included) ||
           !Array.isArray(review.productBoundary.excluded) ||
@@ -320,8 +426,14 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
           review.productBoundary.excluded.length === 0 ||
           !review.productBoundary.included.every(nonBlank) ||
           !review.productBoundary.excluded.every(nonBlank)) return false;
+      const observedAt = new Date(review.observedStatus.observedAt).getTime();
+      const expiresAt = new Date(review.observedStatus.expiresAt).getTime();
+      const now = Date.now();
+      if (observedAt > now || now >= expiresAt || expiresAt <= observedAt ||
+          expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) return false;
       return [review.licenseUrl, review.canonicalRightsPageUrl,
-        review.immutableRightsRevisionUrl].every((value) => {
+        review.immutableRightsRevisionUrl,
+        review.observedStatus.sourcePageRevisionUrl].every((value) => {
         const url = new URL(value);
         return url.protocol === 'https:' && !url.username && !url.password;
       });
@@ -349,7 +461,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
         entry.verificationDate + ' ' + entry.provenance);
     return entry.confidenceClass === reviewedConfidence &&
       entry.rightsStatus === expectedRights(review) &&
-      entry.verificationDate === review.reviewedOn &&
+      entry.verificationDate === review.observedStatus.observedAt &&
       entry.provenance === expectedProvenance(entry);
   };
   const safe = (entry, expectedCorpusId) => {
@@ -457,6 +569,8 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       'License: ' + review.licenseIdentifier,
       'Immutable rights revision: ' + review.immutableRightsRevisionUrl,
       'Historical review date: ' + review.reviewedOn,
+      'Observed source record: ' + review.observedStatus.observedAt +
+        ' through ' + review.observedStatus.expiresAt,
       'Included: ' + review.productBoundary.included.join(', '),
       'Excluded: ' + review.productBoundary.excluded.join(', '),
       'Correction state: ' + entry.correctionState,
@@ -512,7 +626,7 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
     addText(metadata, 'Topics', entry.topicSlugs.join(', '));
     addText(metadata, 'Confidence class', entry.confidenceClass);
     addText(metadata, 'Rights status', entry.rightsStatus);
-    addText(metadata, 'Verification date', entry.verificationDate);
+    addText(metadata, entry.reviewEvidence ? 'Observed at' : 'Verification date', entry.verificationDate);
     addText(metadata, 'Provenance', entry.provenance);
     if (entry.reviewEvidence) {
       addText(metadata, 'Evidence ID', entry.reviewEvidence.evidenceId);
@@ -520,7 +634,8 @@ export const VIDEO_MOMENT_SEARCH_CLIENT = String.raw`(() => {
       addText(metadata, 'License URL', entry.reviewEvidence.licenseUrl);
       addText(metadata, 'Canonical rights page', entry.reviewEvidence.canonicalRightsPageUrl);
       addText(metadata, 'Immutable rights revision', entry.reviewEvidence.immutableRightsRevisionUrl);
-      addText(metadata, 'Review record', entry.reviewEvidence.reviewer + ' · ' + entry.reviewEvidence.reviewedOn);
+      addText(metadata, 'Historical license review', entry.reviewEvidence.reviewer + ' · ' + entry.reviewEvidence.reviewedOn);
+      addText(metadata, 'Observed source record', entry.reviewEvidence.observedStatus.observedAt + ' · expires ' + entry.reviewEvidence.observedStatus.expiresAt);
       addText(metadata, 'Product boundary', 'Included: ' +
         entry.reviewEvidence.productBoundary.included.join(', ') + '; excluded: ' +
         entry.reviewEvidence.productBoundary.excluded.join(', '));

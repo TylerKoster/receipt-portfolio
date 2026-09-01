@@ -5,6 +5,10 @@ import {
   type VideoMoment,
 } from '../../packages/video-moment-core/src/index.js';
 import { normalizePublicBaseUrl } from '../shared/render.js';
+import {
+  parseVideoSourceEvidenceManifest,
+  validateCommonsSourceEvidence,
+} from './source-evidence.js';
 
 export interface OriginalSynthesis {
   readonly text: string;
@@ -62,6 +66,35 @@ function assertValidCorpus(corpus: VideoCorpus): void {
   if (!validation.ok) {
     throw new Error(
       `Invalid video corpus: ${validation.diagnostics.join(', ')}`,
+    );
+  }
+}
+
+function assertValidPublication(
+  corpus: VideoCorpus,
+  sourceEvidence: unknown,
+  validationNow: Date,
+): void {
+  const reviewed =
+    corpus.videos.some((video) => video.reviewEvidenceId !== undefined) ||
+    corpus.rights.some((grant) => grant.reviewEvidence !== undefined);
+  if (!reviewed) {
+    assertValidCorpus(corpus);
+    return;
+  }
+  if (sourceEvidence === undefined) {
+    throw new Error(
+      'Evidence manifest is required for reviewed corpus records',
+    );
+  }
+  const validation = validateCommonsSourceEvidence(
+    corpus,
+    sourceEvidence,
+    validationNow,
+  );
+  if (!validation.ok) {
+    throw new Error(
+      `Invalid evidence manifest: ${validation.diagnostics.join(', ')}`,
     );
   }
 }
@@ -260,8 +293,10 @@ export function renderSitemap(
   origin: string,
   discoveryRoutes: DiscoveryRoutes = {},
   additionalPaths: readonly string[] = [],
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  assertValidCorpus(corpus);
+  assertValidPublication(corpus, sourceEvidence, validationNow);
   const publicMoments = corpus.moments.filter(isPublicMoment);
   const videosById = new Map(corpus.videos.map((video) => [video.id, video]));
   const publicVideos = [
@@ -308,18 +343,32 @@ export function renderAtomFeed(
   corpus: VideoCorpus,
   origin: string,
   guides: readonly FeedGuide[] = [],
+  sourceEvidence?: unknown,
+  validationNow: Date = new Date(),
 ): string {
-  assertValidCorpus(corpus);
+  assertValidPublication(corpus, sourceEvidence, validationNow);
   const videos = new Map(corpus.videos.map((video) => [video.id, video]));
   const grants = new Map(corpus.rights.map((grant) => [grant.id, grant]));
+  const evidenceRecords =
+    sourceEvidence === undefined
+      ? new Map()
+      : new Map(
+          parseVideoSourceEvidenceManifest(sourceEvidence).records.map(
+            (record) => [record.evidenceId, record],
+          ),
+        );
   const moments = corpus.moments.filter(isPublicMoment);
   const eligibleGuides = eligibleDiscoveryRoutes(corpus, origin, {
     guides,
   }).guides;
   const updates = [
-    ...moments.map(
-      (moment) => grants.get(moment.rightsGrantId)!.permissionVerifiedAt,
-    ),
+    ...moments.map((moment) => {
+      const grant = grants.get(moment.rightsGrantId)!;
+      return grant.reviewEvidence === undefined
+        ? grant.permissionVerifiedAt
+        : evidenceRecords.get(grant.reviewEvidence.evidenceId)!.observedStatus
+            .observedAt;
+    }),
     ...eligibleGuides.map((guide) => guide.updatedAt),
   ].sort();
   const updated = updates.at(-1);
@@ -329,9 +378,14 @@ export function renderAtomFeed(
   const momentEntries = moments.map((moment) => {
     const video = videos.get(moment.videoId)!;
     const grant = grants.get(moment.rightsGrantId)!;
+    const updated =
+      grant.reviewEvidence === undefined
+        ? grant.permissionVerifiedAt
+        : evidenceRecords.get(grant.reviewEvidence.evidenceId)!.observedStatus
+            .observedAt;
     const canonical = canonicalUrl(origin, `moments/${moment.id}/`);
     const exactSource = buildTimestampUrl(video, moment.startSeconds);
-    return `  <entry>\n    <id>${xml(canonical)}</id>\n    <title>${xml(`${video.title} at ${formatSeconds(moment.startSeconds)}`)}</title>\n    <updated>${xml(grant.permissionVerifiedAt)}</updated>\n    <link rel="alternate" href="${xml(canonical)}"/>\n    <link rel="related" href="${xml(exactSource)}"/>\n    <summary>${xml(moment.excerpt)}</summary>\n  </entry>`;
+    return `  <entry>\n    <id>${xml(canonical)}</id>\n    <title>${xml(`${video.title} at ${formatSeconds(moment.startSeconds)}`)}</title>\n    <updated>${xml(updated)}</updated>\n    <link rel="alternate" href="${xml(canonical)}"/>\n    <link rel="related" href="${xml(exactSource)}"/>\n    <summary>${xml(moment.excerpt)}</summary>\n  </entry>`;
   });
   const guideEntries = eligibleGuides.map((guide) => {
     const canonical = canonicalUrl(origin, `guides/${guide.slug}/`);

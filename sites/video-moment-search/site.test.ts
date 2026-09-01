@@ -8,15 +8,15 @@ import {
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
 import {
-  renderCreatorPage,
-  renderGuidePage,
-  renderMomentPage,
-  renderSearchResults,
-  renderSearchShell,
-  renderTopicPage,
-  renderVideoMomentHome,
-  renderVideoPage,
-  serializePublicSearchIndex,
+  renderCreatorPage as renderCreatorPageRaw,
+  renderGuidePage as renderGuidePageRaw,
+  renderMomentPage as renderMomentPageRaw,
+  renderSearchResults as renderSearchResultsRaw,
+  renderSearchShell as renderSearchShellRaw,
+  renderTopicPage as renderTopicPageRaw,
+  renderVideoMomentHome as renderVideoMomentHomeRaw,
+  renderVideoPage as renderVideoPageRaw,
+  serializePublicSearchIndex as serializePublicSearchIndexRaw,
 } from './render.js';
 import {
   searchPublicIndex,
@@ -24,7 +24,7 @@ import {
 } from './search-client.js';
 import {
   validateCommonsSourceEvidence,
-  type CommonsSourceRightsEvidence,
+  type VideoSourceEvidenceManifest,
 } from './source-evidence.js';
 import { videoMomentSearchSite } from './index.js';
 
@@ -37,17 +37,96 @@ const fixture = JSON.parse(
     'utf8',
   ),
 ) as VideoCorpus;
-const sourceRightsEvidence = JSON.parse(
+const sourceEvidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/commons-source-rights-v1.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
       import.meta.url,
     ),
     'utf8',
   ),
-) as CommonsSourceRightsEvidence;
+) as VideoSourceEvidenceManifest;
+const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
+
+function manifestFor(
+  corpus: VideoCorpus,
+): VideoSourceEvidenceManifest | undefined {
+  const reviewed = corpus.videos.some(
+    (video) => video.reviewEvidenceId !== undefined,
+  );
+  if (!reviewed) return undefined;
+  const manifest = structuredClone(sourceEvidenceManifest);
+  manifest.corpusId = corpus.corpusId;
+  for (const record of manifest.records) {
+    record.bindings.corpusId = corpus.corpusId;
+  }
+  return manifest;
+}
+
+function serializePublicSearchIndex(
+  ...args: Parameters<typeof serializePublicSearchIndexRaw>
+): ReturnType<typeof serializePublicSearchIndexRaw> {
+  args[2] ??= manifestFor(args[0]);
+  return serializePublicSearchIndexRaw(...args);
+}
+
+function renderSearchResults(
+  ...args: Parameters<typeof renderSearchResultsRaw>
+): ReturnType<typeof renderSearchResultsRaw> {
+  args[3] ??= manifestFor(args[0]);
+  return renderSearchResultsRaw(...args);
+}
+
+function renderSearchShell(
+  ...args: Parameters<typeof renderSearchShellRaw>
+): ReturnType<typeof renderSearchShellRaw> {
+  args[3] ??= manifestFor(args[0]);
+  return renderSearchShellRaw(...args);
+}
+
+function renderVideoMomentHome(
+  ...args: Parameters<typeof renderVideoMomentHomeRaw>
+): ReturnType<typeof renderVideoMomentHomeRaw> {
+  args[3] ??= manifestFor(args[0]);
+  return renderVideoMomentHomeRaw(...args);
+}
+
+function renderVideoPage(
+  ...args: Parameters<typeof renderVideoPageRaw>
+): ReturnType<typeof renderVideoPageRaw> {
+  args[5] ??= manifestFor(args[0]);
+  return renderVideoPageRaw(...args);
+}
+
+function renderMomentPage(
+  ...args: Parameters<typeof renderMomentPageRaw>
+): ReturnType<typeof renderMomentPageRaw> {
+  args[5] ??= manifestFor(args[0]);
+  return renderMomentPageRaw(...args);
+}
+
+function renderTopicPage(
+  ...args: Parameters<typeof renderTopicPageRaw>
+): ReturnType<typeof renderTopicPageRaw> {
+  args[6] ??= manifestFor(args[0]);
+  return renderTopicPageRaw(...args);
+}
+
+function renderCreatorPage(
+  ...args: Parameters<typeof renderCreatorPageRaw>
+): ReturnType<typeof renderCreatorPageRaw> {
+  args[5] ??= manifestFor(args[0]);
+  return renderCreatorPageRaw(...args);
+}
+
+function renderGuidePage(
+  ...args: Parameters<typeof renderGuidePageRaw>
+): ReturnType<typeof renderGuidePageRaw> {
+  args[5] ??= manifestFor(args[0]);
+  return renderGuidePageRaw(...args);
+}
 
 function twoSourceFixture(): VideoCorpus {
   const firstVideo = fixture.videos[0]!;
@@ -115,6 +194,101 @@ function twoSourceFixture(): VideoCorpus {
       },
     ],
   };
+}
+
+function twoReviewedPublication(): {
+  corpus: VideoCorpus;
+  manifest: VideoSourceEvidenceManifest;
+} {
+  const corpus = structuredClone(twoSourceFixture()) as Mutable<VideoCorpus>;
+  const evidenceId = 'commons-independent-source-v1';
+  const canonical =
+    'https://commons.wikimedia.org/wiki/File:Independent_source.webm';
+  corpus.videos[1]!.reviewEvidenceId = evidenceId;
+  corpus.videos[1]!.timestampStrategy = 'media-fragment';
+  corpus.rights[1]!.basis = 'explicit-license';
+  corpus.rights[1]!.licenseNote =
+    'Synthetic Explicit License 1.0; timestamp link plus original editorial annotation only; no inferred permission or endorsement.';
+  corpus.rights[1]!.permissionVerifiedAt = '2026-08-30T00:00:00.000Z';
+  corpus.rights[1]!.revocationContact = canonical;
+  corpus.rights[1]!.reviewEvidence = {
+    classification: 'reviewed-public-source',
+    evidenceId,
+    licenseIdentifier: 'Synthetic Explicit License 1.0',
+    licenseUrl: 'https://license.example/synthetic-1.0',
+    canonicalRightsPageUrl: canonical,
+    immutableRightsRevisionUrl:
+      'https://commons.wikimedia.org/w/index.php?title=File:Independent_source.webm&oldid=1',
+    reviewer: 'SyntheticReviewer',
+    reviewedOn: '2026-08-30',
+    productBoundary: structuredClone(sourceRightsEvidence.productBoundary),
+  };
+
+  const manifest = manifestFor(corpus)!;
+  const secondRecord = structuredClone(manifest.records[0]!);
+  secondRecord.manifestRecordId = 'independent-source-evidence-record-v2';
+  secondRecord.evidenceId = evidenceId;
+  secondRecord.bindings = {
+    corpusId: corpus.corpusId,
+    videoId: 'video-independent-source',
+    rightsGrantId: 'rights-independent-source',
+    momentId: 'moment-independent-source',
+    cueId: 'annotation-independent-source-45',
+  };
+  secondRecord.workTitle = 'Independent controlled source';
+  secondRecord.roles = {
+    publisher: { id: 'synthetic-creator', name: 'Synthetic Creator' },
+    uploader: { id: 'synthetic-uploader', name: 'Synthetic Uploader' },
+    attributedCreator: {
+      id: 'synthetic-creator',
+      name: 'Synthetic Creator',
+    },
+    rightsAuthority: {
+      id: 'synthetic-creator',
+      name: 'Synthetic Creator',
+      relationship: 'named-licensor',
+    },
+    evidenceIssuer: {
+      id: 'wikimedia-commons',
+      name: 'Wikimedia Commons',
+    },
+  };
+  secondRecord.canonicalSourceEvidenceUrl = canonical;
+  secondRecord.immutableSourceEvidenceUrl =
+    'https://commons.wikimedia.org/w/index.php?title=File:Independent_source.webm&oldid=1';
+  secondRecord.license = {
+    name: 'Synthetic Explicit License 1.0',
+    url: 'https://license.example/synthetic-1.0',
+  };
+  secondRecord.delivery = {
+    url: 'https://video.example/independent-source',
+    mediaType: 'video/webm',
+    byteLength: 1,
+    acceptRanges: 'bytes',
+    durationSeconds: 299.5,
+  };
+  secondRecord.timestamp = {
+    strategy: 'media-fragment',
+    seconds: 45,
+    url: 'https://video.example/independent-source#t=45',
+  };
+  secondRecord.historicalLicenseReview = {
+    issuer: 'Wikimedia Commons',
+    reviewer: 'SyntheticReviewer',
+    reviewedOn: '2026-08-30',
+    finding: 'Synthetic reviewer recorded the explicit license.',
+  };
+  secondRecord.observedStatus = {
+    status: 'source-record-observed',
+    observedAt: '2026-08-31T00:00:00.000Z',
+    expiresAt: '2026-09-30T00:00:00.000Z',
+    sourcePageRevisionId: '2',
+    sourcePageRevisionUrl:
+      'https://commons.wikimedia.org/w/index.php?title=File:Independent_source.webm&oldid=2',
+    sourcePageRevisionAt: '2026-08-30T12:00:00.000Z',
+  };
+  manifest.records.push(secondRecord);
+  return { corpus, manifest };
 }
 
 type Mutable<Value> = {
@@ -465,6 +639,240 @@ function executeClientPayload(): ClientHarness {
 }
 
 describe('AI Moment Index public search surface', () => {
+  it('admits a complete versioned evidence manifest with exact record bindings and explicit roles', () => {
+    expect(
+      validateCommonsSourceEvidence(
+        fixture,
+        sourceEvidenceManifest,
+        new Date('2026-08-31T12:00:00.000Z'),
+      ),
+    ).toEqual({ ok: true, diagnostics: [] });
+  });
+
+  it('rejects missing, duplicate, orphaned, and stale reviewed evidence sets deterministically', () => {
+    expect(() => serializePublicSearchIndexRaw(fixture, searchIndex)).toThrow(
+      'Evidence manifest is required for reviewed corpus records',
+    );
+
+    const duplicate = structuredClone(sourceEvidenceManifest);
+    duplicate.records.push(structuredClone(duplicate.records[0]!));
+    expect(
+      validateCommonsSourceEvidence(
+        fixture,
+        duplicate,
+        new Date('2026-08-31T12:00:00.000Z'),
+      ).diagnostics,
+    ).toEqual([
+      'SOURCE_EVIDENCE_BINDING_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
+      'SOURCE_EVIDENCE_ID_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
+      'SOURCE_EVIDENCE_MANIFEST_ID_DUPLICATE:robots-control-evidence-record-v2',
+      'SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=1:actual=2',
+    ]);
+
+    const orphan = structuredClone(sourceEvidenceManifest);
+    orphan.records[0]!.bindings.videoId = 'video-orphan';
+    expect(
+      validateCommonsSourceEvidence(
+        fixture,
+        orphan,
+        new Date('2026-08-31T12:00:00.000Z'),
+      ).diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_VIDEO_BINDING_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
+    );
+
+    const stale = structuredClone(sourceEvidenceManifest);
+    stale.records[0]!.observedStatus.expiresAt = '2026-08-31T12:00:00.000Z';
+    expect(
+      validateCommonsSourceEvidence(
+        fixture,
+        stale,
+        new Date('2026-08-31T12:00:00.000Z'),
+      ).diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_OBSERVATION_EXPIRED:commons-how-can-we-keep-robots-under-control-v1',
+    );
+
+    const clockCases = [
+      [
+        'future',
+        (candidate: Mutable<VideoSourceEvidenceManifest>) => {
+          candidate.records[0]!.observedStatus.observedAt =
+            '2026-08-31T13:00:00.000Z';
+        },
+        'SOURCE_EVIDENCE_OBSERVATION_FUTURE:commons-how-can-we-keep-robots-under-control-v1',
+      ],
+      [
+        'reversed',
+        (candidate: Mutable<VideoSourceEvidenceManifest>) => {
+          candidate.records[0]!.observedStatus.expiresAt =
+            '2026-08-30T00:00:00.000Z';
+        },
+        'SOURCE_EVIDENCE_OBSERVATION_REVERSED:commons-how-can-we-keep-robots-under-control-v1',
+      ],
+      [
+        'overlong',
+        (candidate: Mutable<VideoSourceEvidenceManifest>) => {
+          candidate.records[0]!.observedStatus.expiresAt =
+            '2026-12-01T00:00:00.000Z';
+        },
+        'SOURCE_EVIDENCE_OBSERVATION_WINDOW_TOO_LONG:commons-how-can-we-keep-robots-under-control-v1',
+      ],
+      [
+        'ill-formed',
+        (candidate: Mutable<VideoSourceEvidenceManifest>) => {
+          candidate.records[0]!.observedStatus.observedAt = '2026-08-31';
+        },
+        'SOURCE_EVIDENCE_SCHEMA_INVALID:records.0.observedStatus.observedAt',
+      ],
+    ] as const;
+    for (const [name, mutate, diagnostic] of clockCases) {
+      const candidate = structuredClone(
+        sourceEvidenceManifest,
+      ) as Mutable<VideoSourceEvidenceManifest>;
+      mutate(candidate);
+      expect(
+        validateCommonsSourceEvidence(
+          fixture,
+          candidate,
+          new Date('2026-08-31T12:00:00.000Z'),
+        ).diagnostics,
+        name,
+      ).toContain(diagnostic);
+    }
+  });
+
+  it('validates every record in a multi-record set and rejects swapped or partially invalid bindings', () => {
+    const { corpus, manifest } = twoReviewedPublication();
+    const now = new Date('2026-08-31T12:00:00.000Z');
+    expect(validateCommonsSourceEvidence(corpus, manifest, now)).toEqual({
+      ok: true,
+      diagnostics: [],
+    });
+
+    const swapped = structuredClone(manifest);
+    [
+      swapped.records[0]!.bindings.videoId,
+      swapped.records[1]!.bindings.videoId,
+    ] = [
+      swapped.records[1]!.bindings.videoId,
+      swapped.records[0]!.bindings.videoId,
+    ];
+    expect(validateCommonsSourceEvidence(corpus, swapped, now).ok).toBe(false);
+    expect(
+      validateCommonsSourceEvidence(corpus, swapped, now).diagnostics,
+    ).toEqual(
+      expect.arrayContaining([
+        'SOURCE_EVIDENCE_VIDEO_BINDING_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
+        'SOURCE_EVIDENCE_VIDEO_BINDING_MISMATCH:commons-independent-source-v1',
+      ]),
+    );
+
+    const partial = structuredClone(manifest);
+    partial.records[1]!.timestamp.url =
+      'https://video.example/independent-source#t=46';
+    expect(
+      validateCommonsSourceEvidence(corpus, partial, now).diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:commons-independent-source-v1',
+    );
+
+    const extraGrantCoverage = structuredClone(corpus) as Mutable<VideoCorpus>;
+    extraGrantCoverage.rights[0]!.coveredVideoIds.push(
+      'video-independent-source',
+    );
+    expect(
+      validateCommonsSourceEvidence(extraGrantCoverage, manifest, now)
+        .diagnostics,
+    ).toContain(
+      'SOURCE_EVIDENCE_GRANT_RELATIONSHIP_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
+    );
+  });
+
+  it('requires the manifest on every reviewed rendering path', () => {
+    for (const render of [
+      () => renderSearchResultsRaw(fixture, searchIndex, 'robots control'),
+      () => renderSearchResultsRaw(fixture, searchIndex, '   '),
+      () => renderSearchShellRaw(fixture, searchIndex, baseUrl),
+      () => renderVideoMomentHomeRaw(fixture, searchIndex, baseUrl),
+      () =>
+        renderVideoPageRaw(
+          fixture,
+          searchIndex,
+          'video-robots-under-control',
+          baseUrl,
+        ),
+      () =>
+        renderMomentPageRaw(
+          fixture,
+          searchIndex,
+          'moment-robots-control',
+          baseUrl,
+        ),
+      () =>
+        renderCreatorPageRaw(
+          fixture,
+          searchIndex,
+          'university-of-the-netherlands',
+          baseUrl,
+        ),
+      () => renderGuidePageRaw(fixture, searchIndex, baseUrl),
+    ]) {
+      expect(render).toThrow(
+        'Evidence manifest is required for reviewed corpus records',
+      );
+    }
+  });
+
+  it('preserves exact source, annotation, and product boundaries without network access', () => {
+    const serialized = serializePublicSearchIndex(
+      fixture,
+      searchIndex,
+      sourceEvidenceManifest,
+      new Date('2026-08-31T12:00:00.000Z'),
+    ).entries[0]!;
+    expect(serialized.timestampUrl).toBe(
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(serialized.reviewEvidence).toMatchObject({
+      annotationSha256:
+        '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
+      observedStatus: {
+        status: 'source-record-observed',
+        observedAt: '2026-08-31T00:00:00.000Z',
+        expiresAt: '2026-09-30T00:00:00.000Z',
+      },
+      roles: sourceEvidenceManifest.records[0]!.roles,
+      productBoundary: sourceRightsEvidence.productBoundary,
+    });
+  });
+
+  it('renders historical review and fresh observation as different non-permission facts', () => {
+    const html = renderVideoMomentHome(
+      fixture,
+      searchIndex,
+      baseUrl,
+      sourceEvidenceManifest,
+      new Date('2026-08-31T12:00:00.000Z'),
+    );
+    expect(html).toContain('Historical license review');
+    expect(html).toContain('LicenseReviewerBot · 2022-01-18');
+    expect(html).toContain('Observed source record');
+    expect(html).toContain('2026-08-31T00:00:00.000Z');
+    expect(html).not.toMatch(/current (?:permission|availability)/iu);
+    expect(html).not.toContain('Source and license availability was reviewed');
+    for (const boundary of [
+      'hosting',
+      'embedding',
+      'media distribution',
+      'transcript distribution',
+      'endorsement claim',
+      'inferred permission',
+    ]) {
+      expect(html).toContain(boundary);
+    }
+  });
+
   it('explains the audience and workflow before the enterable search form', () => {
     const html = renderVideoMomentHome(fixture, searchIndex, baseUrl);
     expect(html).toContain(
@@ -495,10 +903,10 @@ describe('AI Moment Index public search surface', () => {
       fixture,
       searchIndex,
       baseUrl,
-      sourceRightsEvidence,
+      sourceEvidenceManifest,
     );
     expect(html).toContain(
-      'Source and license availability was reviewed on 2022-01-18; this is historical evidence, not current verification.',
+      'Historical license review dates: 2022-01-18. Fresh source-record observation windows: 2026-08-31T00:00:00.000Z through 2026-09-30T00:00:00.000Z.',
     );
     expect(html).toContain(
       'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
@@ -520,7 +928,12 @@ describe('AI Moment Index public search surface', () => {
   });
 
   it('renders the fixed query with the reviewed moment first and exact source second', () => {
-    const html = renderSearchResults(fixture, searchIndex, 'robots control');
+    const html = renderSearchResults(
+      fixture,
+      searchIndex,
+      'robots control',
+      sourceEvidenceManifest,
+    );
     expect(
       html.indexOf('data-moment-id="moment-robots-control"'),
     ).toBeGreaterThanOrEqual(0);
@@ -537,19 +950,28 @@ describe('AI Moment Index public search surface', () => {
 
   it('binds the public fixture to the deterministic Commons rights evidence', () => {
     expect(
-      validateCommonsSourceEvidence(fixture, sourceRightsEvidence),
+      validateCommonsSourceEvidence(fixture, sourceEvidenceManifest),
     ).toEqual({
       ok: true,
       diagnostics: [],
     });
-    expect(sourceRightsEvidence).toEqual({
-      schemaVersion: 1,
+    expect(sourceRightsEvidence).toMatchObject({
+      manifestRecordId: 'robots-control-evidence-record-v2',
       evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
       workTitle: 'How can we keep robots under control?',
-      attributionParty: 'University of the Netherlands',
-      canonicalRightsPageUrl:
+      roles: {
+        publisher: { name: 'University of the Netherlands' },
+        uploader: { name: 'PJ Geest' },
+        attributedCreator: { name: 'University of the Netherlands' },
+        rightsAuthority: {
+          name: 'University of the Netherlands',
+          relationship: 'named-licensor',
+        },
+        evidenceIssuer: { name: 'Wikimedia Commons' },
+      },
+      canonicalSourceEvidenceUrl:
         'https://commons.wikimedia.org/wiki/File:How_can_we_keep_robots_under_control.webm',
-      immutableRightsRevisionUrl:
+      immutableSourceEvidenceUrl:
         'https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1000389530',
       license: {
         name: 'CC BY-SA 4.0 International',
@@ -567,11 +989,15 @@ describe('AI Moment Index public search surface', () => {
         seconds: 132,
         url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
       },
-      reviewRecord: {
+      historicalLicenseReview: {
+        issuer: 'Wikimedia Commons',
         reviewer: 'LicenseReviewerBot',
         reviewedOn: '2022-01-18',
-        finding:
-          'Confirmed availability under CC BY-SA 4.0 International on the review date.',
+      },
+      observedStatus: {
+        status: 'source-record-observed',
+        observedAt: '2026-08-31T00:00:00.000Z',
+        expiresAt: '2026-09-30T00:00:00.000Z',
       },
       annotation: {
         kind: 'original-editorial',
@@ -591,21 +1017,10 @@ describe('AI Moment Index public search surface', () => {
         ],
       },
     });
-    const evidence = sourceRightsEvidence as {
-      annotation: { text: string; sha256: string };
-      attributionParty: string;
-      delivery: { url: string };
-      evidenceId: string;
-      immutableRightsRevisionUrl: string;
-      license: { name: string; url: string };
-      productBoundary: { included: string[]; excluded: string[] };
-      reviewRecord: { reviewer: string; reviewedOn: string };
-      timestamp: { strategy: string; seconds: number; url: string };
-      workTitle: string;
-    };
+    const evidence = sourceRightsEvidence;
     expect(fixture.videos[0]).toMatchObject({
       title: evidence.workTitle,
-      creatorName: evidence.attributionParty,
+      creatorName: evidence.roles.attributedCreator.name,
       sourceUrl: evidence.delivery.url,
       timestampStrategy: evidence.timestamp.strategy,
     });
@@ -639,31 +1054,45 @@ describe('AI Moment Index public search surface', () => {
       },
     });
 
-    const publicEntry = serializePublicSearchIndex(fixture, searchIndex)
-      .entries[0] as ReturnType<
+    const publicEntry = serializePublicSearchIndex(
+      fixture,
+      searchIndex,
+      sourceEvidenceManifest,
+    ).entries[0] as ReturnType<
       typeof serializePublicSearchIndex
     >['entries'][number] & {
       reviewEvidence?: unknown;
     };
-    expect(publicEntry.reviewEvidence).toEqual(
-      (fixture.rights[0] as { reviewEvidence?: unknown }).reviewEvidence,
-    );
+    expect(publicEntry.reviewEvidence).toMatchObject({
+      evidenceId: evidence.evidenceId,
+      roles: evidence.roles,
+      observedStatus: evidence.observedStatus,
+    });
     expect(publicEntry.rightsStatus).toContain(evidence.license.name);
-    expect(publicEntry.verificationDate).toBe(evidence.reviewRecord.reviewedOn);
+    expect(publicEntry.verificationDate).toBe(
+      evidence.observedStatus.observedAt,
+    );
     expect(publicEntry.provenance).toContain(evidence.evidenceId);
     expect(publicEntry.provenance).toContain(
-      evidence.immutableRightsRevisionUrl,
+      evidence.immutableSourceEvidenceUrl,
     );
-    expect(publicEntry.provenance).toContain(evidence.reviewRecord.reviewer);
+    expect(publicEntry.provenance).toContain(
+      evidence.historicalLicenseReview.reviewer,
+    );
 
-    const html = renderSearchResults(fixture, searchIndex, 'robots control');
+    const html = renderSearchResults(
+      fixture,
+      searchIndex,
+      'robots control',
+      sourceEvidenceManifest,
+    );
     for (const value of [
       evidence.evidenceId,
       evidence.license.name,
       evidence.license.url,
-      evidence.immutableRightsRevisionUrl.replace('&', '&amp;'),
-      evidence.reviewRecord.reviewer,
-      evidence.reviewRecord.reviewedOn,
+      evidence.immutableSourceEvidenceUrl.replace('&', '&amp;'),
+      evidence.historicalLicenseReview.reviewer,
+      evidence.historicalLicenseReview.reviewedOn,
       ...evidence.productBoundary.included,
       ...evidence.productBoundary.excluded,
     ]) {
@@ -675,40 +1104,42 @@ describe('AI Moment Index public search surface', () => {
     const invalidEvidence = [
       [
         'annotation text',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.annotation.text = 'Unsupported standalone 02:12 claim.'),
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.annotation.text =
+            'Unsupported standalone 02:12 claim.'),
       ],
       [
         'annotation hash',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.annotation.sha256 = '0'.repeat(64)),
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.annotation.sha256 = '0'.repeat(64)),
       ],
       [
         'source linkage',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.delivery.url = 'https://example.test/drifted.webm'),
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.delivery.url =
+            'https://example.test/drifted.webm'),
       ],
       [
         'timestamp linkage',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.timestamp.seconds = 133),
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.timestamp.seconds = 133),
       ],
       [
         'rights linkage',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.license.name = 'CC0 1.0'),
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.license.name = 'CC0 1.0'),
       ],
       [
-        'review finding',
-        (candidate: Mutable<CommonsSourceRightsEvidence>) =>
-          (candidate.reviewRecord.finding = 'Unsupported review finding.'),
+        'binding relationship',
+        (candidate: Mutable<VideoSourceEvidenceManifest>) =>
+          (candidate.records[0]!.bindings.cueId = 'unsupported-cue'),
       ],
     ] as const;
 
     for (const [name, invalidate] of invalidEvidence) {
       const candidate = structuredClone(
-        sourceRightsEvidence,
-      ) as Mutable<CommonsSourceRightsEvidence>;
+        sourceEvidenceManifest,
+      ) as Mutable<VideoSourceEvidenceManifest>;
       invalidate(candidate);
       expect(validateCommonsSourceEvidence(fixture, candidate).ok, name).toBe(
         false,
@@ -716,11 +1147,11 @@ describe('AI Moment Index public search surface', () => {
       expect(
         () => serializePublicSearchIndex(fixture, searchIndex, candidate),
         name,
-      ).toThrow('Invalid Commons source evidence');
+      ).toThrow('Invalid evidence manifest');
       let html: string | undefined;
       expect(() => {
         html = renderVideoMomentHome(fixture, searchIndex, baseUrl, candidate);
-      }, name).toThrow('Invalid Commons source evidence');
+      }, name).toThrow('Invalid evidence manifest');
       expect(html, name).toBeUndefined();
     }
   });
@@ -866,7 +1297,7 @@ describe('AI Moment Index public search surface', () => {
     const synchronizeClaims = (entry: Mutable<typeof baseEntry>): void => {
       const review = entry.reviewEvidence!;
       entry.rightsStatus = `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
-      entry.verificationDate = review.reviewedOn;
+      entry.verificationDate = review.observedStatus.observedAt;
       entry.provenance = `Corpus ${entry.corpusId}; evidence ${review.evidenceId}; immutable rights revision ${review.immutableRightsRevisionUrl}; reviewed by ${review.reviewer} on ${review.reviewedOn}; rights grant ${entry.rightsGrantId}; cue ${entry.cueIds.join(', ')}`;
     };
     const invalidEvidence: readonly [
@@ -879,6 +1310,16 @@ describe('AI Moment Index public search surface', () => {
         (entry) => (entry.reviewEvidence!.licenseIdentifier = ''),
       ],
       ['empty reviewer', (entry) => (entry.reviewEvidence!.reviewer = '')],
+      [
+        'empty publisher identity',
+        (entry) => (entry.reviewEvidence!.roles.publisher.name = ''),
+      ],
+      [
+        'malformed observed timestamp',
+        (entry) => {
+          entry.reviewEvidence!.observedStatus.observedAt = '2026-08-31';
+        },
+      ],
       ['empty review date', (entry) => (entry.reviewEvidence!.reviewedOn = '')],
       [
         'malformed review date',
@@ -968,11 +1409,11 @@ describe('AI Moment Index public search surface', () => {
       expect(
         () => serializePublicSearchIndex(candidate, searchIndex),
         name,
-      ).toThrow('Invalid video corpus');
+      ).toThrow('Invalid evidence manifest');
       let html: string | undefined;
       expect(() => {
         html = renderVideoMomentHome(candidate, searchIndex, baseUrl);
-      }, name).toThrow('Invalid video corpus');
+      }, name).toThrow('Invalid evidence manifest');
       expect(html, name).toBeUndefined();
     }
   });
@@ -996,7 +1437,7 @@ describe('AI Moment Index public search surface', () => {
       'Topics',
       'Confidence class',
       'Rights status',
-      'Verification date',
+      'Observed at',
       'Provenance',
       'Correction state',
     ]) {
@@ -1138,7 +1579,7 @@ describe('AI Moment Index public search surface', () => {
         'Enter the idea or phrase you remember.',
       );
       expect(directPage).toContain(
-        'historical evidence, not current verification',
+        'Historical license review dates: 2022-01-18',
       );
     }
 
@@ -1376,7 +1817,7 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.clear.disabled).toBe(true);
 
     await harness.resolveIndex(
-      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+      serializePublicSearchIndex(fixture, searchIndex, sourceEvidenceManifest),
     );
     harness.submit('robots control');
     const result = descendants(harness.results, 'article')[0]!;
@@ -1453,7 +1894,7 @@ describe('AI Moment Index public search surface', () => {
   it('keeps Clear authoritative when a deferred clipboard copy resolves afterward', async () => {
     const harness = executeClientPayload();
     await harness.resolveIndex(
-      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+      serializePublicSearchIndex(fixture, searchIndex, sourceEvidenceManifest),
     );
     harness.submit('robots control');
     byText(
@@ -1480,7 +1921,7 @@ describe('AI Moment Index public search surface', () => {
   it('keeps Clear authoritative when a deferred clipboard copy rejects afterward', async () => {
     const harness = executeClientPayload();
     await harness.resolveIndex(
-      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+      serializePublicSearchIndex(fixture, searchIndex, sourceEvidenceManifest),
     );
     harness.submit('robots control');
     byText(
@@ -1507,7 +1948,7 @@ describe('AI Moment Index public search surface', () => {
   it('updates the focused handoff control in place for add and remove', async () => {
     const harness = executeClientPayload();
     await harness.resolveIndex(
-      serializePublicSearchIndex(fixture, searchIndex, sourceRightsEvidence),
+      serializePublicSearchIndex(fixture, searchIndex, sourceEvidenceManifest),
     );
     harness.submit('robots control');
     const control = byText(
@@ -1557,7 +1998,7 @@ describe('AI Moment Index public search surface', () => {
     const valid = serializePublicSearchIndex(
       fixture,
       searchIndex,
-      sourceRightsEvidence,
+      sourceEvidenceManifest,
     );
     await malformed.resolveIndex({
       ...valid,

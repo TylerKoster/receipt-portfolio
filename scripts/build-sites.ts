@@ -28,6 +28,7 @@ import {
 } from '../packages/evidence-core/src/index.js';
 import {
   buildSearchIndex,
+  type SearchIndex,
   type VideoCorpus,
 } from '../packages/video-moment-core/src/index.js';
 import { searchReceiptSite } from '../sites/search-receipt/index.js';
@@ -94,7 +95,10 @@ import {
   renderSitemap as renderVideoMomentSitemap,
   renderSitemapIndex as renderVideoMomentSitemapIndex,
 } from '../sites/video-moment-search/seo.js';
-import { validateCommonsSourceEvidence } from '../sites/video-moment-search/source-evidence.js';
+import {
+  validateCommonsSourceEvidence,
+  type VideoSourceEvidenceManifest,
+} from '../sites/video-moment-search/source-evidence.js';
 import { workflowTestLabSite } from '../sites/workflow-test-lab/index.js';
 import { loadVerifiedReceipts } from './evidence-cli.js';
 
@@ -107,6 +111,56 @@ const CLEANUP_RETRY_DELAYS_MS = [25, 100] as const;
 const BACKUP_OWNER_MARKER = '.receipt-portfolio-backup-owner.json';
 const BACKUP_OWNER = 'receipt-portfolio-static-site-builder';
 const BACKUP_FORMAT_VERSION = 2;
+
+interface VideoMomentPublication {
+  readonly fixture: VideoCorpus;
+  readonly manifest: VideoSourceEvidenceManifest;
+  readonly index: SearchIndex;
+  readonly validationNow: Date;
+}
+
+async function loadVideoMomentPublication(
+  manifestPath?: string,
+): Promise<VideoMomentPublication> {
+  const validationNow = new Date();
+  const [fixture, manifest] = await Promise.all([
+    readFile(
+      join(
+        projectRoot(),
+        'fixtures',
+        'video-moment-search',
+        'authorized-ai-video-v1.json',
+      ),
+      'utf8',
+    ).then((content) => JSON.parse(content) as VideoCorpus),
+    readFile(
+      manifestPath ??
+        join(
+          projectRoot(),
+          'fixtures',
+          'video-moment-search',
+          'video-source-evidence-manifest-v2.json',
+        ),
+      'utf8',
+    ).then((content) => JSON.parse(content) as VideoSourceEvidenceManifest),
+  ]);
+  const validation = validateCommonsSourceEvidence(
+    fixture,
+    manifest,
+    validationNow,
+  );
+  if (!validation.ok) {
+    throw new Error(
+      `AI Moment Index evidence manifest is not admitted: ${validation.diagnostics.join(', ')}`,
+    );
+  }
+  return {
+    fixture,
+    manifest,
+    index: buildSearchIndex(fixture),
+    validationNow,
+  };
+}
 export const PUBLIC_BASE_URL_ENV = 'RECEIPT_PORTFOLIO_BASE_URL';
 export const EVIDENCE_DIRECTORY_ENV = 'RECEIPT_PORTFOLIO_EVIDENCE_DIR';
 export const OUTPUT_DIRECTORY_ENV = 'RECEIPT_PORTFOLIO_OUTPUT_DIR';
@@ -367,8 +421,8 @@ async function writeSiteTree(
   outputDirectory: string,
   receipts: readonly Receipt[],
   publicBaseUrl: string,
-  includeVideoMomentSearch: boolean,
-  blogRegistries: readonly ProductBlogRegistry[],
+  videoMomentPublication?: VideoMomentPublication,
+  blogRegistries: readonly ProductBlogRegistry[] = [],
 ): Promise<void> {
   const [
     searchHandoff,
@@ -543,7 +597,7 @@ async function writeSiteTree(
       };
     });
   const sourceBoundSkillDataModule = `export const SOURCE_BOUND_PUBLIC_SKILL_RECORDS = ${canonicalJson(sourceBoundSkillRecords).replaceAll('<', '\\u003c')};\n`;
-  const includedSites = includeVideoMomentSearch
+  const includedSites = videoMomentPublication
     ? [...SITE_DEFINITIONS, videoMomentSearchSite]
     : SITE_DEFINITIONS;
   const blogBySite = new Map(
@@ -853,37 +907,8 @@ async function writeSiteTree(
     }
     await emitProductBlog(site, directory);
   }
-  if (includeVideoMomentSearch) {
-    const [fixture, sourceRightsEvidence] = await Promise.all([
-      readFile(
-        join(
-          projectRoot(),
-          'fixtures',
-          'video-moment-search',
-          'authorized-ai-video-v1.json',
-        ),
-        'utf8',
-      ).then((content) => JSON.parse(content) as VideoCorpus),
-      readFile(
-        join(
-          projectRoot(),
-          'fixtures',
-          'video-moment-search',
-          'commons-source-rights-v1.json',
-        ),
-        'utf8',
-      ).then((content) => JSON.parse(content) as unknown),
-    ]);
-    const sourceEvidenceValidation = validateCommonsSourceEvidence(
-      fixture,
-      sourceRightsEvidence,
-    );
-    if (!sourceEvidenceValidation.ok) {
-      throw new Error(
-        `AI Moment Index source evidence is not admitted: ${sourceEvidenceValidation.diagnostics.join(', ')}`,
-      );
-    }
-    const index = buildSearchIndex(fixture);
+  if (videoMomentPublication) {
+    const { fixture, index, manifest, validationNow } = videoMomentPublication;
     const directory = join(outputDirectory, videoMomentSearchSite.siteId);
     await mkdir(directory, { recursive: true });
     await Promise.all([
@@ -893,13 +918,14 @@ async function writeSiteTree(
           fixture,
           index,
           publicBaseUrl,
-          sourceRightsEvidence,
+          manifest,
+          validationNow,
         ),
       ),
       writeFile(
         join(directory, 'search-index.json'),
         canonicalJson(
-          serializePublicSearchIndex(fixture, index, sourceRightsEvidence),
+          serializePublicSearchIndex(fixture, index, manifest, validationNow),
         ),
       ),
       writeFile(
@@ -930,6 +956,8 @@ async function writeSiteTree(
           publicBaseUrl,
           {},
           blogRouteBySite.get(videoMomentSearchSite.siteId)?.sitemapPaths ?? [],
+          manifest,
+          validationNow,
         ),
       ),
       writeFile(
@@ -938,7 +966,7 @@ async function writeSiteTree(
       ),
       writeFile(
         join(directory, 'feed.xml'),
-        renderAtomFeed(fixture, publicBaseUrl),
+        renderAtomFeed(fixture, publicBaseUrl, [], manifest, validationNow),
       ),
     ]);
 
@@ -947,7 +975,15 @@ async function writeSiteTree(
       await mkdir(pageDirectory, { recursive: true });
       await writeFile(
         join(pageDirectory, 'index.html'),
-        renderVideoPage(fixture, index, video.id, publicBaseUrl),
+        renderVideoPage(
+          fixture,
+          index,
+          video.id,
+          publicBaseUrl,
+          {},
+          manifest,
+          validationNow,
+        ),
       );
     }
     for (const moment of publicMoments.values()) {
@@ -955,7 +991,15 @@ async function writeSiteTree(
       await mkdir(pageDirectory, { recursive: true });
       await writeFile(
         join(pageDirectory, 'index.html'),
-        renderMomentPage(fixture, index, moment.id, publicBaseUrl),
+        renderMomentPage(
+          fixture,
+          index,
+          moment.id,
+          publicBaseUrl,
+          {},
+          manifest,
+          validationNow,
+        ),
       );
     }
     for (const creatorId of publicCreatorIds) {
@@ -963,7 +1007,15 @@ async function writeSiteTree(
       await mkdir(pageDirectory, { recursive: true });
       await writeFile(
         join(pageDirectory, 'index.html'),
-        renderCreatorPage(fixture, index, creatorId, publicBaseUrl),
+        renderCreatorPage(
+          fixture,
+          index,
+          creatorId,
+          publicBaseUrl,
+          {},
+          manifest,
+          validationNow,
+        ),
       );
     }
     await emitProductBlog(videoMomentSearchSite, directory);
@@ -1065,6 +1117,7 @@ export async function buildSites(options: {
   trustedWorkspaceDirectory?: string;
   includeVideoMomentSearch?: boolean;
   blogRegistryRoot?: string;
+  videoMomentEvidenceManifestPath?: string;
 }): Promise<void> {
   const publicBaseUrl = normalizePublicBaseUrl(
     options.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
@@ -1118,6 +1171,9 @@ export async function buildSites(options: {
     dirname(outputDirectory),
   );
   await inspectOptionalRealDirectory(outputDirectory, 'Output root');
+  const videoMomentPublication = options.includeVideoMomentSearch
+    ? await loadVideoMomentPublication(options.videoMomentEvidenceManifestPath)
+    : undefined;
   const backupDirectory = `${outputDirectory}.previous`;
   try {
     const backupStats = await lstat(backupDirectory);
@@ -1138,7 +1194,7 @@ export async function buildSites(options: {
       stagingDirectory,
       receipts,
       publicBaseUrl,
-      options.includeVideoMomentSearch ?? false,
+      videoMomentPublication,
       blogValidation.registries,
     );
     await replaceOutput(stagingDirectory, outputDirectory, canonicalParentPath);

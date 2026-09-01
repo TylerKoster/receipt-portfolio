@@ -5,13 +5,27 @@ import {
   type VideoCorpus,
 } from '../../packages/video-moment-core/src/index.js';
 
+const identifier = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);
 const nonBlank = z.string().refine((value) => value.trim().length > 0);
 const httpsUrl = z
   .string()
   .url()
-  .refine(
-    (value) => value.trim().length > 0 && new URL(value).protocol === 'https:',
-  );
+  .refine((value) => {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      url.username === '' &&
+      url.password === '' &&
+      value.trim() === value
+    );
+  });
+const canonicalInstant = z.string().refine((value) => {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)) {
+    return false;
+  }
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+});
 const strictDate = z.string().refine((value) => {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -21,63 +35,101 @@ const strictDate = z.string().refine((value) => {
   );
 });
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/u);
+const namedRole = z.object({ id: identifier, name: nonBlank }).strict();
 
-export const CommonsSourceRightsEvidenceSchema = z
+export const VideoSourceEvidenceManifestSchema = z
   .object({
-    schemaVersion: z.literal(1),
-    evidenceId: nonBlank,
-    workTitle: nonBlank,
-    attributionParty: nonBlank,
-    canonicalRightsPageUrl: httpsUrl,
-    immutableRightsRevisionUrl: httpsUrl,
-    license: z
-      .object({
-        name: nonBlank,
-        url: httpsUrl,
-      })
-      .strict(),
-    delivery: z
-      .object({
-        url: httpsUrl,
-        mediaType: z.literal('video/webm'),
-        byteLength: z.number().int().positive(),
-        acceptRanges: z.literal('bytes'),
-        durationSeconds: z.number().positive(),
-      })
-      .strict(),
-    timestamp: z
-      .object({
-        strategy: z.literal('media-fragment'),
-        seconds: z.number().int().nonnegative(),
-        url: httpsUrl,
-      })
-      .strict(),
-    reviewRecord: z
-      .object({
-        reviewer: nonBlank,
-        reviewedOn: strictDate,
-        finding: nonBlank,
-      })
-      .strict(),
-    annotation: z
-      .object({
-        kind: z.literal('original-editorial'),
-        text: nonBlank,
-        sha256,
-      })
-      .strict(),
-    productBoundary: z
-      .object({
-        included: z.array(nonBlank).min(1),
-        excluded: z.array(nonBlank).min(1),
-      })
-      .strict(),
+    schemaVersion: z.literal(2),
+    manifestId: identifier,
+    corpusId: identifier,
+    records: z.array(
+      z
+        .object({
+          manifestRecordId: identifier,
+          evidenceId: identifier,
+          bindings: z
+            .object({
+              corpusId: identifier,
+              videoId: identifier,
+              rightsGrantId: identifier,
+              momentId: identifier,
+              cueId: identifier,
+            })
+            .strict(),
+          workTitle: nonBlank,
+          roles: z
+            .object({
+              publisher: namedRole,
+              uploader: namedRole,
+              attributedCreator: namedRole,
+              rightsAuthority: namedRole.extend({
+                relationship: z.literal('named-licensor'),
+              }),
+              evidenceIssuer: namedRole,
+            })
+            .strict(),
+          canonicalSourceEvidenceUrl: httpsUrl,
+          immutableSourceEvidenceUrl: httpsUrl,
+          license: z.object({ name: nonBlank, url: httpsUrl }).strict(),
+          delivery: z
+            .object({
+              url: httpsUrl,
+              mediaType: z.literal('video/webm'),
+              byteLength: z.number().int().positive(),
+              acceptRanges: z.literal('bytes'),
+              durationSeconds: z.number().positive(),
+            })
+            .strict(),
+          timestamp: z
+            .object({
+              strategy: z.literal('media-fragment'),
+              seconds: z.number().int().nonnegative(),
+              url: httpsUrl,
+            })
+            .strict(),
+          historicalLicenseReview: z
+            .object({
+              issuer: nonBlank,
+              reviewer: nonBlank,
+              reviewedOn: strictDate,
+              finding: nonBlank,
+            })
+            .strict(),
+          observedStatus: z
+            .object({
+              status: z.literal('source-record-observed'),
+              observedAt: canonicalInstant,
+              expiresAt: canonicalInstant,
+              sourcePageRevisionId: z.string().regex(/^\d+$/u),
+              sourcePageRevisionUrl: httpsUrl,
+              sourcePageRevisionAt: canonicalInstant,
+            })
+            .strict(),
+          annotation: z
+            .object({
+              kind: z.literal('original-editorial'),
+              text: nonBlank,
+              sha256,
+            })
+            .strict(),
+          productBoundary: z
+            .object({
+              included: z.array(nonBlank).min(1),
+              excluded: z.array(nonBlank).min(1),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
-export type CommonsSourceRightsEvidence = z.infer<
-  typeof CommonsSourceRightsEvidenceSchema
+export type VideoSourceEvidenceManifest = z.infer<
+  typeof VideoSourceEvidenceManifestSchema
 >;
+export type VideoSourceEvidenceRecord =
+  VideoSourceEvidenceManifest['records'][number];
+export type CommonsSourceRightsEvidence = VideoSourceEvidenceManifest;
 
 export interface CommonsSourceEvidenceValidation {
   readonly ok: boolean;
@@ -100,9 +152,43 @@ function timestampUrl(sourceUrl: string, seconds: number): string {
   return url.href;
 }
 
+function duplicates(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) repeated.add(value);
+    seen.add(value);
+  }
+  return [...repeated].sort();
+}
+
+function addSetDiagnostics(
+  expected: ReadonlySet<string>,
+  actual: ReadonlySet<string>,
+  diagnostics: string[],
+): void {
+  for (const value of [...expected].sort()) {
+    if (!actual.has(value)) {
+      diagnostics.push(`SOURCE_EVIDENCE_RECORD_MISSING:${value}`);
+    }
+  }
+  for (const value of [...actual].sort()) {
+    if (!expected.has(value)) {
+      diagnostics.push(`SOURCE_EVIDENCE_RECORD_EXTRA:${value}`);
+    }
+  }
+}
+
+export function parseVideoSourceEvidenceManifest(
+  value: unknown,
+): VideoSourceEvidenceManifest {
+  return VideoSourceEvidenceManifestSchema.parse(value);
+}
+
 export function validateCommonsSourceEvidence(
   corpusValue: unknown,
-  evidenceValue: unknown,
+  manifestValue: unknown,
+  validationNow: Date = new Date(),
 ): CommonsSourceEvidenceValidation {
   const corpusValidation = validateVideoCorpus(corpusValue);
   if (!corpusValidation.ok) {
@@ -113,15 +199,14 @@ export function validateCommonsSourceEvidence(
       ),
     };
   }
-  const parsedCorpus = corpusValue as VideoCorpus;
-  const parsedEvidence =
-    CommonsSourceRightsEvidenceSchema.safeParse(evidenceValue);
-  if (!parsedEvidence.success) {
+  const parsedManifest =
+    VideoSourceEvidenceManifestSchema.safeParse(manifestValue);
+  if (!parsedManifest.success) {
     return {
       ok: false,
       diagnostics: [
         ...new Set(
-          parsedEvidence.error.issues.map(
+          parsedManifest.error.issues.map(
             (issue) =>
               `SOURCE_EVIDENCE_SCHEMA_INVALID:${issue.path.join('.') || '<root>'}`,
           ),
@@ -130,108 +215,273 @@ export function validateCommonsSourceEvidence(
     };
   }
 
-  const evidence = parsedEvidence.data;
+  const corpus = corpusValue as VideoCorpus;
+  const manifest = parsedManifest.data;
   const diagnostics: string[] = [];
-  const grants = parsedCorpus.rights.filter(
-    (grant) => grant.reviewEvidence?.evidenceId === evidence.evidenceId,
-  );
-  const videos = parsedCorpus.videos.filter(
-    (video) => video.reviewEvidenceId === evidence.evidenceId,
-  );
-  if (grants.length !== 1)
-    diagnostics.push('SOURCE_EVIDENCE_GRANT_LINK_MISMATCH');
-  if (videos.length !== 1)
-    diagnostics.push('SOURCE_EVIDENCE_VIDEO_LINK_MISMATCH');
-
-  const grant = grants[0];
-  const video = videos[0];
-  const review = grant?.reviewEvidence;
-  if (review !== undefined) {
-    if (review.licenseIdentifier !== evidence.license.name)
-      diagnostics.push('SOURCE_EVIDENCE_LICENSE_NAME_MISMATCH');
-    if (review.licenseUrl !== evidence.license.url)
-      diagnostics.push('SOURCE_EVIDENCE_LICENSE_URL_MISMATCH');
-    if (review.canonicalRightsPageUrl !== evidence.canonicalRightsPageUrl)
-      diagnostics.push('SOURCE_EVIDENCE_CANONICAL_RIGHTS_MISMATCH');
-    if (
-      review.immutableRightsRevisionUrl !== evidence.immutableRightsRevisionUrl
-    )
-      diagnostics.push('SOURCE_EVIDENCE_IMMUTABLE_RIGHTS_MISMATCH');
-    if (review.reviewer !== evidence.reviewRecord.reviewer)
-      diagnostics.push('SOURCE_EVIDENCE_REVIEWER_MISMATCH');
-    if (review.reviewedOn !== evidence.reviewRecord.reviewedOn)
-      diagnostics.push('SOURCE_EVIDENCE_REVIEW_DATE_MISMATCH');
-    if (
-      !sameStrings(
-        review.productBoundary.included,
-        evidence.productBoundary.included,
-      )
-    )
-      diagnostics.push('SOURCE_EVIDENCE_INCLUDED_USES_MISMATCH');
-    if (
-      !sameStrings(
-        review.productBoundary.excluded,
-        evidence.productBoundary.excluded,
-      )
-    )
-      diagnostics.push('SOURCE_EVIDENCE_EXCLUDED_USES_MISMATCH');
+  const nowMs = validationNow.getTime();
+  if (Number.isNaN(nowMs)) {
+    diagnostics.push('SOURCE_EVIDENCE_VALIDATION_CLOCK_INVALID');
+  }
+  if (manifest.corpusId !== corpus.corpusId) {
+    diagnostics.push('SOURCE_EVIDENCE_MANIFEST_CORPUS_MISMATCH');
   }
 
-  if (video !== undefined && grant !== undefined) {
-    if (video.title !== evidence.workTitle)
-      diagnostics.push('SOURCE_EVIDENCE_WORK_TITLE_MISMATCH');
-    if (video.creatorName !== evidence.attributionParty)
-      diagnostics.push('SOURCE_EVIDENCE_ATTRIBUTION_MISMATCH');
-    if (video.sourceUrl !== evidence.delivery.url)
-      diagnostics.push('SOURCE_EVIDENCE_DELIVERY_URL_MISMATCH');
-    if (Math.ceil(evidence.delivery.durationSeconds) !== video.durationSeconds)
-      diagnostics.push('SOURCE_EVIDENCE_MEDIA_DURATION_MISMATCH');
-    if (video.timestampStrategy !== evidence.timestamp.strategy)
-      diagnostics.push('SOURCE_EVIDENCE_TIMESTAMP_STRATEGY_MISMATCH');
-    if (!grant.coveredVideoIds.includes(video.id))
-      diagnostics.push('SOURCE_EVIDENCE_GRANT_VIDEO_MISMATCH');
-    if (!grant.coveredSourceUrls.includes(evidence.delivery.url))
-      diagnostics.push('SOURCE_EVIDENCE_GRANT_SOURCE_MISMATCH');
-    if (grant.revocationContact !== evidence.canonicalRightsPageUrl)
-      diagnostics.push('SOURCE_EVIDENCE_GRANT_RIGHTS_PAGE_MISMATCH');
+  const videoEvidenceIds = corpus.videos.flatMap((video) =>
+    video.reviewEvidenceId === undefined ? [] : [video.reviewEvidenceId],
+  );
+  const grantEvidenceIds = corpus.rights.flatMap((grant) =>
+    grant.reviewEvidence === undefined ? [] : [grant.reviewEvidence.evidenceId],
+  );
+  const expectedEvidenceIds = new Set(videoEvidenceIds);
+  const grantEvidenceSet = new Set(grantEvidenceIds);
+  const manifestEvidenceIds = manifest.records.map(
+    (record) => record.evidenceId,
+  );
+  const actualEvidenceIds = new Set(manifestEvidenceIds);
 
-    const moments = parsedCorpus.moments.filter(
-      (moment) =>
-        moment.videoId === video.id &&
-        moment.rightsGrantId === grant.id &&
-        moment.startSeconds === evidence.timestamp.seconds,
-    );
-    if (moments.length !== 1)
-      diagnostics.push('SOURCE_EVIDENCE_MOMENT_LINK_MISMATCH');
-    const moment = moments[0];
-    if (moment !== undefined && moment.excerpt !== evidence.annotation.text)
-      diagnostics.push('SOURCE_EVIDENCE_EXCERPT_MISMATCH');
-
-    const cues = parsedCorpus.cues.filter(
-      (cue) =>
-        cue.videoId === video.id &&
-        cue.startSeconds <= evidence.timestamp.seconds &&
-        cue.endSeconds > evidence.timestamp.seconds &&
-        cue.evidenceKind === 'editorial-annotation' &&
-        cue.text === evidence.annotation.text &&
-        cue.contentSha256 === evidence.annotation.sha256,
-    );
-    if (cues.length !== 1)
-      diagnostics.push('SOURCE_EVIDENCE_ANNOTATION_LINK_MISMATCH');
-    if (!grant.coveredAnnotationHashes?.includes(evidence.annotation.sha256))
-      diagnostics.push('SOURCE_EVIDENCE_GRANT_ANNOTATION_MISMATCH');
+  for (const evidenceId of duplicates(videoEvidenceIds)) {
+    diagnostics.push(`SOURCE_EVIDENCE_CORPUS_VIDEO_ID_DUPLICATE:${evidenceId}`);
   }
-
-  if (sha256Utf8(evidence.annotation.text) !== evidence.annotation.sha256)
-    diagnostics.push('SOURCE_EVIDENCE_ANNOTATION_HASH_MISMATCH');
-  const expectedFinding = `Confirmed availability under ${evidence.license.name} on the review date.`;
-  if (evidence.reviewRecord.finding !== expectedFinding)
-    diagnostics.push('SOURCE_EVIDENCE_REVIEW_FINDING_MISMATCH');
+  for (const evidenceId of duplicates(grantEvidenceIds)) {
+    diagnostics.push(`SOURCE_EVIDENCE_CORPUS_GRANT_ID_DUPLICATE:${evidenceId}`);
+  }
   if (
-    timestampUrl(evidence.delivery.url, evidence.timestamp.seconds) !==
-    evidence.timestamp.url
-  )
-    diagnostics.push('SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH');
+    expectedEvidenceIds.size !== grantEvidenceSet.size ||
+    [...expectedEvidenceIds].some(
+      (evidenceId) => !grantEvidenceSet.has(evidenceId),
+    )
+  ) {
+    diagnostics.push('SOURCE_EVIDENCE_CORPUS_REVIEW_SET_MISMATCH');
+  }
+  if (manifest.records.length !== expectedEvidenceIds.size) {
+    diagnostics.push(
+      `SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=${expectedEvidenceIds.size}:actual=${manifest.records.length}`,
+    );
+  }
+  for (const evidenceId of duplicates(manifestEvidenceIds)) {
+    diagnostics.push(`SOURCE_EVIDENCE_ID_DUPLICATE:${evidenceId}`);
+  }
+  for (const recordId of duplicates(
+    manifest.records.map((record) => record.manifestRecordId),
+  )) {
+    diagnostics.push(`SOURCE_EVIDENCE_MANIFEST_ID_DUPLICATE:${recordId}`);
+  }
+  const bindingKeys = manifest.records.map((record) =>
+    [
+      record.bindings.corpusId,
+      record.bindings.videoId,
+      record.bindings.rightsGrantId,
+      record.bindings.momentId,
+      record.bindings.cueId,
+    ].join('|'),
+  );
+  const duplicateBindingKeys = new Set(duplicates(bindingKeys));
+  for (const record of manifest.records) {
+    const bindingKey = [
+      record.bindings.corpusId,
+      record.bindings.videoId,
+      record.bindings.rightsGrantId,
+      record.bindings.momentId,
+      record.bindings.cueId,
+    ].join('|');
+    if (duplicateBindingKeys.has(bindingKey)) {
+      diagnostics.push(
+        `SOURCE_EVIDENCE_BINDING_DUPLICATE:${record.evidenceId}`,
+      );
+    }
+  }
+  addSetDiagnostics(expectedEvidenceIds, actualEvidenceIds, diagnostics);
+
+  for (const record of manifest.records) {
+    const id = record.evidenceId;
+    const video = corpus.videos.find(
+      (candidate) => candidate.id === record.bindings.videoId,
+    );
+    const grant = corpus.rights.find(
+      (candidate) => candidate.id === record.bindings.rightsGrantId,
+    );
+    const moment = corpus.moments.find(
+      (candidate) => candidate.id === record.bindings.momentId,
+    );
+    const cue = corpus.cues.find(
+      (candidate) => candidate.id === record.bindings.cueId,
+    );
+    const review = grant?.reviewEvidence;
+
+    if (
+      record.bindings.corpusId !== corpus.corpusId ||
+      record.bindings.corpusId !== manifest.corpusId
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_CORPUS_BINDING_MISMATCH:${id}`);
+    }
+    if (video === undefined || video.reviewEvidenceId !== id) {
+      diagnostics.push(`SOURCE_EVIDENCE_VIDEO_BINDING_MISMATCH:${id}`);
+    }
+    if (
+      grant === undefined ||
+      grant.basis !== 'explicit-license' ||
+      review?.evidenceId !== id
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_GRANT_BINDING_MISMATCH:${id}`);
+    }
+    if (
+      moment === undefined ||
+      moment.videoId !== record.bindings.videoId ||
+      moment.rightsGrantId !== record.bindings.rightsGrantId ||
+      (moment.state !== 'active' && moment.state !== 'corrected')
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_BINDING_MISMATCH:${id}`);
+    }
+    if (
+      cue === undefined ||
+      cue.videoId !== record.bindings.videoId ||
+      cue.evidenceKind !== 'editorial-annotation'
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_CUE_BINDING_MISMATCH:${id}`);
+    }
+
+    if (video !== undefined) {
+      if (video.title !== record.workTitle) {
+        diagnostics.push(`SOURCE_EVIDENCE_WORK_TITLE_MISMATCH:${id}`);
+      }
+      if (
+        video.creatorId !== record.roles.attributedCreator.id ||
+        video.creatorName !== record.roles.attributedCreator.name
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_ATTRIBUTION_MISMATCH:${id}`);
+      }
+      if (video.sourceUrl !== record.delivery.url) {
+        diagnostics.push(`SOURCE_EVIDENCE_DELIVERY_URL_MISMATCH:${id}`);
+      }
+      if (
+        Math.ceil(record.delivery.durationSeconds) !== video.durationSeconds
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_MEDIA_DURATION_MISMATCH:${id}`);
+      }
+      if (video.timestampStrategy !== record.timestamp.strategy) {
+        diagnostics.push(`SOURCE_EVIDENCE_TIMESTAMP_STRATEGY_MISMATCH:${id}`);
+      }
+    }
+    if (grant !== undefined) {
+      if (
+        grant.creatorId !== record.roles.rightsAuthority.id ||
+        !sameStrings(grant.coveredVideoIds, [record.bindings.videoId]) ||
+        !sameStrings(grant.coveredSourceUrls, [record.delivery.url]) ||
+        !sameStrings(grant.coveredAnnotationHashes ?? [], [
+          record.annotation.sha256,
+        ])
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_GRANT_RELATIONSHIP_MISMATCH:${id}`);
+      }
+    }
+    if (review !== undefined) {
+      if (
+        review.licenseIdentifier !== record.license.name ||
+        review.licenseUrl !== record.license.url
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_LICENSE_MISMATCH:${id}`);
+      }
+      if (review.canonicalRightsPageUrl !== record.canonicalSourceEvidenceUrl) {
+        diagnostics.push(`SOURCE_EVIDENCE_CANONICAL_SOURCE_MISMATCH:${id}`);
+      }
+      if (
+        review.immutableRightsRevisionUrl !== record.immutableSourceEvidenceUrl
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_IMMUTABLE_SOURCE_MISMATCH:${id}`);
+      }
+      if (
+        review.reviewer !== record.historicalLicenseReview.reviewer ||
+        review.reviewedOn !== record.historicalLicenseReview.reviewedOn ||
+        record.historicalLicenseReview.issuer !==
+          record.roles.evidenceIssuer.name
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_HISTORICAL_REVIEW_MISMATCH:${id}`);
+      }
+      if (
+        !sameStrings(
+          review.productBoundary.included,
+          record.productBoundary.included,
+        ) ||
+        !sameStrings(
+          review.productBoundary.excluded,
+          record.productBoundary.excluded,
+        )
+      ) {
+        diagnostics.push(`SOURCE_EVIDENCE_PRODUCT_BOUNDARY_MISMATCH:${id}`);
+      }
+    }
+    if (
+      moment === undefined ||
+      moment.startSeconds !== record.timestamp.seconds ||
+      moment.excerpt !== record.annotation.text
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_MOMENT_CONTENT_MISMATCH:${id}`);
+    }
+    if (
+      cue === undefined ||
+      cue.startSeconds !== record.timestamp.seconds ||
+      cue.endSeconds !== moment?.endSeconds ||
+      cue.text !== record.annotation.text ||
+      cue.contentSha256 !== record.annotation.sha256
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_CUE_CONTENT_MISMATCH:${id}`);
+    }
+    if (sha256Utf8(record.annotation.text) !== record.annotation.sha256) {
+      diagnostics.push(`SOURCE_EVIDENCE_ANNOTATION_HASH_MISMATCH:${id}`);
+    }
+    if (
+      timestampUrl(record.delivery.url, record.timestamp.seconds) !==
+      record.timestamp.url
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:${id}`);
+    }
+
+    const observedMs = new Date(record.observedStatus.observedAt).getTime();
+    const expiresMs = new Date(record.observedStatus.expiresAt).getTime();
+    const revisionMs = new Date(
+      record.observedStatus.sourcePageRevisionAt,
+    ).getTime();
+    if (observedMs > nowMs) {
+      diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_FUTURE:${id}`);
+    }
+    if (nowMs >= expiresMs) {
+      diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_EXPIRED:${id}`);
+    }
+    if (expiresMs <= observedMs) {
+      diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_REVERSED:${id}`);
+    }
+    if (expiresMs - observedMs > 90 * 24 * 60 * 60 * 1000) {
+      diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_WINDOW_TOO_LONG:${id}`);
+    }
+    if (revisionMs > observedMs) {
+      diagnostics.push(`SOURCE_EVIDENCE_REVISION_AFTER_OBSERVATION:${id}`);
+    }
+    const canonicalUrl = new URL(record.canonicalSourceEvidenceUrl);
+    const expectedRevision = new URL('/w/index.php', canonicalUrl);
+    expectedRevision.searchParams.set(
+      'title',
+      canonicalUrl.pathname.replace('/wiki/', ''),
+    );
+    expectedRevision.searchParams.set(
+      'oldid',
+      record.observedStatus.sourcePageRevisionId,
+    );
+    const observedRevision = new URL(
+      record.observedStatus.sourcePageRevisionUrl,
+    );
+    if (
+      expectedRevision.origin !== observedRevision.origin ||
+      expectedRevision.pathname !== observedRevision.pathname ||
+      expectedRevision.searchParams.get('title') !==
+        observedRevision.searchParams.get('title') ||
+      expectedRevision.searchParams.get('oldid') !==
+        observedRevision.searchParams.get('oldid') ||
+      observedRevision.searchParams.size !== 2 ||
+      observedRevision.hash !== ''
+    ) {
+      diagnostics.push(`SOURCE_EVIDENCE_OBSERVED_REVISION_URL_MISMATCH:${id}`);
+    }
+  }
 
   const stableDiagnostics = [...new Set(diagnostics)].sort();
   return { ok: stableDiagnostics.length === 0, diagnostics: stableDiagnostics };

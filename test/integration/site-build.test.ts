@@ -1582,13 +1582,13 @@ describe('static receipt site build', () => {
             projectRoot,
             'fixtures',
             'video-moment-search',
-            'commons-source-rights-v1.json',
+            'video-source-evidence-manifest-v2.json',
           ),
           join(
             firstRuntime,
             'fixtures',
             'video-moment-search',
-            'commons-source-rights-v1.json',
+            'video-source-evidence-manifest-v2.json',
           ),
         ),
         realFileSystem.copyFile(
@@ -1596,13 +1596,13 @@ describe('static receipt site build', () => {
             projectRoot,
             'fixtures',
             'video-moment-search',
-            'commons-source-rights-v1.json',
+            'video-source-evidence-manifest-v2.json',
           ),
           join(
             secondRuntime,
             'fixtures',
             'video-moment-search',
-            'commons-source-rights-v1.json',
+            'video-source-evidence-manifest-v2.json',
           ),
         ),
         realFileSystem.copyFile(

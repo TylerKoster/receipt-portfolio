@@ -1,6 +1,13 @@
-import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildSites } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
@@ -46,6 +53,38 @@ afterEach(async () => {
 });
 
 describe('atomic AI Moment Index build', () => {
+  it('rejects an invalid manifest before creating any output or staging residue', async () => {
+    const manifestPath = join(dirname(outputDirectory), 'invalid.json');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        manifestId: 'invalid-empty-manifest',
+        corpusId: 'wikimedia-commons-ai-video-reviewed-v1',
+        records: [],
+      }),
+    );
+
+    await expect(
+      buildSites({
+        evidenceDirectory,
+        outputDirectory,
+        includeVideoMomentSearch: true,
+        videoMomentEvidenceManifestPath: manifestPath,
+      }),
+    ).rejects.toThrow(
+      /SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH.*SOURCE_EVIDENCE_RECORD_MISSING/iu,
+    );
+    await expect(readdir(outputDirectory)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.includes('.sites-stage-'),
+      ),
+    ).toEqual([]);
+  });
+
   it('keeps direct legacy callers on the three receipt sites by default', async () => {
     await buildSites({ evidenceDirectory, outputDirectory });
     expect(
