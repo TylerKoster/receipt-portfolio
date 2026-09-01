@@ -28,6 +28,18 @@ This fixed synthetic gate covers only the three server-rendered controls: `robot
 - Stop: any wrong/multiple result, timestamp mismatch, native navigation, query/history/storage/telemetry persistence, extra network destination, loss of the server fallback, unsupported or transcript-derived example, or prohibited outcome claim.
 - Evidence boundary: `sites/video-moment-search/site.test.ts` exercises the shipped client payload and stored exact timestamp links. This fixed synthetic recovery gate is not user research or evidence of any user outcome.
 
+## Controlled creator review preview gate
+
+This page-memory-only preview is a deterministic synthetic integrity gate for the three admitted reviewed fixture moments. It allows inspection of stored source, creator, interval, exact source timestamp, evidence, license, immutable rights revision, historical review/freshness wording, product boundary, and correction state. It does not submit a library, change a published record, prove creator onboarding, send or store review/referral data, or establish any user outcome.
+
+- Metric: **deterministic controlled creator review-flow integrity**.
+- Baseline: the creator persona was not yet preview-testable.
+- Target: **3 admitted reviewed moments; exact timestamp landing error 0; correction decisions previewed 1; removal decisions previewed 1; extra requests 0; retained or transmitted measurement records 0**.
+- Stop: missing or ambiguous rights evidence, index mutation, wrong timestamp, persistence or transmission, extra network destination, broken search or fallback, or prohibited outcome claims.
+- Referral evidence: unavailable — measurement is not configured.
+
+The bounded creator onboarding sequence remains: authorized intake and authority attestation (not implemented), quarantine and operator review, creator inspection, correction/removal approval, publication only after passing evidence, and attributable referral reporting only after an explicitly approved endpoint. Real rights-cleared library submission, publication correction/removal, attributable referral evidence, measured task completion/time-to-value, usability, demand, conversion, and revenue remain blocked or unsupported.
+
 ## Persona boundaries
 
 - **Applied-AI researcher:** the preview-testable heuristic route above; no usability or task-completion claim.

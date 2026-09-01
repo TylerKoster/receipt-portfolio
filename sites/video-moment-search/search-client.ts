@@ -386,6 +386,11 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const handoffStatus = document.querySelector('[data-handoff-status]');
   const copy = document.querySelector('[data-copy-handoff]');
   const clear = document.querySelector('[data-clear-handoff]');
+  const creatorPreviewStart = document.querySelector('[data-creator-preview-start]');
+  const creatorPreviewStatus = document.querySelector('[data-creator-preview-status]');
+  const creatorPreviewResults = document.querySelector('[data-creator-preview-results]');
+  const creatorPreviewSummary = document.querySelector('[data-creator-preview-summary]');
+  const creatorPreviewReset = document.querySelector('[data-creator-preview-reset]');
   const controlledQueries = Array.from(document.querySelectorAll('[data-controlled-query]'));
   if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement) ||
       !(status instanceof HTMLElement) || !(results instanceof HTMLElement) ||
@@ -399,6 +404,10 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   let shown = [];
   let handoffRevision = 0;
   const selected = new Map();
+  const creatorDecisions = new Map();
+  const creatorPreviewAvailable = () => creatorPreviewStart instanceof HTMLElement &&
+    creatorPreviewStatus instanceof HTMLElement && creatorPreviewResults instanceof HTMLElement &&
+    creatorPreviewSummary instanceof HTMLElement && creatorPreviewReset instanceof HTMLElement;
   handoffText.readOnly = true;
   copy.disabled = true;
   clear.disabled = true;
@@ -710,6 +719,60 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     article.append(metadata);
     return article;
   };
+  const renderCreatorPreview = () => {
+    if (!creatorPreviewAvailable() || !index) return;
+    const entries = index.entries.filter((entry) => safe(entry, index.corpusId) && entry.reviewEvidence);
+    if (entries.length !== 3 || index.entries.length !== 3) {
+      creatorPreviewStart.disabled = true;
+      creatorPreviewStatus.textContent = 'Creator review preview is unavailable because the reviewed fixture is not available.';
+      return;
+    }
+    const creatorCard = (entry) => {
+      const article = card(entry);
+      const controls = document.createElement('div');
+      ['keep as shown', 'correction needed', 'remove from future preview'].forEach((decision) => {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.textContent = decision;
+        control.addEventListener('click', () => {
+          creatorDecisions.set(entry.momentId, decision);
+          renderCreatorPreview();
+          creatorPreviewStatus.textContent = 'Local preview decision recorded for this open page only.';
+          creatorPreviewStatus.focus();
+        });
+        controls.append(control);
+      });
+      const current = creatorDecisions.get(entry.momentId);
+      if (current) {
+        const decision = document.createElement('p');
+        decision.textContent = 'Local preview decision: ' + current;
+        controls.append(decision);
+      }
+      article.append(controls);
+      return article;
+    };
+    creatorPreviewResults.replaceChildren(...entries.map(creatorCard));
+    creatorPreviewResults.hidden = false;
+    creatorPreviewResults.inert = false;
+    const decisions = Array.from(creatorDecisions.values());
+    creatorPreviewSummary.textContent = decisions.length === 0
+      ? 'No local preview decisions.'
+      : 'Local preview decisions: ' + decisions.join('; ') + '.';
+    creatorPreviewReset.disabled = decisions.length === 0;
+  };
+  if (creatorPreviewAvailable()) {
+    creatorPreviewStart.addEventListener('click', () => {
+      renderCreatorPreview();
+      creatorPreviewStatus.textContent = 'Showing the three admitted reviewed moments for page-memory-only review.';
+      creatorPreviewStatus.focus();
+    });
+    creatorPreviewReset.addEventListener('click', () => {
+      creatorDecisions.clear();
+      renderCreatorPreview();
+      creatorPreviewStatus.textContent = 'Local preview decisions reset.';
+      creatorPreviewStatus.focus();
+    });
+  }
   const hideDynamicResults = () => {
     shown = [];
     results.hidden = true;
@@ -815,9 +878,22 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       index = value;
       error.hidden = true;
       status.textContent = 'Search is ready. Enter a phrase such as “robots control”.';
+      if (creatorPreviewAvailable()) {
+        const reviewed = index.entries.filter((entry) => entry.reviewEvidence);
+        if (index.entries.length === 3 && reviewed.length === 3) {
+          creatorPreviewStart.disabled = false;
+          creatorPreviewStatus.textContent = 'Creator review preview is ready. Inspect the three admitted reviewed moments.';
+        } else {
+          creatorPreviewStatus.textContent = 'Creator review preview is unavailable because the reviewed fixture is not available.';
+        }
+      }
     })
     .catch(() => {
       index = null;
+      if (creatorPreviewAvailable()) {
+        creatorPreviewStart.disabled = true;
+        creatorPreviewStatus.textContent = 'Creator review preview is unavailable because the search index could not load.';
+      }
       showLoadError();
     });
 })(${clockExpression});`;

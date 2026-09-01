@@ -668,6 +668,17 @@ export function renderSearchShell(
     <p class="eyebrow">Available without JavaScript</p>
     <h2 id="initial-heading">${escapeHtml(initialHeading)}</h2>
     ${renderEntries(initial, baseUrl)}
+  </section>
+  <section class="handoff-panel" aria-labelledby="creator-preview-heading" data-creator-preview>
+    <p class="eyebrow">Current page only</p>
+    <h2 id="creator-preview-heading">Controlled creator review preview</h2>
+    <p>This preview uses only the admitted reviewed fixture in the current page. It does not submit a library, change published records, or prove creator onboarding. It sends and stores no review or referral data.</p>
+    <button type="button" data-creator-preview-start disabled>Inspect the three admitted reviewed moments</button>
+    <p class="search-status" role="status" aria-live="polite" tabindex="-1" data-creator-preview-status>Creator review preview is unavailable until the validated search index loads.</p>
+    <div class="moment-list" data-creator-preview-results hidden inert></div>
+    <p data-creator-preview-summary>No local preview decisions.</p>
+    <button type="button" data-creator-preview-reset disabled>Reset local preview decisions</button>
+    <p class="boundary">Referral evidence: unavailable — measurement is not configured.</p>
   </section>`;
   return page(videoMomentSearchSite.title, body, baseUrl, '', true, {
     indexable: initial.length > 0,

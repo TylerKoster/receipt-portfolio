@@ -3218,6 +3218,22 @@ describe('AI Moment Index public search surface', () => {
     expect(VIDEO_MOMENT_SEARCH_CLIENT).toContain("addEventListener('submit'");
   });
 
+  it('renders a controlled creator preview after the initial reviewed moments without a submission claim', () => {
+    const html = renderVideoMomentHome(
+      fixture,
+      searchIndex,
+      baseUrl,
+      sourceEvidenceManifest,
+    );
+    const initialResults = html.indexOf('Available without JavaScript');
+    const creatorPreview = html.indexOf('Controlled creator review preview');
+
+    expect(creatorPreview).toBeGreaterThan(initialResults);
+    expect(html).toContain('data-creator-preview-start');
+    expect(html).toContain('Referral evidence: unavailable');
+    expect(html).toContain('does not submit a library');
+  });
+
   it('records the bounded deterministic-route experiment without usability or demand claims', () => {
     const ledger = JSON.parse(
       readFileSync(

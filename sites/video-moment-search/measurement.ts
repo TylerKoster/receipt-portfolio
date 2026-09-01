@@ -283,6 +283,7 @@ const allowedLedgerKeys = new Set([
   'siteId',
   'historicalArtifact',
   'measurementStatus',
+  'controlledCreatorReviewGate',
   'noDataState',
   'requiredMetrics',
   'personas',
@@ -332,6 +333,23 @@ const expectedNoDataState = {
   ],
 } as const;
 
+const expectedControlledCreatorReviewGate = {
+  evidenceClassification: 'synthetic-heuristic-only',
+  metric: 'deterministic controlled creator review-flow integrity',
+  baseline: 'creator persona was not yet preview-testable',
+  target: {
+    admittedReviewedMoments: 3,
+    exactTimestampLandingError: 0,
+    correctionDecisionsPreviewed: 1,
+    removalDecisionsPreviewed: 1,
+    extraRequests: 0,
+    retainedOrTransmittedMeasurementRecords: 0,
+  },
+  stopRule:
+    'stop on missing or ambiguous rights evidence, index mutation, wrong timestamp, persistence or transmission, extra network destination, broken search or fallback, or prohibited outcome claims',
+  evidencePath: 'sites/video-moment-search/site.test.ts',
+} as const;
+
 const expectedPersonas = [
   {
     id: 'researcher',
@@ -350,12 +368,23 @@ const expectedPersonas = [
   },
   {
     id: 'creator',
-    testability: 'not-yet-testable',
-    testableCapabilities: [],
+    testability: 'preview-testable-heuristic',
+    testableCapabilities: [
+      'controlled-reviewed-fixture-inspection',
+      'page-memory-correction-preview',
+      'page-memory-removal-preview',
+      'not-configured-referral-measurement-status-inspection',
+    ],
     unsupportedCapabilities: [
       'rights-cleared-library-submission',
-      'moment-correction-or-removal',
-      'creator-referral-evidence',
+      'publication-correction-or-removal',
+      'attributable-creator-referral-evidence',
+      'measured-task-completion',
+      'measured-time-to-value',
+      'usability-evidence',
+      'demand-evidence',
+      'conversion-evidence',
+      'revenue-evidence',
     ],
   },
   {
@@ -715,6 +744,16 @@ export function validateExperimentLedger(
   if (ledger.measurementStatus !== 'not-configured') {
     diagnostics.push(
       'measurementStatus must be not-configured without an approved endpoint',
+    );
+  }
+  if (
+    !sameExactStructure(
+      ledger.controlledCreatorReviewGate,
+      expectedControlledCreatorReviewGate,
+    )
+  ) {
+    diagnostics.push(
+      'controlledCreatorReviewGate must match the approved controlled creator review gate',
     );
   }
   if (!sameExactStructure(ledger.noDataState, expectedNoDataState)) {

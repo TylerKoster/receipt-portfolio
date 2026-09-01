@@ -8,6 +8,21 @@
     "role": "released-single-experiment-historical-artifact"
   },
   "measurementStatus": "not-configured",
+  "controlledCreatorReviewGate": {
+    "evidenceClassification": "synthetic-heuristic-only",
+    "metric": "deterministic controlled creator review-flow integrity",
+    "baseline": "creator persona was not yet preview-testable",
+    "target": {
+      "admittedReviewedMoments": 3,
+      "exactTimestampLandingError": 0,
+      "correctionDecisionsPreviewed": 1,
+      "removalDecisionsPreviewed": 1,
+      "extraRequests": 0,
+      "retainedOrTransmittedMeasurementRecords": 0
+    },
+    "stopRule": "stop on missing or ambiguous rights evidence, index mutation, wrong timestamp, persistence or transmission, extra network destination, broken search or fallback, or prohibited outcome claims",
+    "evidencePath": "sites/video-moment-search/site.test.ts"
+  },
   "noDataState": {
     "measurementEvidence": "not-measured",
     "missingDataInterpretation": "unknown-or-blocked",
@@ -52,12 +67,23 @@
     },
     {
       "id": "creator",
-      "testability": "not-yet-testable",
-      "testableCapabilities": [],
+      "testability": "preview-testable-heuristic",
+      "testableCapabilities": [
+        "controlled-reviewed-fixture-inspection",
+        "page-memory-correction-preview",
+        "page-memory-removal-preview",
+        "not-configured-referral-measurement-status-inspection"
+      ],
       "unsupportedCapabilities": [
         "rights-cleared-library-submission",
-        "moment-correction-or-removal",
-        "creator-referral-evidence"
+        "publication-correction-or-removal",
+        "attributable-creator-referral-evidence",
+        "measured-task-completion",
+        "measured-time-to-value",
+        "usability-evidence",
+        "demand-evidence",
+        "conversion-evidence",
+        "revenue-evidence"
       ]
     },
     {

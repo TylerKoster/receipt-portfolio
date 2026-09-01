@@ -89,12 +89,23 @@ const canonicalPersonas = [
   },
   {
     id: 'creator',
-    testability: 'not-yet-testable',
-    testableCapabilities: [],
+    testability: 'preview-testable-heuristic',
+    testableCapabilities: [
+      'controlled-reviewed-fixture-inspection',
+      'page-memory-correction-preview',
+      'page-memory-removal-preview',
+      'not-configured-referral-measurement-status-inspection',
+    ],
     unsupportedCapabilities: [
       'rights-cleared-library-submission',
-      'moment-correction-or-removal',
-      'creator-referral-evidence',
+      'publication-correction-or-removal',
+      'attributable-creator-referral-evidence',
+      'measured-task-completion',
+      'measured-time-to-value',
+      'usability-evidence',
+      'demand-evidence',
+      'conversion-evidence',
+      'revenue-evidence',
     ],
   },
   {
@@ -434,11 +445,14 @@ describe('privacy-preserving measurement contract', () => {
     );
   });
 
-  it('binds testability to persona identity rather than accepting a state swap', () => {
+  it('binds preview capabilities to persona identity rather than accepting a state swap', () => {
     const invalid = structuredClone(ledger);
-    [invalid.personas[0].testability, invalid.personas[1].testability] = [
-      invalid.personas[1].testability,
-      invalid.personas[0].testability,
+    [
+      invalid.personas[0].testableCapabilities,
+      invalid.personas[1].testableCapabilities,
+    ] = [
+      invalid.personas[1].testableCapabilities,
+      invalid.personas[0].testableCapabilities,
     ];
 
     const diagnostics = validateExperimentLedger(invalid).diagnostics;
@@ -451,10 +465,10 @@ describe('privacy-preserving measurement contract', () => {
   });
 
   it.each([['creator', 1]] as const)(
-    'rejects preview-testable for the %s persona',
+    'rejects not-yet-testable for the %s persona',
     (personaId, index) => {
       const invalid = structuredClone(ledger);
-      invalid.personas[index].testability = 'preview-testable-heuristic';
+      invalid.personas[index].testability = 'not-yet-testable';
 
       expect(validateExperimentLedger(invalid).diagnostics).toContain(
         `personas[${index}] must match the ${personaId} persona contract`,
@@ -832,4 +846,13 @@ describe('privacy-preserving measurement contract', () => {
       expect(validateExperimentLedger(candidate).diagnostics).toEqual([]);
     },
   );
+
+  it('fails closed when the controlled creator review gate changes', () => {
+    const invalid = structuredClone(ledger);
+    invalid.controlledCreatorReviewGate.target.extraRequests = 1;
+
+    expect(validateExperimentLedger(invalid).diagnostics).toContain(
+      'controlledCreatorReviewGate must match the approved controlled creator review gate',
+    );
+  });
 });
