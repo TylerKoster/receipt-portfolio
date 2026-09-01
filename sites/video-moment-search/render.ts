@@ -420,7 +420,8 @@ function renderEntry(
   return `<article class="moment-card" data-moment-id="${escapeHtml(entry.momentId)}" aria-labelledby="heading-${escapeHtml(entry.momentId)}">
   <p class="eyebrow">Controlled fixture moment</p>
   <h3 id="heading-${escapeHtml(entry.momentId)}">${link}</h3>
-  <dl class="moment-meta">${detailRows(entry)}</dl>${baseUrl === undefined ? '' : `\n  ${contextualLinks(entry, baseUrl, discovery)}`}
+  ${baseUrl === undefined ? '' : contextualLinks(entry, baseUrl, discovery)}
+  <dl class="moment-meta">${detailRows(entry)}</dl>
 </article>`;
 }
 

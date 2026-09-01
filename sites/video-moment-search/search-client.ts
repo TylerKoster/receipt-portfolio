@@ -687,7 +687,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     const related = document.createElement('a');
     related.href = 'moments/' + encodeURIComponent(entry.momentId) + '/';
     related.textContent = 'Open the evidence-bound moment page';
-    article.append(heading, metadata, related);
+    article.append(heading, related);
     if (entry.reviewEvidence) {
       const select = document.createElement('button');
       const alreadySelected = selected.has(entry.momentId);
@@ -698,6 +698,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       select.addEventListener('click', () => changeSelection(entry, select));
       article.append(select);
     }
+    article.append(metadata);
     return article;
   };
   const hideDynamicResults = () => {

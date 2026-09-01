@@ -2342,6 +2342,82 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.status.textContent).toBe('Showing 1 moment.');
   });
 
+  it('keeps server fallback actions before evidence when renderEntry reorders related navigation above moment-meta', () => {
+    const html = renderSearchShell(fixture, searchIndex, baseUrl);
+    const articleStart = html.indexOf('data-moment-id="moment-robots-control"');
+    const article = html.slice(
+      articleStart,
+      html.indexOf('</article>', articleStart),
+    );
+    const sourceAnchor =
+      'href="https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132"';
+
+    expect(article.indexOf(sourceAnchor)).toBeGreaterThanOrEqual(0);
+    expect(article.indexOf(sourceAnchor)).toBeLessThan(
+      article.indexOf('<nav aria-label="Related pages">'),
+    );
+    expect(article.indexOf('<nav aria-label="Related pages">')).toBeLessThan(
+      article.indexOf('<dl class="moment-meta">'),
+    );
+    expect(article).not.toContain('temporary handoff');
+    expect(article).toContain('<dt>Rights status</dt>');
+    expect(article).toContain('<dt>Provenance</dt>');
+    expect(article).toContain('<dt>Correction state</dt>');
+  });
+
+  it('keeps browser-card actions before evidence when card moves its related link and reviewed handoff above moment-meta', async () => {
+    const reviewed = executeClientPayload();
+    await reviewed.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+    reviewed.submit('robots control');
+    const reviewedCard = descendants(reviewed.results, 'article')[0]!;
+    const reviewedSource = descendants(reviewedCard.children[0]!, 'a')[0]!;
+
+    expect(reviewedSource.href).toBe(
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(
+      reviewedCard.children.map((child) =>
+        child.className === 'moment-meta'
+          ? '.moment-meta'
+          : `${child.tagName}:${child.textContent}`,
+      ),
+    ).toEqual([
+      'h3:',
+      'a:Open the evidence-bound moment page',
+      'button:Add to temporary handoff',
+      '.moment-meta',
+    ]);
+    expect(
+      byText(reviewedCard.children[3]!, 'dt', 'Rights status'),
+    ).toBeDefined();
+    expect(byText(reviewedCard.children[3]!, 'dt', 'Provenance')).toBeDefined();
+    expect(
+      byText(reviewedCard.children[3]!, 'dt', 'Correction state'),
+    ).toBeDefined();
+
+    const unreviewed = executeClientPayload();
+    const unreviewedCorpus = twoSourceFixture();
+    await unreviewed.resolveIndex(
+      serializePublicSearchIndex(
+        unreviewedCorpus,
+        buildSearchIndex(unreviewedCorpus),
+      ),
+    );
+    unreviewed.submit('independent source');
+    const unreviewedCard = descendants(unreviewed.results, 'article')[0]!;
+
+    expect(
+      unreviewedCard.children.map((child) =>
+        child.className === 'moment-meta'
+          ? '.moment-meta'
+          : `${child.tagName}:${child.textContent}`,
+      ),
+    ).toEqual(['h3:', 'a:Open the evidence-bound moment page', '.moment-meta']);
+    expect(descendants(unreviewedCard, 'button')).toEqual([]);
+  });
+
   it('hides the existing server fallback after a successful dynamic search', async () => {
     const harness = executeClientPayload();
     await harness.resolveIndex(
