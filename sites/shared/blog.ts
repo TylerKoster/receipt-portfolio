@@ -1,5 +1,5 @@
-import { lstat, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { lstat, readFile, realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import {
   DEFAULT_PUBLIC_BASE_URL,
   escapeHtml,
@@ -164,14 +164,37 @@ function prohibitedClaim(texts: readonly string[]): {
   const text = texts.join(' ').normalize('NFKC').toLocaleLowerCase('en-US');
   return {
     currentStatus:
-      /\b(?:is|are) currently (?:down|broken|experiencing an? (?:incident|outage))\b/u.test(
+      /\b(?:is|are|remains?|appears?|looks?)\s+(?:currently\s+)?(?:down|broken|unavailable|degraded|experiencing\s+(?:an?\s+)?(?:incident|outage|degradation))(?:\s+right\s+now)?\b/u.test(
         text,
-      ) || /\b(?:current|active) (?:incident|outage)\b/u.test(text),
+      ) ||
+      /\b(?:current|active|ongoing|live)\s+(?:incident|outage|degradation)\b/u.test(
+        text,
+      ) ||
+      /\b(?:incident|outage|degradation)\s+(?:is\s+)?(?:active|ongoing|live|happening)(?:\s+right\s+now)?\b/u.test(
+        text,
+      ),
     causation:
-      /\b(?:caused|causes|because of|due to|is the cause|explains why)\b/u.test(
+      /\b(?:caused|causes|because of|due to|is the cause|explains?|responsible for|reason for|triggered|led to|resulted in)\b/u.test(
         text,
       ),
   };
+}
+
+function normalizedIdentity(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase();
+}
+
+function absoluteFeedId(value: unknown): boolean {
+  if (!nonEmpty(value) || /\s/u.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'urn:' ||
+      (url.protocol === 'https:' && url.username === '' && url.password === '')
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function validateProductBlogRegistries(
@@ -182,6 +205,8 @@ export function validateProductBlogRegistries(
   const namespaces = new Set<string>();
   const canonicals = new Set<string>();
   const feedIds = new Set<string>();
+  const titles = new Set<string>();
+  const descriptions = new Set<string>();
 
   values.forEach((value, registryIndex) => {
     if (!isRecord(value)) {
@@ -210,6 +235,13 @@ export function validateProductBlogRegistries(
       diagnostics.push(`BLOG_REGISTRY_INVALID:${registryIndex}`);
       return;
     }
+    const registryClaims = prohibitedClaim([value.title, value.description]);
+    if (registryClaims.currentStatus) {
+      diagnostics.push(`BLOG_REGISTRY_CURRENT_STATUS_CLAIM:${registryIndex}`);
+    }
+    if (registryClaims.causation) {
+      diagnostics.push(`BLOG_REGISTRY_CAUSATION_CLAIM:${registryIndex}`);
+    }
 
     const postIds = new Set<string>();
     const slugs = new Set<string>();
@@ -221,11 +253,14 @@ export function validateProductBlogRegistries(
       const identityValid =
         slug(postValue.id) &&
         slug(postValue.slug) &&
-        nonEmpty(postValue.feedId) &&
+        absoluteFeedId(postValue.feedId) &&
         nonEmpty(postValue.title) &&
         nonEmpty(postValue.description);
       if (!identityValid) {
         diagnostics.push(`BLOG_POST_INVALID:${registryIndex}:${postIndex}`);
+      }
+      if (!absoluteFeedId(postValue.feedId)) {
+        diagnostics.push(`BLOG_FEED_ID_INVALID:${registryIndex}:${postIndex}`);
       }
       if (typeof postValue.id === 'string') {
         if (postIds.has(postValue.id)) {
@@ -255,6 +290,24 @@ export function validateProductBlogRegistries(
           );
         }
         feedIds.add(postValue.feedId);
+      }
+      if (typeof postValue.title === 'string') {
+        const title = normalizedIdentity(postValue.title);
+        if (titles.has(title)) {
+          diagnostics.push(
+            `BLOG_TITLE_DUPLICATE:${registryIndex}:${postIndex}`,
+          );
+        }
+        titles.add(title);
+      }
+      if (typeof postValue.description === 'string') {
+        const description = normalizedIdentity(postValue.description);
+        if (descriptions.has(description)) {
+          diagnostics.push(
+            `BLOG_DESCRIPTION_DUPLICATE:${registryIndex}:${postIndex}`,
+          );
+        }
+        descriptions.add(description);
       }
 
       const publishedValid = canonicalTimestamp(postValue.publishedAt);
@@ -313,6 +366,30 @@ export function validateProductBlogRegistries(
       if (typeof postValue.title === 'string') claimTexts.push(postValue.title);
       if (typeof postValue.description === 'string') {
         claimTexts.push(postValue.description);
+      }
+      if (isRecord(postValue.author)) {
+        if (typeof postValue.author.name === 'string') {
+          claimTexts.push(postValue.author.name);
+        }
+        if (typeof postValue.author.role === 'string') {
+          claimTexts.push(postValue.author.role);
+        }
+      }
+      if (typeof postValue.editorialDisclosure === 'string') {
+        claimTexts.push(postValue.editorialDisclosure);
+      }
+      for (const source of sources) {
+        if (isRecord(source) && typeof source.purpose === 'string') {
+          claimTexts.push(source.purpose);
+        }
+      }
+      const renderedLinks = Array.isArray(postValue.links)
+        ? postValue.links
+        : [];
+      for (const link of renderedLinks) {
+        if (isRecord(link) && typeof link.label === 'string') {
+          claimTexts.push(link.label);
+        }
       }
       const sections = Array.isArray(postValue.sections)
         ? postValue.sections
@@ -385,7 +462,7 @@ export function validateProductBlogRegistries(
         );
       }
 
-      const links = Array.isArray(postValue.links) ? postValue.links : [];
+      const links = renderedLinks;
       if (links.some((link) => !allowedLink(link, approvedSiteId))) {
         diagnostics.push(
           `BLOG_LINK_NOT_ALLOWLISTED:${registryIndex}:${postIndex}`,
@@ -590,14 +667,46 @@ function isEnoent(error: unknown): boolean {
   );
 }
 
+function sameResolvedPath(left: string, right: string): boolean {
+  return process.platform === 'win32'
+    ? resolve(left).toLowerCase() === resolve(right).toLowerCase()
+    : resolve(left) === resolve(right);
+}
+
+async function realDirectoryState(
+  path: string,
+): Promise<'present' | 'missing' | 'invalid'> {
+  try {
+    const stats = await lstat(path);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) return 'invalid';
+    return sameResolvedPath(await realpath(path), path) ? 'present' : 'invalid';
+  } catch (error) {
+    if (isEnoent(error)) return 'missing';
+    return 'invalid';
+  }
+}
+
 export async function loadProductBlogRegistries(
   root: string,
 ): Promise<BlogValidationResult> {
   const values: unknown[] = [];
   const expectedSiteIds: SiteId[] = [];
   const loadingDiagnostics: string[] = [];
-  for (const siteId of PRODUCT_BLOG_SITE_IDS) {
-    const registryPath = join(root, 'sites', siteId, 'blog-registry.json');
+  siteLoop: for (const siteId of PRODUCT_BLOG_SITE_IDS) {
+    const productDirectory = join(root, 'sites', siteId);
+    for (const ancestor of [
+      resolve(root),
+      join(root, 'sites'),
+      productDirectory,
+    ]) {
+      const state = await realDirectoryState(ancestor);
+      if (state === 'missing') continue siteLoop;
+      if (state === 'invalid') {
+        loadingDiagnostics.push(`BLOG_REGISTRY_PATH_INVALID:${siteId}`);
+        continue siteLoop;
+      }
+    }
+    const registryPath = join(productDirectory, 'blog-registry.json');
     try {
       const stats = await lstat(registryPath);
       if (stats.isSymbolicLink() || !stats.isFile()) {

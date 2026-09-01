@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -138,6 +138,25 @@ describe('fixed product blog registry discovery', () => {
         'BLOG_REGISTRY_NAMESPACE_MISMATCH:skill-ledger',
         'BLOG_SITE_ID_NOT_APPROVED:1',
       ]),
+    );
+  });
+
+  it('rejects a registry reached through a linked product directory', async () => {
+    const rootPath = await root();
+    const external = await root();
+    await writeRegistry(external, 'search-receipt', registry);
+    await mkdir(join(rootPath, 'sites'), { recursive: true });
+    await symlink(
+      join(external, 'sites', 'search-receipt'),
+      join(rootPath, 'sites', 'search-receipt'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const result = await loadProductBlogRegistries(rootPath);
+    expect(result.ok).toBe(false);
+    expect(result.registries).toEqual([]);
+    expect(result.diagnostics).toContain(
+      'BLOG_REGISTRY_PATH_INVALID:search-receipt',
     );
   });
 });

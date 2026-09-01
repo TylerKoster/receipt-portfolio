@@ -1077,6 +1077,17 @@ export async function buildSites(options: {
       `Product blog registries are not admitted: ${blogValidation.diagnostics.join(', ')}`,
     );
   }
+  if (
+    options.includeVideoMomentSearch !== true &&
+    blogValidation.registries.some(
+      (registry) =>
+        registry.siteId === 'video-moment-search' && registry.posts.length > 0,
+    )
+  ) {
+    throw new Error(
+      'Product blog registry targets excluded site video-moment-search',
+    );
+  }
   const outputDirectory = resolve(options.outputDirectory);
   const trustedWorkspaceDirectory = await ensureTrustedRealDirectory(
     options.trustedWorkspaceDirectory ??

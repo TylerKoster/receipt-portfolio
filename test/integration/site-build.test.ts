@@ -32,6 +32,7 @@ import {
 } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { searchReceiptSite } from '../../sites/search-receipt/index.js';
+import type { ProductBlogRegistry } from '../../sites/shared/blog.js';
 import { escapeHtml, renderSite } from '../../sites/shared/render.js';
 import { skillLedgerSite } from '../../sites/skill-ledger/index.js';
 import {
@@ -433,6 +434,50 @@ describe('static receipt site build', () => {
 
     expect(await fileInventory(emptyOutput)).toEqual(
       await fileInventory(outputDirectory),
+    );
+  });
+
+  it('rejects a nonempty AI Moment Index blog when that product is excluded', async () => {
+    const registryRoot = join(dirname(outputDirectory), 'video-blog-root');
+    const registry = JSON.parse(
+      await readFile(
+        join(
+          projectRoot,
+          'fixtures',
+          'shared',
+          'controlled-blog-registry-v1.json',
+        ),
+        'utf8',
+      ),
+    ) as ProductBlogRegistry;
+    registry.siteId = 'video-moment-search';
+    registry.posts[0].sourceBindings[0].url =
+      'https://commons.wikimedia.org/wiki/File:Robots_under_control.webm';
+    registry.posts[0].links = [
+      {
+        label: 'Open AI Moment Index',
+        href: '/video-moment-search/',
+        kind: 'internal',
+      },
+    ];
+    const destination = join(
+      registryRoot,
+      'sites',
+      'video-moment-search',
+      'blog-registry.json',
+    );
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, JSON.stringify(registry));
+
+    await expect(
+      buildSites({
+        evidenceDirectory: testEvidenceDirectory,
+        outputDirectory,
+        blogRegistryRoot: registryRoot,
+        includeVideoMomentSearch: false,
+      }),
+    ).rejects.toThrow(
+      /excluded.*video-moment-search|video-moment-search.*excluded/i,
     );
   });
 

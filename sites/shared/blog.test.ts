@@ -7,6 +7,7 @@ import {
   renderProductBlogIndex,
   renderProductBlogPost,
   validateProductBlogRegistries,
+  type ProductBlogPost,
   type ProductBlogRegistry,
 } from './blog.js';
 
@@ -100,6 +101,22 @@ describe('evidence-bound product blog contract', () => {
       'BLOG_CAUSATION_CLAIM:0:0',
     ],
     [
+      'right-now status claim',
+      (candidate: ProductBlogRegistry) => {
+        candidate.posts[0]!.sections[0]!.paragraphs[0]!.text =
+          'Google Search is down right now.';
+      },
+      'BLOG_CURRENT_STATUS_CLAIM:0:0',
+    ],
+    [
+      'explains causation claim',
+      (candidate: ProductBlogRegistry) => {
+        candidate.posts[0]!.sections[0]!.paragraphs[0]!.text =
+          'This explains the site change.';
+      },
+      'BLOG_CAUSATION_CLAIM:0:0',
+    ],
+    [
       'invalid published date',
       (candidate: ProductBlogRegistry) => {
         candidate.posts[0]!.publishedAt = '2026-02-30T12:00:00.000Z';
@@ -152,6 +169,60 @@ describe('evidence-bound product blog contract', () => {
     expect(result.registries).toEqual([]);
   });
 
+  it.each([
+    [
+      'registry title',
+      (value: ProductBlogRegistry) => (value.title = 'Active outage now'),
+    ],
+    [
+      'registry description',
+      (value: ProductBlogRegistry) =>
+        (value.description = 'Google Search is down right now.'),
+    ],
+  ])('checks claim-bearing %s copy', (_label, mutate) => {
+    const candidate = structuredClone(fixture);
+    mutate(candidate);
+    expect(diagnosticsFor([candidate])).toContain(
+      'BLOG_REGISTRY_CURRENT_STATUS_CLAIM:0',
+    );
+  });
+
+  it.each([
+    [
+      'editorial disclosure',
+      (post: ProductBlogPost) =>
+        (post.editorialDisclosure = 'This explains the site change.'),
+    ],
+    [
+      'source purpose',
+      (post: ProductBlogPost) =>
+        (post.sourceBindings[0]!.purpose = 'The outage is ongoing now.'),
+    ],
+    [
+      'link label',
+      (post: ProductBlogPost) =>
+        (post.links[0]!.label = 'This caused the site change'),
+    ],
+    [
+      'author name',
+      (post: ProductBlogPost) =>
+        (post.author.name = 'The outage is active now'),
+    ],
+    [
+      'author role',
+      (post: ProductBlogPost) =>
+        (post.author.role = 'Explains why the site changed'),
+    ],
+  ])('checks rendered %s for prohibited claims', (_label, mutate) => {
+    const candidate = structuredClone(fixture);
+    mutate(candidate.posts[0]!);
+    expect(diagnosticsFor([candidate])).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^BLOG_(?:CURRENT_STATUS|CAUSATION)_CLAIM:0:0$/u),
+      ]),
+    );
+  });
+
   it('rejects unapproved namespaces and duplicate namespace, slug, canonical, or feed identity', () => {
     const unapproved = structuredClone(fixture);
     (unapproved as { siteId: string }).siteId = 'unapproved-site';
@@ -170,7 +241,15 @@ describe('evidence-bound product blog contract', () => {
         'BLOG_SLUG_DUPLICATE:0:1',
         'BLOG_CANONICAL_DUPLICATE:0:1',
         'BLOG_FEED_ID_DUPLICATE:0:1',
+        'BLOG_TITLE_DUPLICATE:0:1',
+        'BLOG_DESCRIPTION_DUPLICATE:0:1',
       ]),
+    );
+
+    const invalidFeedId = structuredClone(fixture);
+    invalidFeedId.posts[0]!.feedId = 'not an absolute atom id';
+    expect(diagnosticsFor([invalidFeedId])).toContain(
+      'BLOG_FEED_ID_INVALID:0:0',
     );
   });
 
