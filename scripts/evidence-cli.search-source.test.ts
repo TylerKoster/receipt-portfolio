@@ -1,5 +1,6 @@
 import {
   access,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -457,6 +458,53 @@ describe('bounded Search Receipt live collection', () => {
     expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
   });
 
+  it('rolls back every new canonical file when second-source persistence fails', async () => {
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-all-persist-fail-',
+    );
+    await collectAllSearchSources({
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const before = await evidenceSnapshot(evidenceDirectory);
+    const changedStatus = Buffer.from(
+      STATUS_BYTES.toString('utf8').replace('Delayed reports.', 'Late reports.'),
+    );
+    const changedFeed = Buffer.from(
+      FEED_BYTES.toString('utf8').replace('Second &amp; newer', 'Second updated'),
+    );
+    const obstruction = join(
+      evidenceDirectory,
+      'objects',
+      'raw',
+      `${sha256(changedFeed)}.bin`,
+    );
+    await expect(
+      collectAllSearchSources({
+        evidenceDirectory,
+        fetchSource: async (manifest) => {
+          const bytes =
+            manifest.sourceId === 'google-search-status'
+              ? changedStatus
+              : changedFeed;
+          return {
+            ...rawFetch(manifest),
+            observedAt: '2026-09-01T00:00:00.000Z',
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          };
+        },
+        beforePersistSearchPlan: async (_sourceId, index) => {
+          if (index === 1) await mkdir(obstruction, { recursive: true });
+        },
+      }),
+    ).rejects.toThrow(/existing target is not a regular file/);
+    await rm(obstruction, { recursive: true });
+    expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
+    await expect(verifyEvidenceTree(evidenceDirectory)).resolves.toBeUndefined();
+  });
+
   it('requires review when the complete incident set is replaced', async () => {
     const evidenceDirectory = await newEvidenceDirectory(
       'search-large-change-',
@@ -578,7 +626,7 @@ describe('bounded Search Receipt live collection', () => {
 
   it('ignores a complete entry contained only in an XML comment', async () => {
     const bytes = Buffer.from(
-      `<feed><!--<entry><id>comment</id><title>Comment</title><link href="https://developers.google.com/search/blog/comment"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry>--></feed>`,
+      `<feed xmlns="http://www.w3.org/2005/Atom"><!--<entry><id>comment</id><title>Comment</title><link href="https://developers.google.com/search/blog/comment"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry>--></feed>`,
     );
     const result = await collectSearchSource('google-search-central-blog', {
       evidenceDirectory: await newEvidenceDirectory('search-feed-comment-'),
@@ -597,7 +645,7 @@ describe('bounded Search Receipt live collection', () => {
 
   it('does not treat a structurally nested entry as a direct feed entry', async () => {
     const bytes = Buffer.from(
-      `<feed><wrapper><entry><id>nested</id><title>Nested</title><link href="https://developers.google.com/search/blog/nested"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></wrapper></feed>`,
+      `<feed xmlns="http://www.w3.org/2005/Atom"><wrapper><entry><id>nested</id><title>Nested</title><link href="https://developers.google.com/search/blog/nested"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></wrapper></feed>`,
     );
     const result = await collectSearchSource('google-search-central-blog', {
       evidenceDirectory: await newEvidenceDirectory('search-feed-nested-'),
@@ -668,6 +716,28 @@ describe('bounded Search Receipt live collection', () => {
       'reserved xml-like prefix',
       `<feed xmlns:xmlfoo="urn:x"><xmlfoo:entry/></feed>`,
     ],
+    [
+      'case-changed Atom element',
+      `<Feed xmlns="http://www.w3.org/2005/Atom"><Entry><ID>x</ID></Entry></Feed>`,
+    ],
+    [
+      'namespace-less Atom shape',
+      `<feed><entry><id>x</id><title>X</title><link href="https://developers.google.com/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    ],
+    [
+      'invalid numeric character reference',
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>x</id><title>&#0;</title><link href="https://developers.google.com/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    ],
+    [
+      'invalid raw control character',
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>x</id><title>bad \u0001</title></entry></feed>`,
+    ],
+    ['malformed XML declaration', `<?xml?><feed xmlns="http://www.w3.org/2005/Atom"/>`],
+    [
+      'misplaced XML declaration',
+      `<feed xmlns="http://www.w3.org/2005/Atom"><?xml version="1.0"?></feed>`,
+    ],
+    ['CDATA outside its root', `<![CDATA[]]><feed xmlns="http://www.w3.org/2005/Atom"/>`],
   ] as const)('rejects malformed XML with an %s', async (_label, xml) => {
     const bytes = Buffer.from(xml);
     const evidenceDirectory = await newEvidenceDirectory('search-xml-invalid-');

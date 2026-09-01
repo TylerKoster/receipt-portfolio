@@ -848,6 +848,10 @@ export async function collectMicrosoftSkillCreatorObservation(options: {
 export interface CollectSearchSourceOptions {
   readonly evidenceDirectory: string;
   readonly fetchSource?: (manifest: SourceManifest) => Promise<RawFetch>;
+  readonly beforePersistSearchPlan?: (
+    sourceId: SearchSourceId,
+    index: number,
+  ) => Promise<void>;
 }
 
 export interface SearchCollectionResult {
@@ -1077,6 +1081,63 @@ async function persistSearchPlan(
   );
 }
 
+function searchPlanPaths(
+  plan: PlannedSearchSource,
+  evidenceDirectory: string,
+): readonly string[] {
+  if (plan.idempotent) return [];
+  return [
+    join(evidenceDirectory, plan.receipt.payload.rawObjectPath),
+    join(evidenceDirectory, plan.receipt.payload.normalizedObjectPath),
+    join(
+      evidenceDirectory,
+      'manifests',
+      `${plan.receipt.payload.manifestSha256}.json`,
+    ),
+    plan.path,
+  ];
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (missingPath(error)) return false;
+    throw error;
+  }
+}
+
+async function persistSearchPlansAtomically(
+  plans: readonly PlannedSearchSource[],
+  evidenceDirectory: string,
+  beforePersist?: (sourceId: SearchSourceId, index: number) => Promise<void>,
+): Promise<void> {
+  const targets = plans.flatMap((plan) =>
+    searchPlanPaths(plan, evidenceDirectory),
+  );
+  const absentBefore = new Set<string>();
+  for (const target of targets) {
+    if (!(await pathExists(target))) absentBefore.add(target);
+  }
+  try {
+    for (const [index, plan] of plans.entries()) {
+      await beforePersist?.(plan.prepared.sourceId, index);
+      await persistSearchPlan(plan, evidenceDirectory);
+    }
+  } catch (error) {
+    for (const target of [...absentBefore].reverse()) {
+      try {
+        const stats = await lstat(target);
+        if (stats.isFile() && !stats.isSymbolicLink()) await unlink(target);
+      } catch (rollbackError) {
+        if (!missingPath(rollbackError)) throw rollbackError;
+      }
+    }
+    throw error;
+  }
+}
+
 export async function collectSearchSource(
   sourceIdInput: SearchSourceId,
   options: CollectSearchSourceOptions,
@@ -1149,9 +1210,11 @@ export async function collectAllSearchSources(
           // Every receipt and PASS decision is complete before the first
           // immutable canonical write. Source failures therefore leave the
           // prior evidence inventory unchanged.
-          for (const plan of plans) {
-            await persistSearchPlan(plan, options.evidenceDirectory);
-          }
+          await persistSearchPlansAtomically(
+            plans,
+            options.evidenceDirectory,
+            options.beforePersistSearchPlan,
+          );
           await verifyEvidenceTree(options.evidenceDirectory);
           return plans.map((plan) => ({
             receipt: plan.receipt,

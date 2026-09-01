@@ -158,7 +158,7 @@ function decodeXml(value: string, name: string): string {
   );
   if (unknownEntity !== null)
     return notAdmitted(`${name} contains an unknown XML entity`);
-  return withoutCdata
+  const decoded = withoutCdata
     .replace(/&#x([a-fA-F0-9]+);/g, (_match, digits: string) =>
       String.fromCodePoint(Number.parseInt(digits, 16)),
     )
@@ -170,6 +170,10 @@ function decodeXml(value: string, name: string): string {
     .replaceAll('&quot;', '"')
     .replaceAll('&apos;', "'")
     .replaceAll('&amp;', '&');
+  if ([...decoded].some((character) => !validXmlCodePoint(character.codePointAt(0)!))) {
+    return notAdmitted(`${name} contains an invalid XML character`);
+  }
+  return decoded;
 }
 
 interface XmlNode {
@@ -208,7 +212,18 @@ function qualifiedName(name: string, label: string): {
 }
 
 function localName(name: string): string {
-  return (name.split(':').at(-1) ?? '').toLowerCase();
+  return name.split(':').at(-1) ?? '';
+}
+
+function validXmlCodePoint(codePoint: number): boolean {
+  return (
+    codePoint === 0x9 ||
+    codePoint === 0xa ||
+    codePoint === 0xd ||
+    (codePoint >= 0x20 && codePoint <= 0xd7ff) ||
+    (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
+    (codePoint >= 0x10000 && codePoint <= 0x10ffff)
+  );
 }
 
 function tagEnd(xml: string, start: number): number {
@@ -253,6 +268,9 @@ function parseAttributes(value: string): Readonly<Record<string, string>> {
 }
 
 function parseXml(xml: string): XmlNode {
+  if ([...xml].some((character) => !validXmlCodePoint(character.codePointAt(0)!))) {
+    return notAdmitted('feed contains an invalid XML character');
+  }
   const roots: XmlNode[] = [];
   const stack: XmlFrame[] = [];
   let offset = 0;
@@ -275,6 +293,15 @@ function parseXml(xml: string): XmlNode {
       const end = xml.indexOf('?>', offset + 2);
       if (end < 0)
         return notAdmitted('feed processing instruction is malformed');
+      const instruction = xml.slice(offset, end + 2);
+      if (
+        offset !== 0 ||
+        !/^<\?xml\s+version=(?:"1\.0"|'1\.0')(?:\s+encoding=(?:"[A-Za-z][A-Za-z0-9._-]*"|'[A-Za-z][A-Za-z0-9._-]*'))?(?:\s+standalone=(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/.test(
+          instruction,
+        )
+      ) {
+        return notAdmitted('feed XML declaration is malformed or misplaced');
+      }
       offset = end + 2;
       continue;
     }
@@ -291,6 +318,7 @@ function parseXml(xml: string): XmlNode {
     if (xml.startsWith('<![CDATA[', offset)) {
       const end = xml.indexOf(']]>', offset + 9);
       if (end < 0) return notAdmitted('feed CDATA is malformed');
+      if (stack.length === 0) return notAdmitted('feed CDATA is outside its root');
       appendText(xml.slice(offset + 9, end), false);
       offset = end + 3;
       continue;
@@ -401,7 +429,7 @@ function parseXml(xml: string): XmlNode {
     stack.length > 0 ||
     roots.length !== 1 ||
     localName(roots[0]!.name) !== 'feed' ||
-    !['', ATOM_NAMESPACE].includes(roots[0]!.namespaceUri)
+    roots[0]!.namespaceUri !== ATOM_NAMESPACE
   ) {
     return notAdmitted('feed response is not one well-formed Atom document');
   }
