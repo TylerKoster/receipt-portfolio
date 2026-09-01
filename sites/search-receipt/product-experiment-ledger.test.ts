@@ -241,6 +241,24 @@ describe('Search Receipt product experiment ledger', () => {
     });
   });
 
+  it('records the first source-bound public-blog experiment without claiming an outcome', () => {
+    const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+
+    expect(ledger.experiments[13]).toMatchObject({
+      id: 'source-bound-evergreen-blog-post-v1',
+      rank: 14,
+      status: 'CONTENT_CONTRACT_ADMITTED_PENDING_RELEASE',
+      metric:
+        'Deterministic registry admission with every source binding resolving to a PASS receipt and matching immutable object bytes.',
+      target:
+        '100% deterministic source-binding and route-output admission before publication.',
+      stopRule:
+        'Stop publication preparation if any source binding lacks a PASS receipt, matching object bytes, or a required boundary.',
+      noDataBoundary:
+        'Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.',
+    });
+  });
+
   it('keeps the rank-thirteen ledger contract aligned with the admitted handoff contract', () => {
     const handoff = JSON.parse(readFileSync(handoffPath, 'utf8'));
     const ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
@@ -424,7 +442,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     expect(ledger.experiments[6]).toMatchObject({
       id: 'offer-preview-clarity-v1',
       rank: 7,
@@ -448,7 +466,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     expect(ledger.experiments[7]).toMatchObject({
       id: 'query-formulation-guidance-v1',
       rank: 8,
@@ -472,7 +490,7 @@ describe('Search Receipt product experiment ledger', () => {
 
     expect(
       ledger.experiments.map((experiment: { rank: number }) => experiment.rank),
-    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     expect(ledger.experiments[8]).toMatchObject({
       id: 'shareable-filter-view-v1',
       rank: 9,

@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "siteId": "search-receipt",
+  "title": "Search Receipt notes",
+  "description": "Original, source-bound notes for separating official Google Search observations from evidence recorded on your own site.",
+  "posts": [
+    {
+      "id": "separate-google-search-status-from-site-evidence",
+      "slug": "separate-google-search-status-from-site-evidence",
+      "feedId": "urn:receipt-portfolio:search-receipt:separate-google-search-status-from-site-evidence",
+      "title": "Google Search status or site evidence? Start with two separate records",
+      "description": "An answer-first workflow for site owners who need to decide what to inspect before escalating a Google Search change.",
+      "publishedAt": "2026-09-01T14:05:27.778Z",
+      "modifiedAt": "2026-09-01T14:05:27.778Z",
+      "author": {
+        "name": "Search Receipt editorial desk",
+        "role": "Project-original editor"
+      },
+      "editorialDisclosure": "This is original Search Receipt editorial guidance. It uses only admitted official record facts and does not reproduce Google Search Central feed descriptions or linked article bodies.",
+      "sourceBindings": [
+        {
+          "receiptId": "754c45ef8cf59a085e5e4edd0a11136b6fc7ede71f94f399b45b16a629f06960",
+          "sourceId": "google-search-status",
+          "url": "https://status.search.google.com/incidents.json",
+          "observedAt": "2026-09-01T14:05:27.778Z",
+          "sha256": "23ae3be78b87801c0dc74c1501fa120c3b441d055519f35f367aa59125c30f55",
+          "purpose": "Official Google Search Status observation with 10 admitted incident records."
+        },
+        {
+          "receiptId": "fb99243b2f13791e98ee43e8424c235e73568b0272693db5f12790481994b361",
+          "sourceId": "google-search-central-blog",
+          "url": "https://feeds.feedburner.com/blogspot/amDG",
+          "observedAt": "2026-09-01T14:05:27.745Z",
+          "sha256": "6a00c8c2b2077ffb4238451ecb51f5145c3ebda0fc713112fbc3095a27ac6a9c",
+          "purpose": "Official Google Search Central feed observation with 10 admitted entry records; feed bodies are not source facts."
+        }
+      ],
+      "sections": [
+        {
+          "heading": "For site owners separating two evidence tracks",
+          "paragraphs": [
+            {
+              "text": "Answer first: inspect the official Google Search sources at decision time, then keep dated evidence from your own site in a separate record. That separation helps you decide what to inspect next before an escalation.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            },
+            {
+              "text": "At the recorded observations, the official status response contained 10 admitted incident records and the official Google Search Central feed contained 10 admitted entry records. These are two official record surfaces, not a conclusion about an individual site.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "A three-step decision-time workflow",
+          "paragraphs": [
+            {
+              "text": "Step 1: Open Google Search Status directly at the time of your decision and record the observation time and the information it presents.",
+              "sourceBindingIds": ["google-search-status"]
+            },
+            {
+              "text": "Step 2: Open the admitted Google Search Central feed only for its entry identifiers, titles, links, and timestamps; do not substitute a feed body or linked article for your own evidence.",
+              "sourceBindingIds": ["google-search-central-blog"]
+            },
+            {
+              "text": "Step 3: Keep your site's dated observations separate, then use the checklist or worksheet before sharing a manual escalation handoff with a reviewer.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Currentness, uncertainty, and corrections",
+          "paragraphs": [
+            {
+              "text": "This article is bound to the status observation at 2026-09-01T14:05:27.778Z and the feed observation at 2026-09-01T14:05:27.745Z. Check both official sources directly at decision time instead of treating this dated record as a live reading.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            },
+            {
+              "text": "If a bound official record is corrected or superseded, update this article's binding and publication dates before relying on it again. Keep any correction separate from the evidence from your own site.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            },
+            {
+              "text": "FAQ — Does this article report a current Google Search status? No. This post does not report a current status or incident; inspect the official status source directly at decision time.",
+              "sourceBindingIds": ["google-search-status"]
+            },
+            {
+              "text": "FAQ — Does an official observation settle what happened on my site? No. This post does not diagnose a change and does not establish cause for an individual site.",
+              "sourceBindingIds": [
+                "google-search-status",
+                "google-search-central-blog"
+              ]
+            }
+          ]
+        }
+      ],
+      "links": [
+        {
+          "label": "Search controlled records",
+          "href": "/search-receipt/",
+          "kind": "internal"
+        },
+        {
+          "label": "Filter controlled records",
+          "href": "/search-receipt/",
+          "kind": "internal"
+        },
+        {
+          "label": "Read the status-or-site guide",
+          "href": "/search-receipt/guides/is-google-search-down-or-my-site/",
+          "kind": "internal"
+        },
+        {
+          "label": "Use the manual escalation checklist",
+          "href": "/search-receipt/checklists/record-before-escalating-google-search-change/",
+          "kind": "internal"
+        },
+        {
+          "label": "Use the evidence worksheet",
+          "href": "/search-receipt/worksheets/compare-google-search-status-with-site-evidence/",
+          "kind": "internal"
+        },
+        {
+          "label": "Inspect Google Search Status",
+          "href": "https://status.search.google.com/incidents.json",
+          "kind": "external"
+        },
+        {
+          "label": "Inspect Google Search Central feed",
+          "href": "https://feeds.feedburner.com/blogspot/amDG",
+          "kind": "external"
+        }
+      ],
+      "boundaries": {
+        "currentness": "This post does not report a current status or incident; inspect the admitted official sources directly at decision time.",
+        "noCausation": "This post does not diagnose a change and does not establish cause from the recorded observations."
+      }
+    }
+  ]
+}

@@ -231,6 +231,36 @@
       "noDataBoundary": "Internal content-quality completion is not users, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
       "coordinatorDependency": "A coordinator-owned shared static route adapter is required before any public route can render this handoff contract.",
       "nextSafeAction": "Maintain admitted source bindings and handoff boundaries; do not claim users, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
+    },
+    {
+      "id": "source-bound-evergreen-blog-post-v1",
+      "rank": 14,
+      "status": "CONTENT_CONTRACT_ADMITTED_PENDING_RELEASE",
+      "hypothesis": "A source-bound evergreen blog post may help a site owner separate official Google Search observations from dated own-site evidence before deciding what to inspect or escalate, without stating current status, diagnosis, cause, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome.",
+      "firstUserOutcome": "Use an answer-first, three-step workflow to inspect official source records at decision time and keep own-site evidence separate before escalation.",
+      "metric": "Deterministic registry admission with every source binding resolving to a PASS receipt and matching immutable object bytes.",
+      "target": "100% deterministic source-binding and route-output admission before publication.",
+      "stopRule": "Stop publication preparation if any source binding lacks a PASS receipt, matching object bytes, or a required boundary.",
+      "noDataBoundary": "Internal content/discoverability admission is not users, rankings, SEO traffic, demand, conversion, willingness to pay, revenue, or commercial-outcome evidence.",
+      "admittedEvidence": [
+        {
+          "sourceId": "google-search-status",
+          "receiptId": "754c45ef8cf59a085e5e4edd0a11136b6fc7ede71f94f399b45b16a629f06960",
+          "observedAt": "2026-09-01T14:05:27.778Z",
+          "rawSha256": "23ae3be78b87801c0dc74c1501fa120c3b441d055519f35f367aa59125c30f55",
+          "normalizedSha256": "1339ea67d33683e7a2c1c97624d3f6d11cf7dd017ed815cbfbdb63b464d28ef8",
+          "manifestSha256": "e983f92d3e33a4856e219577419bb38df345a1af680788849ea7ff2abc27716b"
+        },
+        {
+          "sourceId": "google-search-central-blog",
+          "receiptId": "fb99243b2f13791e98ee43e8424c235e73568b0272693db5f12790481994b361",
+          "observedAt": "2026-09-01T14:05:27.745Z",
+          "rawSha256": "6a00c8c2b2077ffb4238451ecb51f5145c3ebda0fc713112fbc3095a27ac6a9c",
+          "normalizedSha256": "78b03d8dd99fe4b6c56cc52c99a58308ea4f6d6b726c5a9c23c78cad1923c5b5",
+          "manifestSha256": "6a5ff11cac77df30fd5a5e3697c6a8cf281e23eb69bec54a0231bc26f6dc2c2e"
+        }
+      ],
+      "nextSafeAction": "Run the admitted static blog route through coordinator integration and public verification; do not claim users, rankings, traffic, demand, conversion, willingness to pay, revenue, or another commercial outcome."
     }
   ]
 }
