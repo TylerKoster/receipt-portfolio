@@ -33,6 +33,14 @@ const validationNow = new Date('2026-08-31T12:00:00.000Z');
 
 function manifestFor(candidate: VideoCorpus): VideoSourceEvidenceManifest {
   const manifest = structuredClone(evidenceManifest);
+  const reviewedEvidenceIds = new Set(
+    candidate.videos.flatMap((video) =>
+      video.reviewEvidenceId === undefined ? [] : [video.reviewEvidenceId],
+    ),
+  );
+  manifest.records = manifest.records.filter((record) =>
+    reviewedEvidenceIds.has(record.evidenceId),
+  );
   manifest.corpusId = candidate.corpusId;
   for (const record of manifest.records) {
     record.bindings.corpusId = candidate.corpusId;

@@ -63,5 +63,7 @@ good hosted release through the coordinator's human-controlled recovery path,
 then rerun the three public checks: the AI Moment Index home page,
 `videos/robots-under-control/`, and `moments/moment-robots-control/`. The two
 representative public documents must each retain the ordinary source media
-fragment `#t=132`. The controlled corpus contains one admitted moment; no lane
-work invents a second moment or downloads/scrapes media.
+fragment `#t=132`. The controlled corpus contains exactly three admitted
+moments: robots control at `#t=132`, the KI-Campus generative-AI interface at
+`#t=18`, and the World Economic Forum industry/society panel at `#t=75`. No
+lane work admits another moment or downloads/scrapes media.

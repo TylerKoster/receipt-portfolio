@@ -53,6 +53,54 @@ afterEach(async () => {
 });
 
 describe('atomic AI Moment Index build', () => {
+  it('blocks every reviewed output when one new admitted record is invalid', async () => {
+    const manifest = JSON.parse(
+      await readFile(
+        new URL(
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as {
+      records: Array<{
+        evidenceId: string;
+        timestamp: { url: string };
+      }>;
+    };
+    expect(manifest.records).toHaveLength(3);
+    const wefRecord = manifest.records.find(
+      ({ evidenceId }) =>
+        evidenceId === 'commons-davos-2016-state-of-artificial-intelligence-v1',
+    );
+    expect(wefRecord).toBeDefined();
+    if (wefRecord === undefined) return;
+    wefRecord.timestamp.url =
+      'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=76';
+    const manifestPath = join(dirname(outputDirectory), 'invalid-wef.json');
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await expect(
+      buildSites({
+        evidenceDirectory,
+        outputDirectory,
+        includeVideoMomentSearch: true,
+        videoMomentEvidenceManifestPath: manifestPath,
+        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
+      }),
+    ).rejects.toThrow(
+      'SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:commons-davos-2016-state-of-artificial-intelligence-v1',
+    );
+    await expect(readdir(outputDirectory)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.includes('.sites-stage-'),
+      ),
+    ).toEqual([]);
+  });
+
   it('rejects an invalid manifest before creating any output or staging residue', async () => {
     const manifestPath = join(dirname(outputDirectory), 'invalid.json');
     await writeFile(

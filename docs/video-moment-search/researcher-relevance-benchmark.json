@@ -6,7 +6,7 @@
     "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
     "caseReview": "independent-code-review-not-user-research",
     "transcriptDerivedCases": "prohibited",
-    "evaluatedCorpusSemanticSha256": "d727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557",
+    "evaluatedCorpusSemanticSha256": "2a6c36825772c8e8178cf6cfd26b6d8c5738e429f41cc35087b1cc2adaf6ffe2",
     "prohibitedClaims": [
       "user",
       "usability",

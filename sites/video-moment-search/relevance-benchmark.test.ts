@@ -178,6 +178,38 @@ function loadBenchmark(): ResearcherRelevanceBenchmark {
 }
 
 describe('controlled researcher-relevance benchmark', () => {
+  it('separates robots control, generative-AI interfaces, and the AI industry/society panel', () => {
+    const index = buildSearchIndex(fixture);
+    const cases = [
+      {
+        query: 'robots control',
+        expectedMomentId: 'moment-robots-control',
+        expectedTimestampSuffix: '#t=132',
+      },
+      {
+        query: 'generative AI conversational interfaces',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedTimestampSuffix: '#t=18',
+      },
+      {
+        query: 'AI industry society panel',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedTimestampSuffix: '#t=75',
+      },
+    ] as const;
+
+    for (const benchmarkCase of cases) {
+      const results = searchMoments(index, benchmarkCase.query, 3);
+      expect(results, benchmarkCase.query).toHaveLength(1);
+      expect(results[0]!.momentId, benchmarkCase.query).toBe(
+        benchmarkCase.expectedMomentId,
+      );
+      expect(new URL(results[0]!.timestampUrl).hash, benchmarkCase.query).toBe(
+        benchmarkCase.expectedTimestampSuffix,
+      );
+    }
+  });
+
   it('binds rank 3 to the controlled benchmark evidence path', () => {
     expect(validateExperimentLedger(ledger).diagnostics).toEqual([]);
     expect(ledger.experiments[2].evidencePaths).toContainEqual({
@@ -220,7 +252,7 @@ describe('controlled researcher-relevance benchmark', () => {
         'revenue',
       ],
       evaluatedCorpusSemanticSha256:
-        'd727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557',
+        '2a6c36825772c8e8178cf6cfd26b6d8c5738e429f41cc35087b1cc2adaf6ffe2',
     });
     expect(benchmark.target).toEqual({
       minimumControlledPositiveCases: 20,
@@ -239,7 +271,7 @@ describe('controlled researcher-relevance benchmark', () => {
       validateResearcherRelevanceBenchmarkCorpus(benchmark, fixture)
         .diagnostics,
     ).toEqual([]);
-    expect(buildSearchIndex(driftedCorpus).entries).toHaveLength(1);
+    expect(buildSearchIndex(driftedCorpus).entries).toHaveLength(3);
     expect(
       searchMoments(buildSearchIndex(driftedCorpus), 'robots control', 3),
     ).toMatchObject([
@@ -265,7 +297,7 @@ describe('controlled researcher-relevance benchmark', () => {
     };
 
     expect(canonicalVideoCorpusSemanticSha256(fixture)).toBe(
-      'd727dca3d41aa10714d53a872b1326198575b96f3ebc9b0af6f29ea7f69d9557',
+      '2a6c36825772c8e8178cf6cfd26b6d8c5738e429f41cc35087b1cc2adaf6ffe2',
     );
     expect(canonicalVideoCorpusSemanticSha256(reorderedCorpus)).toBe(
       canonicalVideoCorpusSemanticSha256(fixture),

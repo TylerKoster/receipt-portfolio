@@ -12,6 +12,28 @@
       "durationSeconds": 908,
       "timestampStrategy": "media-fragment",
       "reviewEvidenceId": "commons-how-can-we-keep-robots-under-control-v1"
+    },
+    {
+      "id": "video-generative-ai-explained",
+      "slug": "generative-ai-explained-in-2-minutes",
+      "title": "Generative AI explained in 2 minutes",
+      "creatorId": "ki-campus",
+      "creatorName": "KI-Campus",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm",
+      "durationSeconds": 123,
+      "timestampStrategy": "media-fragment",
+      "reviewEvidenceId": "commons-generative-ai-explained-in-2-minutes-v1"
+    },
+    {
+      "id": "video-davos-state-of-ai",
+      "slug": "davos-2016-state-of-artificial-intelligence",
+      "title": "Davos 2016 - The State of Artificial Intelligence",
+      "creatorId": "world-economic-forum",
+      "creatorName": "World Economic Forum",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm",
+      "durationSeconds": 3309,
+      "timestampStrategy": "media-fragment",
+      "reviewEvidenceId": "commons-davos-2016-state-of-artificial-intelligence-v1"
     }
   ],
   "rights": [
@@ -58,6 +80,94 @@
           ]
         }
       }
+    },
+    {
+      "id": "rights-commons-generative-ai-explained",
+      "creatorId": "ki-campus",
+      "basis": "explicit-license",
+      "coveredVideoIds": ["video-generative-ai-explained"],
+      "coveredSourceUrls": [
+        "https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm"
+      ],
+      "coveredCaptionHashes": [],
+      "coveredAnnotationHashes": [
+        "4ff3be6d42965ecebce82df2354177a313ef5a03ea0b47ac841f32618e8498ba"
+      ],
+      "allowedUses": {
+        "commercialUse": true,
+        "excerpts": true,
+        "timestampLinks": true
+      },
+      "maxExcerptCharacters": 280,
+      "licenseNote": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0); timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
+      "permissionVerifiedAt": "2024-08-06T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:Generative_AI_explained_in_2_minutes.webm",
+      "reviewEvidence": {
+        "classification": "reviewed-public-source",
+        "evidenceId": "commons-generative-ai-explained-in-2-minutes-v1",
+        "licenseIdentifier": "Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:Generative_AI_explained_in_2_minutes.webm",
+        "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071",
+        "reviewer": "Speravir",
+        "reviewedOn": "2024-08-06",
+        "productBoundary": {
+          "included": ["timestamp link", "original editorial annotation"],
+          "excluded": [
+            "hosting",
+            "embedding",
+            "media distribution",
+            "transcript distribution",
+            "endorsement claim",
+            "inferred permission"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rights-commons-davos-ai-panel",
+      "creatorId": "world-economic-forum",
+      "basis": "explicit-license",
+      "coveredVideoIds": ["video-davos-state-of-ai"],
+      "coveredSourceUrls": [
+        "https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm"
+      ],
+      "coveredCaptionHashes": [],
+      "coveredAnnotationHashes": [
+        "afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531"
+      ],
+      "allowedUses": {
+        "commercialUse": true,
+        "excerpts": true,
+        "timestampLinks": true
+      },
+      "maxExcerptCharacters": 280,
+      "licenseNote": "Creative Commons Attribution 3.0 Unported (CC BY 3.0); timestamp link plus original editorial annotation only; no inferred permission or endorsement.",
+      "permissionVerifiedAt": "2016-12-21T00:00:00.000Z",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "revocationContact": "https://commons.wikimedia.org/wiki/File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm",
+      "reviewEvidence": {
+        "classification": "reviewed-public-source",
+        "evidenceId": "commons-davos-2016-state-of-artificial-intelligence-v1",
+        "licenseIdentifier": "Creative Commons Attribution 3.0 Unported (CC BY 3.0)",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "canonicalRightsPageUrl": "https://commons.wikimedia.org/wiki/File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm",
+        "immutableRightsRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664",
+        "reviewer": "INeverCry",
+        "reviewedOn": "2016-12-21",
+        "productBoundary": {
+          "included": ["timestamp link", "original editorial annotation"],
+          "excluded": [
+            "hosting",
+            "embedding",
+            "media distribution",
+            "transcript distribution",
+            "endorsement claim",
+            "inferred permission"
+          ]
+        }
+      }
     }
   ],
   "cues": [
@@ -69,6 +179,24 @@
       "text": "Timestamped review point in the lecture “How can we keep robots under control?” This original index annotation is not transcript text.",
       "evidenceKind": "editorial-annotation",
       "contentSha256": "080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd"
+    },
+    {
+      "id": "annotation-generative-ai-18",
+      "videoId": "video-generative-ai-explained",
+      "startSeconds": 18,
+      "endSeconds": 19,
+      "text": "At 18 seconds, an AI Campus animation shows a seated person beside a large smartphone displaying a bot face and chat bubbles.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "4ff3be6d42965ecebce82df2354177a313ef5a03ea0b47ac841f32618e8498ba"
+    },
+    {
+      "id": "annotation-davos-ai-panel-75",
+      "videoId": "video-davos-state-of-ai",
+      "startSeconds": 75,
+      "endSeconds": 76,
+      "text": "At 75 seconds, a World Economic Forum panel sits around the moderator in a blue-lit room.",
+      "evidenceKind": "editorial-annotation",
+      "contentSha256": "afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531"
     }
   ],
   "moments": [
@@ -81,6 +209,30 @@
       "topicSlugs": ["robots-control"],
       "state": "active",
       "rightsGrantId": "rights-commons-robots-control"
+    },
+    {
+      "id": "moment-generative-ai-interface",
+      "videoId": "video-generative-ai-explained",
+      "startSeconds": 18,
+      "endSeconds": 19,
+      "excerpt": "At 18 seconds, an AI Campus animation shows a seated person beside a large smartphone displaying a bot face and chat bubbles.",
+      "topicSlugs": [
+        "generative-ai",
+        "conversational-interfaces",
+        "human-chatbot-interaction"
+      ],
+      "state": "active",
+      "rightsGrantId": "rights-commons-generative-ai-explained"
+    },
+    {
+      "id": "moment-ai-industry-society-panel",
+      "videoId": "video-davos-state-of-ai",
+      "startSeconds": 75,
+      "endSeconds": 76,
+      "excerpt": "At 75 seconds, a World Economic Forum panel sits around the moderator in a blue-lit room.",
+      "topicSlugs": ["ai-industry-society", "multi-stakeholder-panel"],
+      "state": "active",
+      "rightsGrantId": "rights-commons-davos-ai-panel"
     }
   ]
 }

@@ -67,6 +67,14 @@ function manifestFor(
   );
   if (!reviewed) return undefined;
   const manifest = structuredClone(sourceEvidenceManifest);
+  const reviewedEvidenceIds = new Set(
+    corpus.videos.flatMap((video) =>
+      video.reviewEvidenceId === undefined ? [] : [video.reviewEvidenceId],
+    ),
+  );
+  manifest.records = manifest.records.filter((record) =>
+    reviewedEvidenceIds.has(record.evidenceId),
+  );
   manifest.corpusId = corpus.corpusId;
   for (const record of manifest.records) {
     record.bindings.corpusId = corpus.corpusId;
@@ -679,6 +687,112 @@ function executeClientPayload(
 }
 
 describe('AI Moment Index public search surface', () => {
+  it('publishes exactly the three admitted evidence records with exact ordinary timestamp routes', () => {
+    expect(
+      validateCommonsSourceEvidence(
+        fixture,
+        sourceEvidenceManifest,
+        validationNow,
+      ),
+    ).toEqual({
+      ok: true,
+      diagnostics: [],
+    });
+    expect(fixture.videos).toHaveLength(3);
+    expect(fixture.rights).toHaveLength(3);
+    expect(fixture.cues).toHaveLength(3);
+    expect(fixture.moments).toHaveLength(3);
+    expect(sourceEvidenceManifest.records).toHaveLength(3);
+
+    expect(
+      sourceEvidenceManifest.records.map((record) => ({
+        evidenceId: record.evidenceId,
+        publisher: record.roles.publisher.name,
+        uploader: record.roles.uploader.name,
+        attributedCreator: record.roles.attributedCreator.name,
+        rightsAuthority: record.roles.rightsAuthority.name,
+        evidenceIssuer: record.roles.evidenceIssuer.name,
+        historicalReviewer: record.historicalLicenseReview.reviewer,
+        historicalReviewedOn: record.historicalLicenseReview.reviewedOn,
+        observedAt: record.observedStatus.observedAt,
+        expiresAt: record.observedStatus.expiresAt,
+        timestampUrl: record.timestamp.url,
+      })),
+    ).toEqual([
+      {
+        evidenceId: 'commons-how-can-we-keep-robots-under-control-v1',
+        publisher: 'University of the Netherlands',
+        uploader: 'PJ Geest',
+        attributedCreator: 'University of the Netherlands',
+        rightsAuthority: 'University of the Netherlands',
+        evidenceIssuer: 'Wikimedia Commons',
+        historicalReviewer: 'LicenseReviewerBot',
+        historicalReviewedOn: '2022-01-18',
+        observedAt: '2026-08-31T00:00:00.000Z',
+        expiresAt: '2026-09-30T00:00:00.000Z',
+        timestampUrl:
+          'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+      },
+      {
+        evidenceId: 'commons-generative-ai-explained-in-2-minutes-v1',
+        publisher: 'KI-Campus',
+        uploader: 'Prototyperspective',
+        attributedCreator: 'KI-Campus',
+        rightsAuthority: 'KI-Campus',
+        evidenceIssuer: 'Wikimedia Commons',
+        historicalReviewer: 'Speravir',
+        historicalReviewedOn: '2024-08-06',
+        observedAt: '2026-08-31T00:00:00.000Z',
+        expiresAt: '2026-09-30T00:00:00.000Z',
+        timestampUrl:
+          'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18',
+      },
+      {
+        evidenceId: 'commons-davos-2016-state-of-artificial-intelligence-v1',
+        publisher: 'World Economic Forum',
+        uploader: 'Vanished Account Byeznhpyxeuztibuo',
+        attributedCreator: 'World Economic Forum',
+        rightsAuthority: 'World Economic Forum',
+        evidenceIssuer: 'Wikimedia Commons',
+        historicalReviewer: 'INeverCry',
+        historicalReviewedOn: '2016-12-21',
+        observedAt: '2026-08-31T00:00:00.000Z',
+        expiresAt: '2026-09-30T00:00:00.000Z',
+        timestampUrl:
+          'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75',
+      },
+    ]);
+
+    const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const routes = [
+      ['robots control', 'moment-robots-control', 132, '#t=132'],
+      [
+        'generative AI conversational interfaces',
+        'moment-generative-ai-interface',
+        18,
+        '#t=18',
+      ],
+      [
+        'AI industry society panel',
+        'moment-ai-industry-society-panel',
+        75,
+        '#t=75',
+      ],
+    ] as const;
+    for (const [query, momentId, seconds, hash] of routes) {
+      const results = searchPublicIndex(publicIndex, query);
+      expect(results, query).toHaveLength(1);
+      expect(results[0], query).toMatchObject({
+        momentId,
+        startSeconds: seconds,
+        timestampStrategy: 'media-fragment',
+      });
+      const route = new URL(results[0]!.timestampUrl);
+      expect(route.hash, query).toBe(hash);
+      expect(route.search, query).toBe('');
+    }
+  });
+
   it('admits a complete versioned evidence manifest with exact record bindings and explicit roles', () => {
     expect(
       validateCommonsSourceEvidence(
@@ -706,7 +820,7 @@ describe('AI Moment Index public search surface', () => {
       'SOURCE_EVIDENCE_BINDING_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
       'SOURCE_EVIDENCE_ID_DUPLICATE:commons-how-can-we-keep-robots-under-control-v1',
       'SOURCE_EVIDENCE_MANIFEST_ID_DUPLICATE:robots-control-evidence-record-v2',
-      'SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=1:actual=2',
+      'SOURCE_EVIDENCE_RECORD_CARDINALITY_MISMATCH:expected=3:actual=4',
     ]);
 
     const orphan = structuredClone(sourceEvidenceManifest);
@@ -1051,7 +1165,7 @@ describe('AI Moment Index public search surface', () => {
       sourceEvidenceManifest,
     );
     expect(html).toContain(
-      'Historical license review dates: 2022-01-18. Fresh source-record observation windows: 2026-08-31T00:00:00.000Z through 2026-09-30T00:00:00.000Z.',
+      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-08-06. Fresh source-record observation windows: 2026-08-31T00:00:00.000Z through 2026-09-30T00:00:00.000Z.',
     );
     expect(html).toContain(
       'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
