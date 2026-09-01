@@ -281,6 +281,43 @@ describe('bounded Search Receipt live collection', () => {
     expect(serializedFacts).not.toContain('not a published fact');
   });
 
+  it('canonicalizes positive and negative RFC822 offsets across UTC date boundaries', async () => {
+    const bytes = Buffer.from(
+      FEED_BYTES.toString('utf8')
+        .replace(
+          'Mon, 31 Aug 2026 17:00:00 +0000',
+          'Mon, 31 Aug 2026 12:00:00 -0500',
+        )
+        .replace(
+          'Sun, 30 Aug 2026 10:00:00 GMT',
+          'Tue, 01 Sep 2026 00:30:00 +0530',
+        ),
+    );
+    const result = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory: await newEvidenceDirectory('search-rss-offsets-'),
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        byteCount: bytes.byteLength,
+        rawSha256: sha256(bytes),
+        bytes,
+      }),
+    });
+    expect(result.receipt.payload.publicFacts).toMatchObject({
+      entries: [
+        {
+          entryId: 'tag:google.com,2026:first',
+          publishedAt: '2026-08-31T19:00:00.000Z',
+          updatedAt: '2026-08-31T19:00:00.000Z',
+        },
+        {
+          entryId: 'tag:google.com,2026:second',
+          publishedAt: '2026-08-31T17:00:00.000Z',
+          updatedAt: '2026-08-31T17:00:00.000Z',
+        },
+      ],
+    });
+  });
+
   it.each([
     [
       'wrong RSS version',
@@ -332,6 +369,34 @@ describe('bounded Search Receipt live collection', () => {
       ),
     ],
     [
+      'duplicate item GUID',
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid><guid isPermaLink="false">duplicate</guid>',
+      ),
+    ],
+    [
+      'GUID xml:base attribute',
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '<guid xml:base="https://evil.example/">tag:google.com,2026:second</guid>',
+      ),
+    ],
+    [
+      'GUID foreign namespaced attribute',
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '<guid xmlns:evil="urn:evil" evil:mode="unsafe">tag:google.com,2026:second</guid>',
+      ),
+    ],
+    [
+      'GUID unknown unqualified attribute',
+      FEED_BYTES.toString('utf8').replace(
+        '<guid isPermaLink="false">tag:google.com,2026:second</guid>',
+        '<guid mode="unsafe">tag:google.com,2026:second</guid>',
+      ),
+    ],
+    [
       'foreign namespace title impersonation',
       FEED_BYTES.toString('utf8').replace(
         '<title>Second &amp; newer</title>',
@@ -360,6 +425,14 @@ describe('bounded Search Receipt live collection', () => {
       ),
     ],
     [
+      'out-of-range RFC822 hour offset',
+      FEED_BYTES.toString('utf8').replace('+0000', '+2400'),
+    ],
+    [
+      'out-of-range RFC822 minute offset',
+      FEED_BYTES.toString('utf8').replace('+0000', '+0060'),
+    ],
+    [
       'query-bearing item URL',
       FEED_BYTES.toString('utf8').replace(
         'https://developers.google.com/search/blog/second</link>',
@@ -385,6 +458,27 @@ describe('bounded Search Receipt live collection', () => {
       FEED_BYTES.toString('utf8').replace(
         'https://developers.google.com/search/blog/second</link>',
         'https://developers.google.com/search/blog/%73econd</link>',
+      ),
+    ],
+    [
+      'credential-bearing URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://user@developers.google.com/search/blog/second</link>',
+      ),
+    ],
+    [
+      'surrounding-whitespace URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        ' https://developers.google.com/search/blog/second</link>',
+      ),
+    ],
+    [
+      'same-origin non-blog URL',
+      FEED_BYTES.toString('utf8').replace(
+        'https://developers.google.com/search/blog/second</link>',
+        'https://developers.google.com/search/docs/second</link>',
       ),
     ],
     [
@@ -611,6 +705,58 @@ describe('bounded Search Receipt live collection', () => {
       fetchSource: async (manifest) => rawFetch(manifest),
     });
     const replacementRaw = Buffer.from('[]');
+    const replacementRawSha256 = sha256(replacementRaw);
+    const { schemaVersion, ...receiptInput } = first.receipt.payload;
+    void schemaVersion;
+    const replacement = createReceipt({
+      ...receiptInput,
+      rawSha256: replacementRawSha256,
+      rawObjectPath: `objects/raw/${replacementRawSha256}.bin`,
+      gateInputs: {
+        ...receiptInput.gateInputs,
+        rawSha256: replacementRawSha256,
+      },
+    });
+    await rm(
+      join(
+        evidenceDirectory,
+        ...first.receipt.payload.rawObjectPath.split('/'),
+      ),
+    );
+    await rm(first.path);
+    await writeFile(
+      join(evidenceDirectory, ...replacement.payload.rawObjectPath.split('/')),
+      replacementRaw,
+    );
+    await writeFile(
+      join(
+        evidenceDirectory,
+        'receipts',
+        'search-receipt',
+        `${replacement.id}.json`,
+      ),
+      canonicalJson(replacement),
+    );
+
+    await expect(verifyEvidenceTree(evidenceDirectory)).rejects.toMatchObject({
+      code: 'OBJECT_INTEGRITY_MISMATCH',
+    });
+  });
+
+  it('re-derives RSS facts from raw bytes even when replacement receipt hashes are internally consistent', async () => {
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-rss-semantic-tamper-',
+    );
+    const first = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const replacementRaw = Buffer.from(
+      FEED_BYTES.toString('utf8').replace(
+        'Second &amp; newer',
+        'Changed but consistently re-keyed',
+      ),
+    );
     const replacementRawSha256 = sha256(replacementRaw);
     const { schemaVersion, ...receiptInput } = first.receipt.payload;
     void schemaVersion;

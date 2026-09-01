@@ -516,7 +516,12 @@ function childText(node: XmlNode, name: string, label: string): string {
   return requiredString(nodeText(child(node, name, label)), label, true);
 }
 
-function exactLeafText(node: XmlNode, name: string, label: string): string {
+function exactLeafText(
+  node: XmlNode,
+  name: string,
+  label: string,
+  requireCanonicalWhitespace = false,
+): string {
   const selected = child(node, name, label);
   if (
     selected.children.length > 0 ||
@@ -524,7 +529,11 @@ function exactLeafText(node: XmlNode, name: string, label: string): string {
   ) {
     return notAdmitted(`${label} must contain unextended text only`);
   }
-  return requiredString(selected.text.join(' '), label, true);
+  const raw = selected.text.join(' ');
+  if (requireCanonicalWhitespace && raw !== raw.trim()) {
+    return notAdmitted(`${label} must not have surrounding whitespace`);
+  }
+  return requiredString(raw, label, !requireCanonicalWhitespace);
 }
 
 function nonNamespaceAttributes(
@@ -670,7 +679,7 @@ function rssEntries(root: XmlNode) {
     return notAdmitted('RSS channel must be unqualified');
   }
   exactLeafText(channel, 'title', 'RSS channel title');
-  const channelLink = exactLeafText(channel, 'link', 'RSS channel link');
+  const channelLink = exactLeafText(channel, 'link', 'RSS channel link', true);
   if (channelLink !== 'https://developers.google.com/search/blog') {
     return notAdmitted('RSS channel link is not admitted');
   }
@@ -685,7 +694,7 @@ function rssEntries(root: XmlNode) {
       return notAdmitted(`item[${index}] attributes are not admitted`);
     }
     const title = exactLeafText(item, 'title', `item[${index}].title`);
-    const link = exactLeafText(item, 'link', `item[${index}].link`);
+    const link = exactLeafText(item, 'link', `item[${index}].link`, true);
     const publishedAt = rssTimestamp(
       exactLeafText(item, 'pubDate', `item[${index}].pubDate`),
       `item[${index}].pubDate`,
@@ -695,11 +704,13 @@ function rssEntries(root: XmlNode) {
       return notAdmitted(`item[${index}].guid must contain text only`);
     }
     const guidAttributes = nonNamespaceAttributes(guidNode);
-    if (
-      Object.keys(guidAttributes).length > 1 ||
-      (guidAttributes.isPermaLink !== undefined &&
-        guidAttributes.isPermaLink !== 'false')
-    ) {
+    const guidAttributeNames = Object.keys(guidAttributes);
+    if (!(
+      guidAttributeNames.length === 0 ||
+      (guidAttributeNames.length === 1 &&
+        guidAttributeNames[0] === 'isPermaLink' &&
+        guidAttributes.isPermaLink === 'false')
+    )) {
       return notAdmitted(`item[${index}].guid attributes are not admitted`);
     }
     return {
