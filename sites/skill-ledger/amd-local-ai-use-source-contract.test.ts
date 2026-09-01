@@ -186,4 +186,92 @@ describe('AMD local-ai-use designated source contract', () => {
       disclosure: null,
     });
   });
+
+  it.each([
+    [
+      'an invalid observed timestamp',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        observedAt: '2026-02-30T04:12:34.567Z',
+      }),
+      ['invalid-observed-at'],
+    ],
+    [
+      'a changed license name',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        inheritedLicense: { ...record.inheritedLicense, name: 'Apache-2.0' },
+      }),
+      ['license-name-mismatch'],
+    ],
+    [
+      'a changed license reference',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        inheritedLicense: {
+          ...record.inheritedLicense,
+          referenceUrl: 'https://example.invalid/LICENSE',
+        },
+      }),
+      ['license-reference-mismatch'],
+    ],
+    [
+      'a changed license byte length',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        inheritedLicense: { ...record.inheritedLicense, bytes: 1105 },
+      }),
+      ['license-bytes-mismatch'],
+    ],
+    [
+      'a changed raw byte length',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        raw: { ...record.raw, bytes: 18206 },
+      }),
+      ['raw-bytes-mismatch'],
+    ],
+    [
+      'a changed declared name',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        declaredMetadata: { ...record.declaredMetadata, name: 'different' },
+      }),
+      ['declared-name-mismatch'],
+    ],
+    [
+      'a malformed raw URL',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        source: { ...record.source, rawUrl: 'not a URL' },
+      }),
+      ['source-raw-url-mismatch'],
+    ],
+    [
+      'a raw-host alias',
+      (record: AmdLocalAiUseProspectiveSource) => ({
+        ...record,
+        source: {
+          ...record.source,
+          rawUrl:
+            'https://raw.githubusercontent.com.example.invalid/amd/skills/e867fa4ae4516f644221cb04dcdf24008a43cb99/skills/local-ai-use/SKILL.md',
+        },
+      }),
+      ['source-raw-url-mismatch'],
+    ],
+  ] as const)(
+    'returns no disclosure for %s',
+    (_label, mutate, expectedIssues) => {
+      const result = discloseAmdLocalAiUseProspectiveSource(
+        mutate(controlledProspectiveSource()),
+      );
+
+      expect(result).toEqual({
+        kind: 'not-ready',
+        issues: expectedIssues,
+        disclosure: null,
+        boundary: AMD_LOCAL_AI_USE_SOURCE_BOUNDARY,
+      });
+    },
+  );
 });
