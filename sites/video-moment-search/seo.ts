@@ -367,7 +367,7 @@ export function renderAtomFeed(
       return grant.reviewEvidence === undefined
         ? grant.permissionVerifiedAt
         : evidenceRecords.get(grant.reviewEvidence.evidenceId)!.observedStatus
-            .observedAt;
+            .sourcePageRevisionAt;
     }),
     ...eligibleGuides.map((guide) => guide.updatedAt),
   ].sort();
@@ -382,7 +382,7 @@ export function renderAtomFeed(
       grant.reviewEvidence === undefined
         ? grant.permissionVerifiedAt
         : evidenceRecords.get(grant.reviewEvidence.evidenceId)!.observedStatus
-            .observedAt;
+            .sourcePageRevisionAt;
     const canonical = canonicalUrl(origin, `moments/${moment.id}/`);
     const exactSource = buildTimestampUrl(video, moment.startSeconds);
     return `  <entry>\n    <id>${xml(canonical)}</id>\n    <title>${xml(`${video.title} at ${formatSeconds(moment.startSeconds)}`)}</title>\n    <updated>${xml(updated)}</updated>\n    <link rel="alternate" href="${xml(canonical)}"/>\n    <link rel="related" href="${xml(exactSource)}"/>\n    <summary>${xml(moment.excerpt)}</summary>\n  </entry>`;

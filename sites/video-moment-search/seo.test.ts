@@ -151,7 +151,8 @@ describe('video moment search SEO', () => {
     expect(sitemap).not.toContain('player');
     const feed = renderAtomFeed(corpus, baseUrl);
     expect(feed).toContain('#t=132');
-    expect(feed).toContain('<updated>2026-08-31T00:00:00.000Z</updated>');
+    expect(feed).toContain('<updated>2026-02-04T14:54:21.000Z</updated>');
+    expect(feed).not.toContain('<updated>2026-08-31T00:00:00.000Z</updated>');
     expect(feed).not.toContain('<updated>2022-01-18T00:00:00.000Z</updated>');
   });
 

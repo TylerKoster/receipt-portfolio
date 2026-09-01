@@ -306,7 +306,9 @@ function twoReviewedPublication(): {
   };
   secondRecord.observedStatus = {
     status: 'source-record-observed',
-    observedAt: '2026-08-31T00:00:00.000Z',
+    precision: 'date',
+    observedOn: '2026-08-31',
+    normalizedAt: '2026-08-31T00:00:00.000Z',
     expiresAt: '2026-09-30T00:00:00.000Z',
     sourcePageRevisionId: '2',
     sourcePageRevisionUrl:
@@ -687,6 +689,151 @@ function executeClientPayload(
 }
 
 describe('AI Moment Index public search surface', () => {
+  it('carries date-precision observations without presenting normalized midnight as the observation instant', () => {
+    const publicIndex = serializePublicSearchIndex(fixture, searchIndex);
+    for (const entry of publicIndex.entries) {
+      const observedStatus = entry.reviewEvidence?.observedStatus as
+        | {
+            precision?: unknown;
+            observedOn?: unknown;
+            normalizedAt?: unknown;
+            observedAt?: unknown;
+          }
+        | undefined;
+      expect(observedStatus, entry.momentId).toMatchObject({
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
+      });
+      expect(observedStatus, entry.momentId).not.toHaveProperty('observedAt');
+      expect(entry.verificationDate, entry.momentId).toBe('2026-08-31');
+    }
+
+    const html = renderVideoMomentHome(
+      fixture,
+      searchIndex,
+      baseUrl,
+      sourceEvidenceManifest,
+    );
+    expect(html).toContain('Observed on 2026-08-31 (date precision)');
+    expect(html).not.toContain('Observed at');
+    expect(html).not.toContain(
+      '<dt>Observed source record</dt><dd>2026-08-31T00:00:00.000Z',
+    );
+  });
+
+  it('pins every accepted manifest-only fact for KI-Campus and WEF to hand-derived literals', () => {
+    expect(
+      sourceEvidenceManifest.records
+        .filter(({ evidenceId }) =>
+          [
+            'commons-generative-ai-explained-in-2-minutes-v1',
+            'commons-davos-2016-state-of-artificial-intelligence-v1',
+          ].includes(evidenceId),
+        )
+        .map((record) => {
+          const cue = fixture.cues.find(
+            ({ id }) => id === record.bindings.cueId,
+          )!;
+          return {
+            evidenceId: record.evidenceId,
+            canonicalUrl: record.canonicalSourceEvidenceUrl,
+            immutableUrl: record.immutableSourceEvidenceUrl,
+            immutableOldid: new URL(
+              record.immutableSourceEvidenceUrl,
+            ).searchParams.get('oldid'),
+            license: record.license,
+            delivery: record.delivery,
+            observedRevision: {
+              id: record.observedStatus.sourcePageRevisionId,
+              url: record.observedStatus.sourcePageRevisionUrl,
+              at: record.observedStatus.sourcePageRevisionAt,
+            },
+            annotation: record.annotation,
+            cueInterval: [cue.startSeconds, cue.endSeconds],
+            bindings: record.bindings,
+          };
+        }),
+    ).toEqual([
+      {
+        evidenceId: 'commons-generative-ai-explained-in-2-minutes-v1',
+        canonicalUrl:
+          'https://commons.wikimedia.org/wiki/File:Generative_AI_explained_in_2_minutes.webm',
+        immutableUrl:
+          'https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071',
+        immutableOldid: '1145693071',
+        license: {
+          name: 'Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)',
+          url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+        },
+        delivery: {
+          url: 'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm',
+          mediaType: 'video/webm',
+          byteLength: 26848205,
+          acceptRanges: 'bytes',
+          durationSeconds: 122.081,
+        },
+        observedRevision: {
+          id: '1145693071',
+          url: 'https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071',
+          at: '2026-01-10T22:07:20.000Z',
+        },
+        annotation: {
+          kind: 'original-editorial',
+          text: 'At 18 seconds, an AI Campus animation shows a seated person beside a large smartphone displaying a bot face and chat bubbles.',
+          sha256:
+            '4ff3be6d42965ecebce82df2354177a313ef5a03ea0b47ac841f32618e8498ba',
+        },
+        cueInterval: [18, 19],
+        bindings: {
+          corpusId: 'wikimedia-commons-ai-video-reviewed-v1',
+          videoId: 'video-generative-ai-explained',
+          rightsGrantId: 'rights-commons-generative-ai-explained',
+          momentId: 'moment-generative-ai-interface',
+          cueId: 'annotation-generative-ai-18',
+        },
+      },
+      {
+        evidenceId: 'commons-davos-2016-state-of-artificial-intelligence-v1',
+        canonicalUrl:
+          'https://commons.wikimedia.org/wiki/File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm',
+        immutableUrl:
+          'https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664',
+        immutableOldid: '1159390664',
+        license: {
+          name: 'Creative Commons Attribution 3.0 Unported (CC BY 3.0)',
+          url: 'https://creativecommons.org/licenses/by/3.0/',
+        },
+        delivery: {
+          url: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm',
+          mediaType: 'video/webm',
+          byteLength: 363432763,
+          acceptRanges: 'bytes',
+          durationSeconds: 3308.545,
+        },
+        observedRevision: {
+          id: '1159390664',
+          url: 'https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664',
+          at: '2026-02-04T14:54:21.000Z',
+        },
+        annotation: {
+          kind: 'original-editorial',
+          text: 'At 75 seconds, a World Economic Forum panel sits around the moderator in a blue-lit room.',
+          sha256:
+            'afc527653686901c075ae03eb56f831692291339a3fc39e8e8730e8a70318531',
+        },
+        cueInterval: [75, 76],
+        bindings: {
+          corpusId: 'wikimedia-commons-ai-video-reviewed-v1',
+          videoId: 'video-davos-state-of-ai',
+          rightsGrantId: 'rights-commons-davos-ai-panel',
+          momentId: 'moment-ai-industry-society-panel',
+          cueId: 'annotation-davos-ai-panel-75',
+        },
+      },
+    ]);
+  });
+
   it('publishes exactly the three admitted evidence records with exact ordinary timestamp routes', () => {
     expect(
       validateCommonsSourceEvidence(
@@ -714,7 +861,9 @@ describe('AI Moment Index public search surface', () => {
         evidenceIssuer: record.roles.evidenceIssuer.name,
         historicalReviewer: record.historicalLicenseReview.reviewer,
         historicalReviewedOn: record.historicalLicenseReview.reviewedOn,
-        observedAt: record.observedStatus.observedAt,
+        precision: record.observedStatus.precision,
+        observedOn: record.observedStatus.observedOn,
+        normalizedAt: record.observedStatus.normalizedAt,
         expiresAt: record.observedStatus.expiresAt,
         timestampUrl: record.timestamp.url,
       })),
@@ -728,7 +877,9 @@ describe('AI Moment Index public search surface', () => {
         evidenceIssuer: 'Wikimedia Commons',
         historicalReviewer: 'LicenseReviewerBot',
         historicalReviewedOn: '2022-01-18',
-        observedAt: '2026-08-31T00:00:00.000Z',
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
         timestampUrl:
           'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
@@ -742,7 +893,9 @@ describe('AI Moment Index public search surface', () => {
         evidenceIssuer: 'Wikimedia Commons',
         historicalReviewer: 'Speravir',
         historicalReviewedOn: '2024-08-06',
-        observedAt: '2026-08-31T00:00:00.000Z',
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
         timestampUrl:
           'https://upload.wikimedia.org/wikipedia/commons/c/c5/Generative_AI_explained_in_2_minutes.webm#t=18',
@@ -756,7 +909,9 @@ describe('AI Moment Index public search surface', () => {
         evidenceIssuer: 'Wikimedia Commons',
         historicalReviewer: 'INeverCry',
         historicalReviewedOn: '2016-12-21',
-        observedAt: '2026-08-31T00:00:00.000Z',
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
         timestampUrl:
           'https://upload.wikimedia.org/wikipedia/commons/a/a5/Davos_2016_-_The_State_of_Artificial_Intelligence.webm#t=75',
@@ -851,8 +1006,9 @@ describe('AI Moment Index public search surface', () => {
       [
         'future',
         (candidate: Mutable<VideoSourceEvidenceManifest>) => {
-          candidate.records[0]!.observedStatus.observedAt =
-            '2026-08-31T13:00:00.000Z';
+          candidate.records[0]!.observedStatus.observedOn = '2026-09-01';
+          candidate.records[0]!.observedStatus.normalizedAt =
+            '2026-09-01T00:00:00.000Z';
         },
         'SOURCE_EVIDENCE_OBSERVATION_FUTURE:commons-how-can-we-keep-robots-under-control-v1',
       ],
@@ -875,9 +1031,10 @@ describe('AI Moment Index public search surface', () => {
       [
         'ill-formed',
         (candidate: Mutable<VideoSourceEvidenceManifest>) => {
-          candidate.records[0]!.observedStatus.observedAt = '2026-08-31';
+          candidate.records[0]!.observedStatus.observedOn =
+            '2026-08-31T00:00:00.000Z';
         },
-        'SOURCE_EVIDENCE_SCHEMA_INVALID:records.0.observedStatus.observedAt',
+        'SOURCE_EVIDENCE_SCHEMA_INVALID:records.0.observedStatus.observedOn',
       ],
     ] as const;
     for (const [name, mutate, diagnostic] of clockCases) {
@@ -1098,7 +1255,9 @@ describe('AI Moment Index public search surface', () => {
         '080c1bf2566fee9fce3db83f35990d76311eb5e2c2ab22fc2d2daf9c917c5fdd',
       observedStatus: {
         status: 'source-record-observed',
-        observedAt: '2026-08-31T00:00:00.000Z',
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
       },
       roles: sourceEvidenceManifest.records[0]!.roles,
@@ -1117,7 +1276,8 @@ describe('AI Moment Index public search surface', () => {
     expect(html).toContain('Historical license review');
     expect(html).toContain('LicenseReviewerBot · 2022-01-18');
     expect(html).toContain('Observed source record');
-    expect(html).toContain('2026-08-31T00:00:00.000Z');
+    expect(html).toContain('Observed on 2026-08-31 (date precision)');
+    expect(html).not.toContain('2026-08-31T00:00:00.000Z');
     expect(html).not.toMatch(/current (?:permission|availability)/iu);
     expect(html).not.toContain('Source and license availability was reviewed');
     for (const boundary of [
@@ -1165,7 +1325,7 @@ describe('AI Moment Index public search surface', () => {
       sourceEvidenceManifest,
     );
     expect(html).toContain(
-      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-08-06. Fresh source-record observation windows: 2026-08-31T00:00:00.000Z through 2026-09-30T00:00:00.000Z.',
+      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-08-06. Fresh source-record status: observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z.',
     );
     expect(html).toContain(
       'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
@@ -1259,7 +1419,9 @@ describe('AI Moment Index public search surface', () => {
       },
       observedStatus: {
         status: 'source-record-observed',
-        observedAt: '2026-08-31T00:00:00.000Z',
+        precision: 'date',
+        observedOn: '2026-08-31',
+        normalizedAt: '2026-08-31T00:00:00.000Z',
         expiresAt: '2026-09-30T00:00:00.000Z',
       },
       annotation: {
@@ -1333,7 +1495,7 @@ describe('AI Moment Index public search surface', () => {
     });
     expect(publicEntry.rightsStatus).toContain(evidence.license.name);
     expect(publicEntry.verificationDate).toBe(
-      evidence.observedStatus.observedAt,
+      evidence.observedStatus.observedOn,
     );
     expect(publicEntry.provenance).toContain(evidence.evidenceId);
     expect(publicEntry.provenance).toContain(
@@ -1561,7 +1723,7 @@ describe('AI Moment Index public search surface', () => {
     const synchronizeClaims = (entry: Mutable<typeof baseEntry>): void => {
       const review = entry.reviewEvidence!;
       entry.rightsStatus = `${review.licenseIdentifier}; ${review.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`;
-      entry.verificationDate = review.observedStatus.observedAt;
+      entry.verificationDate = review.observedStatus.observedOn;
       entry.provenance = `Corpus ${entry.corpusId}; evidence ${review.evidenceId}; immutable rights revision ${review.immutableRightsRevisionUrl}; reviewed by ${review.reviewer} on ${review.reviewedOn}; rights grant ${entry.rightsGrantId}; cue ${entry.cueIds.join(', ')}`;
     };
     const invalidEvidence: readonly [
@@ -1579,9 +1741,10 @@ describe('AI Moment Index public search surface', () => {
         (entry) => (entry.reviewEvidence!.roles.publisher.name = ''),
       ],
       [
-        'malformed observed timestamp',
+        'malformed observed date',
         (entry) => {
-          entry.reviewEvidence!.observedStatus.observedAt = '2026-08-31';
+          entry.reviewEvidence!.observedStatus.observedOn =
+            '2026-08-31T00:00:00.000Z';
         },
       ],
       ['empty review date', (entry) => (entry.reviewEvidence!.reviewedOn = '')],
@@ -1701,7 +1864,7 @@ describe('AI Moment Index public search surface', () => {
       'Topics',
       'Confidence class',
       'Rights status',
-      'Observed at',
+      'Observed on',
       'Provenance',
       'Correction state',
     ]) {
@@ -2122,6 +2285,10 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.handoffText.value).toContain(
       'Historical review date: 2022-01-18',
     );
+    expect(harness.handoffText.value).toContain(
+      'Observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z',
+    );
+    expect(harness.handoffText.value).not.toContain('2026-08-31T00:00:00.000Z');
     expect(harness.handoffText.value).toContain(
       'Included: timestamp link, original editorial annotation',
     );

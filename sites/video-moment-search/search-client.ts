@@ -23,7 +23,9 @@ export interface PublicReviewEvidence {
   readonly annotationSha256: string;
   readonly observedStatus: {
     readonly status: 'source-record-observed';
-    readonly observedAt: string;
+    readonly precision: 'date';
+    readonly observedOn: string;
+    readonly normalizedAt: string;
     readonly expiresAt: string;
     readonly sourcePageRevisionId: string;
     readonly sourcePageRevisionUrl: string;
@@ -122,6 +124,16 @@ function canonicalInstant(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
+function strictDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
+}
+
 function safeReviewEvidence(
   value: unknown,
   validationNowMs: number,
@@ -146,7 +158,9 @@ function safeReviewEvidence(
     typeof observedStatus !== 'object' ||
     observedStatus === null ||
     observedStatus.status !== 'source-record-observed' ||
-    !canonicalInstant(observedStatus.observedAt) ||
+    observedStatus.precision !== 'date' ||
+    !strictDate(observedStatus.observedOn) ||
+    !canonicalInstant(observedStatus.normalizedAt) ||
     !canonicalInstant(observedStatus.expiresAt) ||
     !canonicalInstant(observedStatus.sourcePageRevisionAt) ||
     typeof observedStatus.sourcePageRevisionId !== 'string' ||
@@ -155,13 +169,18 @@ function safeReviewEvidence(
   ) {
     return false;
   }
-  const observedAt = new Date(observedStatus.observedAt).getTime();
+  if (
+    observedStatus.normalizedAt !== `${observedStatus.observedOn}T00:00:00.000Z`
+  ) {
+    return false;
+  }
+  const normalizedAt = new Date(observedStatus.normalizedAt).getTime();
   const expiresAt = new Date(observedStatus.expiresAt).getTime();
   if (
-    observedAt > validationNowMs ||
+    normalizedAt > validationNowMs ||
     validationNowMs >= expiresAt ||
-    expiresAt <= observedAt ||
-    expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000
+    expiresAt <= normalizedAt ||
+    expiresAt - normalizedAt > 90 * 24 * 60 * 60 * 1000
   ) {
     return false;
   }
@@ -216,7 +235,7 @@ function claimsMatchEvidence(entry: PublicSearchEntry): boolean {
   return (
     entry.confidenceClass === REVIEWED_CONFIDENCE &&
     entry.rightsStatus === expectedRightsStatus(review) &&
-    entry.verificationDate === review.observedStatus.observedAt &&
+    entry.verificationDate === review.observedStatus.observedOn &&
     entry.provenance === expectedProvenance(entry)
   );
 }
@@ -427,7 +446,9 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
           !namedRoleSafe(review.roles.evidenceIssuer) ||
           !review.observedStatus || typeof review.observedStatus !== 'object' ||
           review.observedStatus.status !== 'source-record-observed' ||
-          !canonicalInstant(review.observedStatus.observedAt) ||
+          review.observedStatus.precision !== 'date' ||
+          !validReviewDate(review.observedStatus.observedOn) ||
+          !canonicalInstant(review.observedStatus.normalizedAt) ||
           !canonicalInstant(review.observedStatus.expiresAt) ||
           !canonicalInstant(review.observedStatus.sourcePageRevisionAt) ||
           !/^\d+$/.test(review.observedStatus.sourcePageRevisionId) ||
@@ -441,10 +462,12 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
           review.productBoundary.excluded.length === 0 ||
           !review.productBoundary.included.every(nonBlank) ||
           !review.productBoundary.excluded.every(nonBlank)) return false;
-      const observedAt = new Date(review.observedStatus.observedAt).getTime();
+      if (review.observedStatus.normalizedAt !==
+          review.observedStatus.observedOn + 'T00:00:00.000Z') return false;
+      const normalizedAt = new Date(review.observedStatus.normalizedAt).getTime();
       const expiresAt = new Date(review.observedStatus.expiresAt).getTime();
-      if (observedAt > validationNow || validationNow >= expiresAt || expiresAt <= observedAt ||
-          expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) return false;
+      if (normalizedAt > validationNow || validationNow >= expiresAt || expiresAt <= normalizedAt ||
+          expiresAt - normalizedAt > 90 * 24 * 60 * 60 * 1000) return false;
       return [review.licenseUrl, review.canonicalRightsPageUrl,
         review.immutableRightsRevisionUrl,
         review.observedStatus.sourcePageRevisionUrl].every((value) => {
@@ -475,7 +498,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
         entry.verificationDate + ' ' + entry.provenance);
     return entry.confidenceClass === reviewedConfidence &&
       entry.rightsStatus === expectedRights(review) &&
-      entry.verificationDate === review.observedStatus.observedAt &&
+      entry.verificationDate === review.observedStatus.observedOn &&
       entry.provenance === expectedProvenance(entry);
   };
   const safe = (entry, expectedCorpusId) => {
@@ -583,8 +606,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       'License: ' + review.licenseIdentifier,
       'Immutable rights revision: ' + review.immutableRightsRevisionUrl,
       'Historical review date: ' + review.reviewedOn,
-      'Observed source record: ' + review.observedStatus.observedAt +
-        ' through ' + review.observedStatus.expiresAt,
+      'Observed on ' + review.observedStatus.observedOn +
+        ' (date precision); freshness expires ' + review.observedStatus.expiresAt,
       'Included: ' + review.productBoundary.included.join(', '),
       'Excluded: ' + review.productBoundary.excluded.join(', '),
       'Correction state: ' + entry.correctionState,
@@ -640,7 +663,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     addText(metadata, 'Topics', entry.topicSlugs.join(', '));
     addText(metadata, 'Confidence class', entry.confidenceClass);
     addText(metadata, 'Rights status', entry.rightsStatus);
-    addText(metadata, entry.reviewEvidence ? 'Observed at' : 'Verification date', entry.verificationDate);
+    addText(metadata, entry.reviewEvidence ? 'Observed on' : 'Verification date',
+      entry.reviewEvidence ? entry.verificationDate + ' (date precision)' : entry.verificationDate);
     addText(metadata, 'Provenance', entry.provenance);
     if (entry.reviewEvidence) {
       addText(metadata, 'Evidence ID', entry.reviewEvidence.evidenceId);
@@ -649,7 +673,10 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       addText(metadata, 'Canonical rights page', entry.reviewEvidence.canonicalRightsPageUrl);
       addText(metadata, 'Immutable rights revision', entry.reviewEvidence.immutableRightsRevisionUrl);
       addText(metadata, 'Historical license review', entry.reviewEvidence.reviewer + ' · ' + entry.reviewEvidence.reviewedOn);
-      addText(metadata, 'Observed source record', entry.reviewEvidence.observedStatus.observedAt + ' · expires ' + entry.reviewEvidence.observedStatus.expiresAt);
+      addText(metadata, 'Observed source record', 'Observed on ' +
+        entry.reviewEvidence.observedStatus.observedOn +
+        ' (date precision) · freshness expires ' +
+        entry.reviewEvidence.observedStatus.expiresAt);
       addText(metadata, 'Product boundary', 'Included: ' +
         entry.reviewEvidence.productBoundary.included.join(', ') + '; excluded: ' +
         entry.reviewEvidence.productBoundary.excluded.join(', '));

@@ -248,7 +248,7 @@ export function serializePublicSearchIndex(
           ? grant.licenseNote
           : `${reviewEvidence.licenseIdentifier}; ${reviewEvidence.productBoundary.included.join(' plus ')} only; no inferred permission or endorsement.`,
       verificationDate:
-        reviewEvidence?.observedStatus.observedAt ??
+        reviewEvidence?.observedStatus.observedOn ??
         grant.permissionVerifiedAt.slice(0, 10),
       provenance:
         reviewEvidence === undefined
@@ -280,8 +280,10 @@ function detailRows(entry: PublicSearchEntry): string {
     ['Confidence class', entry.confidenceClass],
     ['Rights status', entry.rightsStatus],
     [
-      entry.reviewEvidence === undefined ? 'Verification date' : 'Observed at',
-      entry.verificationDate,
+      entry.reviewEvidence === undefined ? 'Verification date' : 'Observed on',
+      entry.reviewEvidence === undefined
+        ? entry.verificationDate
+        : `${entry.verificationDate} (date precision)`,
     ],
     ['Provenance', entry.provenance],
   ];
@@ -301,7 +303,7 @@ function detailRows(entry: PublicSearchEntry): string {
       ],
       [
         'Observed source record',
-        `${entry.reviewEvidence.observedStatus.observedAt} · expires ${entry.reviewEvidence.observedStatus.expiresAt}`,
+        `Observed on ${entry.reviewEvidence.observedStatus.observedOn} (date precision) · freshness expires ${entry.reviewEvidence.observedStatus.expiresAt}`,
       ],
       ['Publisher', entry.reviewEvidence.roles.publisher.name],
       ['Uploader', entry.reviewEvidence.roles.uploader.name],
@@ -586,13 +588,13 @@ export function renderSearchShell(
         entry.reviewEvidence === undefined
           ? []
           : [
-              `${entry.reviewEvidence.observedStatus.observedAt} through ${entry.reviewEvidence.observedStatus.expiresAt}`,
+              `observed on ${entry.reviewEvidence.observedStatus.observedOn} (date precision); freshness expires ${entry.reviewEvidence.observedStatus.expiresAt}`,
             ],
       ),
     ),
   ].sort();
   const historicalReviewBoundary = allInitialEntriesReviewed
-    ? ` Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record observation windows: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`
+    ? ` Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record status: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`
     : '';
   const rightsBoundary = allInitialEntriesReviewed
     ? `This reviewed Commons source provides a timestamp link plus an original editorial annotation only.${historicalReviewBoundary} It does not host, embed, or distribute media or transcripts; claim endorsement or inferred permission; represent a live creator library; or provide usability, demand, or revenue evidence. It is not a live creator library.`
@@ -712,7 +714,7 @@ function filteredPage(
         entry.reviewEvidence === undefined
           ? []
           : [
-              `${entry.reviewEvidence.observedStatus.observedAt} through ${entry.reviewEvidence.observedStatus.expiresAt}`,
+              `observed on ${entry.reviewEvidence.observedStatus.observedOn} (date precision); freshness expires ${entry.reviewEvidence.observedStatus.expiresAt}`,
             ],
       ),
     ),
@@ -720,7 +722,7 @@ function filteredPage(
   const currentnessBoundary =
     reviewedOnDates.length === 0
       ? 'Review status is unavailable for this controlled page.'
-      : `Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record observation windows: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`;
+      : `Historical license review dates: ${reviewedOnDates.join(', ')}. Fresh source-record status: ${observedWindows.join(', ')}. These are separate evidence facts; neither is a permission grant.`;
   const directPageHowTo = [
     'Review the excerpt and evidence details.',
     'Inspect the rights, provenance, and correction state.',

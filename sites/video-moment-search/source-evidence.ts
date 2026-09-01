@@ -98,7 +98,9 @@ export const VideoSourceEvidenceManifestSchema = z
           observedStatus: z
             .object({
               status: z.literal('source-record-observed'),
-              observedAt: canonicalInstant,
+              precision: z.literal('date'),
+              observedOn: strictDate,
+              normalizedAt: canonicalInstant,
               expiresAt: canonicalInstant,
               sourcePageRevisionId: z.string().regex(/^\d+$/u),
               sourcePageRevisionUrl: httpsUrl,
@@ -436,24 +438,32 @@ export function validateCommonsSourceEvidence(
       diagnostics.push(`SOURCE_EVIDENCE_TIMESTAMP_URL_MISMATCH:${id}`);
     }
 
-    const observedMs = new Date(record.observedStatus.observedAt).getTime();
+    const normalizedMs = new Date(record.observedStatus.normalizedAt).getTime();
     const expiresMs = new Date(record.observedStatus.expiresAt).getTime();
     const revisionMs = new Date(
       record.observedStatus.sourcePageRevisionAt,
     ).getTime();
-    if (observedMs > nowMs) {
+    if (
+      record.observedStatus.normalizedAt !==
+      `${record.observedStatus.observedOn}T00:00:00.000Z`
+    ) {
+      diagnostics.push(
+        `SOURCE_EVIDENCE_OBSERVATION_NORMALIZATION_MISMATCH:${id}`,
+      );
+    }
+    if (normalizedMs > nowMs) {
       diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_FUTURE:${id}`);
     }
     if (nowMs >= expiresMs) {
       diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_EXPIRED:${id}`);
     }
-    if (expiresMs <= observedMs) {
+    if (expiresMs <= normalizedMs) {
       diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_REVERSED:${id}`);
     }
-    if (expiresMs - observedMs > 90 * 24 * 60 * 60 * 1000) {
+    if (expiresMs - normalizedMs > 90 * 24 * 60 * 60 * 1000) {
       diagnostics.push(`SOURCE_EVIDENCE_OBSERVATION_WINDOW_TOO_LONG:${id}`);
     }
-    if (revisionMs > observedMs) {
+    if (revisionMs > normalizedMs) {
       diagnostics.push(`SOURCE_EVIDENCE_REVISION_AFTER_OBSERVATION:${id}`);
     }
     const canonicalUrl = new URL(record.canonicalSourceEvidenceUrl);

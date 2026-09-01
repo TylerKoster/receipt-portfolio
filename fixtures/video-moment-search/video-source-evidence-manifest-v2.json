@@ -60,7 +60,9 @@
       },
       "observedStatus": {
         "status": "source-record-observed",
-        "observedAt": "2026-08-31T00:00:00.000Z",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
         "expiresAt": "2026-09-30T00:00:00.000Z",
         "sourcePageRevisionId": "1092595523",
         "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:How_can_we_keep_robots_under_control.webm&oldid=1092595523",
@@ -137,7 +139,9 @@
       },
       "observedStatus": {
         "status": "source-record-observed",
-        "observedAt": "2026-08-31T00:00:00.000Z",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
         "expiresAt": "2026-09-30T00:00:00.000Z",
         "sourcePageRevisionId": "1145693071",
         "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Generative_AI_explained_in_2_minutes.webm&oldid=1145693071",
@@ -220,7 +224,9 @@
       },
       "observedStatus": {
         "status": "source-record-observed",
-        "observedAt": "2026-08-31T00:00:00.000Z",
+        "precision": "date",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
         "expiresAt": "2026-09-30T00:00:00.000Z",
         "sourcePageRevisionId": "1159390664",
         "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Davos_2016_-_The_State_of_Artificial_Intelligence.webm&oldid=1159390664",
