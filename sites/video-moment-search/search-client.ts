@@ -700,13 +700,22 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     }
     return article;
   };
+  const hideDynamicResults = () => {
+    shown = [];
+    results.hidden = true;
+    try {
+      results.replaceChildren();
+    } catch {}
+  };
   const showLoadError = () => {
     serverResults.hidden = false;
+    hideDynamicResults();
     error.hidden = false;
     status.textContent = 'Interactive search is unavailable; initial controlled moments remain below.';
   };
   const showSearchError = () => {
     serverResults.hidden = false;
+    hideDynamicResults();
     error.hidden = false;
     status.textContent = 'Search could not load. The initial controlled moments remain available below.';
   };
@@ -749,6 +758,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       if (query.length === 0) {
         shown = [];
         renderShown();
+        results.hidden = true;
         serverResults.hidden = false;
         status.textContent = 'Enter a phrase such as “robots control”.';
         return;
@@ -756,6 +766,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       const found = find(query);
       shown = found;
       renderShown();
+      results.hidden = false;
       serverResults.hidden = true;
       error.hidden = true;
       status.textContent = found.length === 0

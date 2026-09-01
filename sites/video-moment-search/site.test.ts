@@ -2360,9 +2360,29 @@ describe('AI Moment Index public search surface', () => {
 
     harness.submit('robots control');
     expect(harness.serverResults.hidden).toBe(true);
+    expect(descendants(harness.results, 'article')).toHaveLength(1);
+    expect(
+      byText(
+        descendants(harness.results, 'article')[0]!,
+        'button',
+        'Add to temporary handoff',
+      ),
+    ).toBeDefined();
     harness.failNextRender();
     harness.submit('agent evaluation');
     expect(harness.serverResults.hidden).toBe(false);
+    expect(harness.results.children).toEqual([]);
+    expect(descendants(harness.results, 'article')).toEqual([]);
+    expect(descendants(harness.results, 'button')).toEqual([]);
+
+    harness.submit('robots control');
+    expect(harness.serverResults.hidden).toBe(true);
+    expect(harness.results.hidden).toBe(false);
+    expect(
+      descendants(harness.results, 'article').map(
+        (article) => article.dataset.momentId,
+      ),
+    ).toEqual(['moment-robots-control']);
 
     const beforeLoad = executeClientPayload();
     beforeLoad.submit('robots control');
