@@ -77,6 +77,23 @@ function httpsUrl(value: unknown, name: string): string {
   return url.href;
 }
 
+function statusIncidentUrl(
+  value: unknown,
+  incidentId: string,
+  name: string,
+): string {
+  if (typeof value !== 'string') return notAdmitted(`${name} must be a string`);
+  if (!/^[A-Za-z0-9_-]+$/.test(incidentId)) {
+    return notAdmitted(`${name} record id is not an admitted path segment`);
+  }
+  const relative = `incidents/${incidentId}`;
+  const absolute = `https://status.search.google.com/${relative}`;
+  if (value !== relative && value !== absolute) {
+    return notAdmitted(`${name} destination is not admitted`);
+  }
+  return absolute;
+}
+
 function verifyFetchBinding(manifest: SourceManifest, fetched: RawFetch): void {
   if (
     fetched.sourceUrl !== manifest.endpoint ||
@@ -108,16 +125,17 @@ function normalizeStatus(fetched: RawFetch): ReceiptPublicFacts {
   const incidents = input.map((value, index) => {
     const incident = record(value, `incident[${index}]`);
     const end = incident.end;
-    const url = httpsUrl(incident.uri, `incident[${index}].uri`);
-    const parsedUrl = new URL(url);
-    if (
-      parsedUrl.origin !== 'https://status.search.google.com' ||
-      !parsedUrl.pathname.startsWith('/incidents/')
-    ) {
-      return notAdmitted(`incident[${index}].uri destination is not admitted`);
+    const incidentId = requiredString(incident.id, `incident[${index}].id`);
+    if (incident.id !== incidentId) {
+      return notAdmitted(`incident[${index}].id is not canonical`);
     }
+    const url = statusIncidentUrl(
+      incident.uri,
+      incidentId,
+      `incident[${index}].uri`,
+    );
     return {
-      incidentId: requiredString(incident.id, `incident[${index}].id`),
+      incidentId,
       service: requiredString(
         incident.service_name,
         `incident[${index}].service_name`,

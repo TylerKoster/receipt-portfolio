@@ -37,7 +37,7 @@ const STATUS_BYTES = Buffer.from(
       status_impact: 'SERVICE_DISRUPTION',
       severity: 'SERVICE_DISRUPTION',
       external_desc: '  Delayed reports.  ',
-      uri: 'https://status.search.google.com/incidents/example-b',
+      uri: 'incidents/incident-b',
     },
     {
       id: 'incident-a',
@@ -48,7 +48,7 @@ const STATUS_BYTES = Buffer.from(
       status_impact: 'AVAILABLE',
       severity: 'SERVICE_INFORMATION',
       external_desc: 'Resolved ranking issue.',
-      uri: 'https://status.search.google.com/incidents/example-a',
+      uri: 'incidents/incident-a',
     },
   ]),
 );
@@ -199,7 +199,7 @@ describe('bounded Search Receipt live collection', () => {
           impact: 'AVAILABLE',
           severity: 'SERVICE_INFORMATION',
           summary: 'Resolved ranking issue.',
-          url: 'https://status.search.google.com/incidents/example-a',
+          url: 'https://status.search.google.com/incidents/incident-a',
         },
         {
           incidentId: 'incident-b',
@@ -210,7 +210,7 @@ describe('bounded Search Receipt live collection', () => {
           impact: 'SERVICE_DISRUPTION',
           severity: 'SERVICE_DISRUPTION',
           summary: 'Delayed reports.',
-          url: 'https://status.search.google.com/incidents/example-b',
+          url: 'https://status.search.google.com/incidents/incident-b',
         },
       ],
     });
@@ -263,6 +263,32 @@ describe('bounded Search Receipt live collection', () => {
     ).rejects.toThrow('source unavailable');
     await expectNoEvidenceWrites(evidenceDirectory);
   });
+
+  it.each([' incident-b', 'incident-b ', 'incident/b', 'incident.b'])(
+    'rejects a noncanonical status incident id %s without writing evidence',
+    async (incidentId) => {
+      const parsed = JSON.parse(STATUS_BYTES.toString('utf8')) as Array<
+        Record<string, unknown>
+      >;
+      parsed[0]!.id = incidentId;
+      const bytes = Buffer.from(JSON.stringify(parsed));
+      const evidenceDirectory = await newEvidenceDirectory(
+        'search-status-id-invalid-',
+      );
+      await expect(
+        collectSearchSource('google-search-status', {
+          evidenceDirectory,
+          fetchSource: async (manifest) => ({
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          }),
+        }),
+      ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+      await expectNoEvidenceWrites(evidenceDirectory);
+    },
+  );
 
   it.each([
     ['malformed status JSON', 'google-search-status', Buffer.from('{')],
@@ -683,20 +709,70 @@ describe('bounded Search Receipt live collection', () => {
     await expectNoEvidenceWrites(evidenceDirectory);
   });
 
+  it('admits the exact absolute status incident URL bound to its record id', async () => {
+    const bytes = Buffer.from(
+      STATUS_BYTES.toString('utf8').replace(
+        'incidents/incident-b',
+        'https://status.search.google.com/incidents/incident-b',
+      ),
+    );
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-status-absolute-url-',
+    );
+    const result = await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        byteCount: bytes.byteLength,
+        rawSha256: sha256(bytes),
+        bytes,
+      }),
+    });
+    expect(result.receipt.payload.publicFacts).toMatchObject({
+      incidents: [
+        { url: 'https://status.search.google.com/incidents/incident-a' },
+        { url: 'https://status.search.google.com/incidents/incident-b' },
+      ],
+    });
+  });
+
   it.each([
     [
       'nondefault port',
-      'https://status.search.google.com:444/incidents/example-b',
+      'https://status.search.google.com:444/incidents/incident-b',
     ],
     ['non-incident path', 'https://status.search.google.com/not-an-incident'],
+    ['mismatched relative id', 'incidents/incident-a'],
+    ['relative traversal', 'incidents/../incident-b'],
+    ['relative query', 'incidents/incident-b?view=1'],
+    ['relative fragment', 'incidents/incident-b#details'],
+    ['relative backslash', 'incidents\\incident-b'],
+    ['encoded separator', 'incidents%2Fincident-b'],
+    ['encoded path segment', 'incidents/%69ncident-b'],
+    ['surrounding whitespace', ' incidents/incident-b'],
+    ['leading slash', '/incidents/incident-b'],
+    ['trailing slash', 'incidents/incident-b/'],
+    [
+      'absolute mismatched id',
+      'https://status.search.google.com/incidents/not-incident-b',
+    ],
+    [
+      'absolute query',
+      'https://status.search.google.com/incidents/incident-b?view=1',
+    ],
+    [
+      'absolute fragment',
+      'https://status.search.google.com/incidents/incident-b#details',
+    ],
+    [
+      'absolute credentials',
+      'https://user@status.search.google.com/incidents/incident-b',
+    ],
   ] as const)(
     'rejects a status incident URL with a %s',
     async (_label, url) => {
       const bytes = Buffer.from(
-        STATUS_BYTES.toString('utf8').replace(
-          'https://status.search.google.com/incidents/example-b',
-          url,
-        ),
+        STATUS_BYTES.toString('utf8').replace('incidents/incident-b', url),
       );
       const evidenceDirectory = await newEvidenceDirectory(
         'search-status-url-invalid-',
