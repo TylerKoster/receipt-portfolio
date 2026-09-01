@@ -2333,6 +2333,50 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.status.textContent).toBe('Showing 1 moment.');
   });
 
+  it('hides the existing server fallback after a successful dynamic search', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+
+    harness.submit('robots control');
+
+    expect(harness.serverResults.hidden).toBe(true);
+  });
+
+  it('restores the existing server fallback for empty submissions and recovery paths', async () => {
+    const validIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const harness = executeClientPayload();
+    await harness.resolveIndex(validIndex);
+    expect(harness.serverResults.hidden).toBe(false);
+
+    harness.submit('unmatched phrase');
+    expect(harness.results.children).toEqual([]);
+    expect(harness.serverResults.hidden).toBe(true);
+
+    harness.submit('   ');
+    expect(harness.results.children).toEqual([]);
+    expect(harness.serverResults.hidden).toBe(false);
+
+    harness.submit('robots control');
+    expect(harness.serverResults.hidden).toBe(true);
+    harness.failNextRender();
+    harness.submit('agent evaluation');
+    expect(harness.serverResults.hidden).toBe(false);
+
+    const beforeLoad = executeClientPayload();
+    beforeLoad.submit('robots control');
+    expect(beforeLoad.serverResults.hidden).toBe(false);
+
+    const malformed = executeClientPayload();
+    await malformed.resolveIndex({ entries: 'not-an-array' });
+    expect(malformed.serverResults.hidden).toBe(false);
+
+    const failedLoad = executeClientPayload();
+    await failedLoad.rejectFetch();
+    expect(failedLoad.serverResults.hidden).toBe(false);
+  });
+
   it('keeps one reviewed fixed-flow moment in a page-memory-only timestamp and rights handoff', async () => {
     const harness = executeClientPayload();
     expect(harness.handoffList.children).toEqual([]);

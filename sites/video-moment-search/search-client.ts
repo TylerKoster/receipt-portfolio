@@ -379,6 +379,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const status = document.querySelector('[data-search-status]');
   const results = document.querySelector('[data-client-results]');
   const error = document.querySelector('[data-search-error]');
+  const serverResults = document.querySelector('[data-server-results]');
   const handoff = document.querySelector('[data-moment-page-base]');
   const selectedList = document.querySelector('[data-selected-moments]');
   const handoffText = document.querySelector('[data-handoff-text]');
@@ -387,7 +388,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const clear = document.querySelector('[data-clear-handoff]');
   if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement) ||
       !(status instanceof HTMLElement) || !(results instanceof HTMLElement) ||
-      !(error instanceof HTMLElement) || !(handoff instanceof HTMLElement) ||
+      !(error instanceof HTMLElement) || !(serverResults instanceof HTMLElement) ||
+      !(handoff instanceof HTMLElement) ||
       !(selectedList instanceof HTMLElement) || !(handoffText instanceof HTMLElement) ||
       !(handoffStatus instanceof HTMLElement) || !(copy instanceof HTMLElement) ||
       !(clear instanceof HTMLElement)) return;
@@ -699,10 +701,12 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     return article;
   };
   const showLoadError = () => {
+    serverResults.hidden = false;
     error.hidden = false;
     status.textContent = 'Interactive search is unavailable; initial controlled moments remain below.';
   };
   const showSearchError = () => {
+    serverResults.hidden = false;
     error.hidden = false;
     status.textContent = 'Search could not load. The initial controlled moments remain available below.';
   };
@@ -745,12 +749,14 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       if (query.length === 0) {
         shown = [];
         renderShown();
+        serverResults.hidden = false;
         status.textContent = 'Enter a phrase such as “robots control”.';
         return;
       }
       const found = find(query);
       shown = found;
       renderShown();
+      serverResults.hidden = true;
       error.hidden = true;
       status.textContent = found.length === 0
         ? 'No moments match this phrase. Try fewer or different words.'
