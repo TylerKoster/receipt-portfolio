@@ -1,3 +1,5 @@
+import { lstat, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   DEFAULT_PUBLIC_BASE_URL,
   escapeHtml,
@@ -570,4 +572,55 @@ export function productBlogRoutes(
           .toSorted((left, right) => left.localeCompare(right)),
       ],
     }));
+}
+
+function isEnoent(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
+}
+
+export async function loadProductBlogRegistries(
+  root: string,
+): Promise<BlogValidationResult> {
+  const values: unknown[] = [];
+  const expectedSiteIds: SiteId[] = [];
+  const loadingDiagnostics: string[] = [];
+  for (const siteId of PRODUCT_BLOG_SITE_IDS) {
+    const registryPath = join(root, 'sites', siteId, 'blog-registry.json');
+    try {
+      const stats = await lstat(registryPath);
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        loadingDiagnostics.push(`BLOG_REGISTRY_FILE_INVALID:${siteId}`);
+        continue;
+      }
+      const value = JSON.parse(await readFile(registryPath, 'utf8')) as unknown;
+      values.push(value);
+      expectedSiteIds.push(siteId);
+    } catch (error) {
+      if (isEnoent(error)) continue;
+      loadingDiagnostics.push(`BLOG_REGISTRY_READ_FAILED:${siteId}`);
+    }
+  }
+
+  const validation = validateProductBlogRegistries(values);
+  const namespaceDiagnostics = values.flatMap((value, index) =>
+    isRecord(value) && value.siteId === expectedSiteIds[index]
+      ? []
+      : [`BLOG_REGISTRY_NAMESPACE_MISMATCH:${expectedSiteIds[index]}`],
+  );
+  const diagnostics = [
+    ...new Set([
+      ...loadingDiagnostics,
+      ...validation.diagnostics,
+      ...namespaceDiagnostics,
+    ]),
+  ].sort();
+  return {
+    ok: diagnostics.length === 0,
+    diagnostics,
+    registries: diagnostics.length === 0 ? validation.registries : [],
+  };
 }
