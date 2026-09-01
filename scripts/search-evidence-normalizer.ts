@@ -174,6 +174,7 @@ function decodeXml(value: string, name: string): string {
 
 interface XmlNode {
   readonly name: string;
+  readonly namespaceUri: string;
   readonly attributes: Readonly<Record<string, string>>;
   readonly children: XmlNode[];
   readonly text: string[];
@@ -186,6 +187,7 @@ interface XmlFrame {
 
 const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
 const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
+const ATOM_NAMESPACE = 'http://www.w3.org/2005/Atom';
 const NC_NAME = /^[A-Za-z_][\w.-]*$/;
 
 function qualifiedName(name: string, label: string): {
@@ -240,6 +242,9 @@ function parseAttributes(value: string): Readonly<Record<string, string>> {
       result[name] !== undefined
     ) {
       return notAdmitted('feed tag attributes are duplicated or malformed');
+    }
+    if (rawValue.includes('<')) {
+      return notAdmitted('feed attribute contains forbidden XML syntax');
     }
     result[name] = decodeXml(rawValue, `attribute ${name}`);
     offset = pattern.lastIndex;
@@ -337,6 +342,7 @@ function parseXml(xml: string): XmlNode {
         const prefix = name.slice(6);
         if (
           !NC_NAME.test(prefix) ||
+          /^xml/i.test(prefix) && prefix !== 'xml' ||
           prefix === 'xmlns' ||
           namespace.length === 0 ||
           namespace === XMLNS_NAMESPACE ||
@@ -360,8 +366,27 @@ function parseXml(xml: string): XmlNode {
           return notAdmitted('feed attribute uses an unbound namespace prefix');
         }
       }
+      const expandedAttributes = new Set<string>();
+      for (const name of Object.keys(parsedAttributes)) {
+        if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
+        const parsedName = qualifiedName(name, 'feed attribute');
+        const namespace =
+          parsedName.prefix === undefined
+            ? ''
+            : namespaces.get(parsedName.prefix)!;
+        const expanded = `${namespace}\u0000${parsedName.local}`;
+        if (expandedAttributes.has(expanded)) {
+          return notAdmitted('feed attributes have a duplicate expanded name');
+        }
+        expandedAttributes.add(expanded);
+      }
+      const elementNamespace =
+        elementPrefix === undefined
+          ? (namespaces.get('') ?? '')
+          : namespaces.get(elementPrefix)!;
       const node: XmlNode = {
         name: match[1],
+        namespaceUri: elementNamespace,
         attributes: parsedAttributes,
         children: [],
         text: [],
@@ -375,7 +400,8 @@ function parseXml(xml: string): XmlNode {
   if (
     stack.length > 0 ||
     roots.length !== 1 ||
-    localName(roots[0]!.name) !== 'feed'
+    localName(roots[0]!.name) !== 'feed' ||
+    !['', ATOM_NAMESPACE].includes(roots[0]!.namespaceUri)
   ) {
     return notAdmitted('feed response is not one well-formed Atom document');
   }
@@ -384,7 +410,9 @@ function parseXml(xml: string): XmlNode {
 
 function child(node: XmlNode, name: string, label: string): XmlNode {
   const matches = node.children.filter(
-    (value) => localName(value.name) === name,
+    (value) =>
+      localName(value.name) === name &&
+      value.namespaceUri === node.namespaceUri,
   );
   if (matches.length !== 1)
     return notAdmitted(`${label} must occur exactly once`);
@@ -401,7 +429,9 @@ function childText(node: XmlNode, name: string, label: string): string {
 
 function entryUrl(entry: XmlNode, name: string): string {
   const links = entry.children.filter(
-    (node) => localName(node.name) === 'link',
+    (node) =>
+      localName(node.name) === 'link' &&
+      node.namespaceUri === entry.namespaceUri,
   );
   const selected =
     links.find(
@@ -425,7 +455,11 @@ function normalizeFeed(fetched: RawFetch): ReceiptPublicFacts {
   const xml = Buffer.from(fetched.bytes).toString('utf8');
   const feed = parseXml(xml);
   const entries = feed.children
-    .filter((node) => localName(node.name) === 'entry')
+    .filter(
+      (node) =>
+        localName(node.name) === 'entry' &&
+        node.namespaceUri === feed.namespaceUri,
+    )
     .map((entry, index) => {
       return {
         entryId: childText(entry, 'id', `entry[${index}].id`),

@@ -655,6 +655,19 @@ describe('bounded Search Receipt live collection', () => {
       'reserved xmlns element prefix',
       `<xmlns:feed xmlns:xmlns="urn:x"></xmlns:feed>`,
     ],
+    [
+      'foreign namespace impersonating Atom',
+      `<evil:feed xmlns:evil="urn:not-atom"><evil:entry><evil:id>x</evil:id><evil:title>X</evil:title><evil:link href="https://developers.google.com/search/blog/x"/><evil:published>2026-08-31T00:00:00Z</evil:published><evil:updated>2026-08-31T00:00:00Z</evil:updated></evil:entry></evil:feed>`,
+    ],
+    [
+      'duplicate expanded attribute name',
+      `<feed xmlns:a="urn:same" xmlns:b="urn:same" a:x="1" b:x="2"></feed>`,
+    ],
+    ['raw less-than in an attribute', `<feed title="bad < value"></feed>`],
+    [
+      'reserved xml-like prefix',
+      `<feed xmlns:xmlfoo="urn:x"><xmlfoo:entry/></feed>`,
+    ],
   ] as const)('rejects malformed XML with an %s', async (_label, xml) => {
     const bytes = Buffer.from(xml);
     const evidenceDirectory = await newEvidenceDirectory('search-xml-invalid-');
