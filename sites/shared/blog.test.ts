@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { searchReceiptSite } from '../search-receipt/index.js';
 import {
+  productBlogRoutes,
+  renderProductBlogAtom,
+  renderProductBlogIndex,
+  renderProductBlogPost,
   validateProductBlogRegistries,
   type ProductBlogRegistry,
 } from './blog.js';
@@ -159,5 +164,84 @@ describe('evidence-bound product blog contract', () => {
         'BLOG_FEED_ID_DUPLICATE:0:1',
       ]),
     );
+  });
+
+  it('renders a self-canonical index and post with dates, editorial disclosure, and admitted links', () => {
+    const index = renderProductBlogIndex(
+      searchReceiptSite,
+      fixture,
+      'https://example.com/receipt-portfolio/',
+    );
+    const post = renderProductBlogPost(
+      searchReceiptSite,
+      fixture.posts[0]!,
+      'https://example.com/receipt-portfolio/',
+    );
+
+    expect(index).toContain(
+      '<link rel="canonical" href="https://example.com/receipt-portfolio/search-receipt/blog/">',
+    );
+    expect(index).toContain(`<title>${fixture.title}</title>`);
+    expect(index).toContain(`content="${fixture.description}"`);
+    expect(index).toContain(
+      'href="/receipt-portfolio/search-receipt/blog/controlled-search-handoff-checklist/"',
+    );
+    expect(post).toContain(
+      '<link rel="canonical" href="https://example.com/receipt-portfolio/search-receipt/blog/controlled-search-handoff-checklist/">',
+    );
+    expect(post).toContain('<time datetime="2026-08-30T12:00:00.000Z">');
+    expect(post).toContain('<time datetime="2026-08-31T12:00:00.000Z">');
+    expect(post).toContain(fixture.posts[0]!.author.name);
+    expect(post).toContain(fixture.posts[0]!.author.role);
+    expect(post).toContain(fixture.posts[0]!.editorialDisclosure);
+    expect(post).toContain(
+      'href="https://status.search.google.com/incidents.json"',
+    );
+    expect(post).toContain(
+      'href="/receipt-portfolio/search-receipt/guides/is-google-search-down-or-my-site/"',
+    );
+    expect(post).toContain(fixture.posts[0]!.boundaries.currentness);
+    expect(post).toContain(fixture.posts[0]!.boundaries.noCausation);
+    expect(post).not.toContain('<form');
+    expect(post).not.toContain('<script type="module"');
+  });
+
+  it('escapes blog content and emits deterministic Atom plus exact sitemap and inventory paths', () => {
+    const hostile = structuredClone(fixture);
+    hostile.posts[0]!.sections[0]!.heading = '<script>alert(1)</script>';
+    hostile.posts[0]!.links[0]!.label = '<img src=x onerror=alert(1)>';
+    const post = renderProductBlogPost(searchReceiptSite, hostile.posts[0]!);
+    expect(post).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(post).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(post).not.toContain('<script>alert(1)</script>');
+    expect(post).not.toContain('<img src=x');
+
+    const atom = renderProductBlogAtom(
+      searchReceiptSite,
+      fixture,
+      'https://example.com/receipt-portfolio/',
+    );
+    expect(atom).toContain('<feed xmlns="http://www.w3.org/2005/Atom">');
+    expect(atom).toContain(
+      '<id>https://example.com/receipt-portfolio/search-receipt/blog/</id>',
+    );
+    expect(atom).toContain(`<id>${fixture.posts[0]!.feedId}</id>`);
+    expect(atom).toContain('<published>2026-08-30T12:00:00.000Z</published>');
+    expect(atom).toContain('<updated>2026-08-31T12:00:00.000Z</updated>');
+    expect(atom).toContain(
+      'href="https://example.com/receipt-portfolio/search-receipt/blog/controlled-search-handoff-checklist/"',
+    );
+
+    expect(productBlogRoutes([fixture])).toEqual([
+      {
+        siteId: 'search-receipt',
+        sitemapPaths: ['/blog/', '/blog/controlled-search-handoff-checklist/'],
+        inventoryPaths: [
+          'blog/feed.xml',
+          'blog/index.html',
+          'blog/controlled-search-handoff-checklist/index.html',
+        ],
+      },
+    ]);
   });
 });

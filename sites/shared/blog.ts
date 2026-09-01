@@ -1,4 +1,12 @@
-import type { SiteDefinition, SiteId } from './render.js';
+import {
+  DEFAULT_PUBLIC_BASE_URL,
+  escapeHtml,
+  jsonForHtml,
+  normalizePublicBaseUrl,
+  renderStaticPage,
+  type SiteDefinition,
+  type SiteId,
+} from './render.js';
 
 export const PRODUCT_BLOG_SITE_IDS = [
   'search-receipt',
@@ -390,3 +398,176 @@ export type ProductBlogSite = Pick<
   SiteDefinition,
   'siteId' | 'name' | 'title' | 'description'
 >;
+
+export interface ProductBlogRouteInventory {
+  readonly siteId: SiteId;
+  readonly sitemapPaths: readonly string[];
+  readonly inventoryPaths: readonly string[];
+}
+
+function blogRootUrl(site: SiteDefinition, publicBaseUrl: string): string {
+  return `${normalizePublicBaseUrl(publicBaseUrl)}${site.siteId}/blog/`;
+}
+
+function blogPostUrl(
+  site: SiteDefinition,
+  slug: string,
+  publicBaseUrl: string,
+): string {
+  return `${blogRootUrl(site, publicBaseUrl)}${slug}/`;
+}
+
+function publicInternalLink(href: string, publicBaseUrl: string): string {
+  const basePath = new URL(normalizePublicBaseUrl(publicBaseUrl)).pathname;
+  return `${basePath === '/' ? '' : basePath.replace(/\/$/u, '')}${href}`;
+}
+
+function xml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function orderedPosts(registry: ProductBlogRegistry): ProductBlogPost[] {
+  return registry.posts.toSorted(
+    (left, right) =>
+      right.modifiedAt.localeCompare(left.modifiedAt) ||
+      left.slug.localeCompare(right.slug),
+  );
+}
+
+export function renderProductBlogIndex(
+  site: SiteDefinition,
+  registry: ProductBlogRegistry,
+  publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+): string {
+  if (registry.siteId !== site.siteId) {
+    throw new Error(
+      'Blog registry cannot render outside its product namespace',
+    );
+  }
+  const canonical = blogRootUrl(site, publicBaseUrl);
+  const posts = orderedPosts(registry)
+    .map(
+      (post) =>
+        `<article class="receipt-card"><h3><a href="${escapeHtml(publicInternalLink(`/${site.siteId}/blog/${post.slug}/`, publicBaseUrl))}">${escapeHtml(post.title)}</a></h3><p>${escapeHtml(post.description)}</p><p>Published <time datetime="${escapeHtml(post.publishedAt)}">${escapeHtml(post.publishedAt)}</time> · Updated <time datetime="${escapeHtml(post.modifiedAt)}">${escapeHtml(post.modifiedAt)}</time></p></article>`,
+    )
+    .join('');
+  return renderStaticPage(
+    site,
+    {
+      path: '/blog/',
+      title: registry.title,
+      description: registry.description,
+      structuredData: jsonForHtml({
+        '@context': 'https://schema.org',
+        '@type': 'Blog',
+        name: registry.title,
+        description: registry.description,
+        url: canonical,
+      }),
+      body: `<section aria-labelledby="blog-index-heading"><p class="eyebrow">Evidence-bound editorial</p><h2 id="blog-index-heading">${escapeHtml(registry.title)}</h2><p>${escapeHtml(registry.description)}</p><div class="receipt-list">${posts}</div></section>`,
+    },
+    publicBaseUrl,
+  );
+}
+
+export function renderProductBlogPost(
+  site: SiteDefinition,
+  post: ProductBlogPost,
+  publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+): string {
+  const canonical = blogPostUrl(site, post.slug, publicBaseUrl);
+  const sections = post.sections
+    .map(
+      (section, index) =>
+        `<section aria-labelledby="blog-section-${index + 1}"><h2 id="blog-section-${index + 1}">${escapeHtml(section.heading)}</h2>${section.paragraphs.map((paragraph) => `<p data-source-bindings="${escapeHtml(paragraph.sourceBindingIds.join(' '))}">${escapeHtml(paragraph.text)}</p>`).join('')}</section>`,
+    )
+    .join('');
+  const sources = post.sourceBindings
+    .map(
+      (source) =>
+        `<li id="source-${escapeHtml(source.sourceId)}"><a href="${escapeHtml(source.url)}">${escapeHtml(source.sourceId)}</a> · observed <time datetime="${escapeHtml(source.observedAt)}">${escapeHtml(source.observedAt)}</time> · SHA-256 ${escapeHtml(source.sha256)} · ${escapeHtml(source.purpose)}</li>`,
+    )
+    .join('');
+  const links = post.links
+    .map((link) => {
+      const href =
+        link.kind === 'internal'
+          ? publicInternalLink(link.href, publicBaseUrl)
+          : link.href;
+      return `<li><a href="${escapeHtml(href)}">${escapeHtml(link.label)}</a></li>`;
+    })
+    .join('');
+  return renderStaticPage(
+    site,
+    {
+      path: `/blog/${post.slug}/`,
+      title: post.title,
+      description: post.description,
+      structuredData: jsonForHtml({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        description: post.description,
+        datePublished: post.publishedAt,
+        dateModified: post.modifiedAt,
+        author: {
+          '@type': 'Person',
+          name: post.author.name,
+        },
+        mainEntityOfPage: canonical,
+        url: canonical,
+      }),
+      body: `<article><p class="eyebrow">Evidence-bound editorial</p><h2>${escapeHtml(post.title)}</h2><p>${escapeHtml(post.description)}</p><p>Published <time datetime="${escapeHtml(post.publishedAt)}">${escapeHtml(post.publishedAt)}</time> · Updated <time datetime="${escapeHtml(post.modifiedAt)}">${escapeHtml(post.modifiedAt)}</time></p><section class="information-panel" aria-labelledby="editorial-disclosure-heading"><h2 id="editorial-disclosure-heading">Author and editorial disclosure</h2><p><strong>${escapeHtml(post.author.name)}</strong> · ${escapeHtml(post.author.role)}</p><p>${escapeHtml(post.editorialDisclosure)}</p></section>${sections}<section aria-labelledby="blog-limits-heading"><h2 id="blog-limits-heading">Currentness and causation limits</h2><p>${escapeHtml(post.boundaries.currentness)}</p><p>${escapeHtml(post.boundaries.noCausation)}</p></section><section aria-labelledby="blog-sources-heading"><h2 id="blog-sources-heading">Source bindings</h2><ul>${sources}</ul></section><section aria-labelledby="blog-links-heading"><h2 id="blog-links-heading">Related links</h2><ul>${links}</ul></section></article>`,
+    },
+    publicBaseUrl,
+  );
+}
+
+export function renderProductBlogAtom(
+  site: SiteDefinition,
+  registry: ProductBlogRegistry,
+  publicBaseUrl = DEFAULT_PUBLIC_BASE_URL,
+): string {
+  if (registry.siteId !== site.siteId || registry.posts.length === 0) {
+    throw new Error('Atom requires a matching nonempty product blog registry');
+  }
+  const root = blogRootUrl(site, publicBaseUrl);
+  const posts = orderedPosts(registry);
+  const updated = posts[0]!.modifiedAt;
+  const entries = posts
+    .map(
+      (post) =>
+        `<entry><id>${xml(post.feedId)}</id><title>${xml(post.title)}</title><link href="${xml(blogPostUrl(site, post.slug, publicBaseUrl))}"/><published>${xml(post.publishedAt)}</published><updated>${xml(post.modifiedAt)}</updated><author><name>${xml(post.author.name)}</name></author><summary>${xml(post.description)}</summary></entry>`,
+    )
+    .join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><id>${xml(root)}</id><title>${xml(registry.title)}</title><link href="${xml(root)}"/><link rel="self" href="${xml(`${root}feed.xml`)}"/><updated>${xml(updated)}</updated>${entries}</feed>\n`;
+}
+
+export function productBlogRoutes(
+  registries: readonly ProductBlogRegistry[],
+): ProductBlogRouteInventory[] {
+  return registries
+    .filter((registry) => registry.posts.length > 0)
+    .toSorted((left, right) => left.siteId.localeCompare(right.siteId))
+    .map((registry) => ({
+      siteId: registry.siteId,
+      sitemapPaths: [
+        '/blog/',
+        ...registry.posts
+          .map((post) => `/blog/${post.slug}/`)
+          .toSorted((left, right) => left.localeCompare(right)),
+      ],
+      inventoryPaths: [
+        'blog/feed.xml',
+        'blog/index.html',
+        ...registry.posts
+          .map((post) => `blog/${post.slug}/index.html`)
+          .toSorted((left, right) => left.localeCompare(right)),
+      ],
+    }));
+}
