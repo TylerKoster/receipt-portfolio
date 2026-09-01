@@ -703,6 +703,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const hideDynamicResults = () => {
     shown = [];
     results.hidden = true;
+    results.inert = true;
     try {
       results.replaceChildren();
     } catch {}
@@ -759,7 +760,9 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
         shown = [];
         renderShown();
         results.hidden = true;
+        results.inert = true;
         serverResults.hidden = false;
+        error.hidden = true;
         status.textContent = 'Enter a phrase such as “robots control”.';
         return;
       }
@@ -767,6 +770,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       shown = found;
       renderShown();
       results.hidden = false;
+      results.inert = false;
       serverResults.hidden = true;
       error.hidden = true;
       status.textContent = found.length === 0

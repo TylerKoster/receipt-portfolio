@@ -345,13 +345,14 @@ class FakeHTMLElement {
   disabled = false;
   hidden = false;
   href = '';
+  inert = false;
   isConnected = false;
   parentElement: FakeHTMLElement | null = null;
   readOnly = false;
   textContent = '';
   type = '';
   focusCount = 0;
-  failNextReplace = false;
+  replaceFailuresRemaining = 0;
 
   constructor(readonly tagName = 'div') {}
 
@@ -364,8 +365,8 @@ class FakeHTMLElement {
   }
 
   replaceChildren(...children: FakeHTMLElement[]): void {
-    if (this.failNextReplace) {
-      this.failNextReplace = false;
+    if (this.replaceFailuresRemaining > 0) {
+      this.replaceFailuresRemaining -= 1;
       throw new Error('controlled DOM write failure');
     }
     this.children.forEach((child) => {
@@ -391,8 +392,16 @@ class FakeHTMLElement {
     ]);
   }
 
+  private hasHiddenOrInertAncestor(): boolean {
+    return (
+      this.hidden ||
+      this.inert ||
+      (this.parentElement?.hasHiddenOrInertAncestor() ?? false)
+    );
+  }
+
   click(): void {
-    if (!this.disabled)
+    if (!this.disabled && !this.hasHiddenOrInertAncestor())
       this.clickListeners.get('click')?.forEach((listener) => listener());
   }
 
@@ -496,7 +505,7 @@ interface ClientHarness {
   readonly results: FakeHTMLElement;
   readonly serverResults: FakeHTMLElement;
   readonly status: FakeHTMLElement;
-  failNextRender(): void;
+  failNextRender(failures?: number): void;
   failCopy(): void;
   deferCopy(): void;
   resolveCopy(): void;
@@ -654,8 +663,8 @@ function executeClientPayload(
     results,
     serverResults,
     status,
-    failNextRender: () => {
-      results.failNextReplace = true;
+    failNextRender: (failures = 1) => {
+      results.replaceFailuresRemaining = failures;
     },
     failCopy: () => {
       copyFails = true;
@@ -2395,6 +2404,59 @@ describe('AI Moment Index public search surface', () => {
     const failedLoad = executeClientPayload();
     await failedLoad.rejectFetch();
     expect(failedLoad.serverResults.hidden).toBe(false);
+  });
+
+  it('clears a prior render error when an empty query restores the server fallback', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex),
+    );
+    harness.failNextRender();
+    harness.submit('agent evaluation');
+    expect(harness.error.hidden).toBe(false);
+
+    harness.submit('   ');
+
+    expect(harness.error.hidden).toBe(true);
+    expect(harness.serverResults.hidden).toBe(false);
+    expect(harness.results.hidden).toBe(true);
+    expect(harness.status.textContent).toBe(
+      'Enter a phrase such as “robots control”.',
+    );
+  });
+
+  it('keeps stale dynamic controls inert when recovery cleanup also fails', async () => {
+    const harness = executeClientPayload();
+    await harness.resolveIndex(
+      serializePublicSearchIndex(fixture, searchIndex, sourceEvidenceManifest),
+    );
+    harness.submit('robots control');
+    const staleControl = byText(
+      descendants(harness.results, 'article')[0]!,
+      'button',
+      'Add to temporary handoff',
+    );
+    expect(staleControl).toBeDefined();
+    harness.failNextRender(2);
+
+    harness.submit('agent evaluation');
+
+    expect(harness.serverResults.hidden).toBe(false);
+    expect(harness.results.hidden).toBe(true);
+    expect(harness.results.inert).toBe(true);
+    expect(staleControl?.isConnected).toBe(true);
+    staleControl?.click();
+    expect(harness.handoffList.children).toEqual([]);
+
+    harness.submit('robots control');
+    expect(harness.serverResults.hidden).toBe(true);
+    expect(harness.results.hidden).toBe(false);
+    expect(harness.results.inert).toBe(false);
+    expect(
+      descendants(harness.results, 'article').map(
+        (article) => article.dataset.momentId,
+      ),
+    ).toEqual(['moment-robots-control']);
   });
 
   it('keeps one reviewed fixed-flow moment in a page-memory-only timestamp and rights handoff', async () => {
