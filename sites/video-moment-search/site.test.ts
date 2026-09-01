@@ -3139,9 +3139,10 @@ describe('AI Moment Index public search surface', () => {
         kind: 'SIMULATED_HEURISTIC_REGRESSION_EVIDENCE',
       },
       experiment: {
-        baseline: 'Production route returned 404 before this candidate.',
+        baseline:
+          'Accepted v0.1.65 exposes three evidence-admitted moments; no measured-user baseline exists.',
         target:
-          '100% deterministic fixed-flow completion; expected moment appears in the top three; zero timestamp landing error.',
+          '100% deterministic fixed-flow integrity; expected moment appears in the top three; zero timestamp landing error.',
         stopRule:
           'Stop if any result lacks validated rights or exact source-time routing.',
         fixedFlow: {
