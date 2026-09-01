@@ -212,6 +212,11 @@ describe('OpenAI skill-creator designated source contract', () => {
       'unknown-root-fields',
     ],
     [
+      'the upstream metadata.short-description field',
+      { metadata: { 'short-description': 'must not be admitted' } },
+      'unknown-root-fields',
+    ],
+    [
       'an instruction body',
       { instructionBody: 'must not be admitted' },
       'unknown-root-fields',
