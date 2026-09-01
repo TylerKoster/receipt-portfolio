@@ -264,7 +264,15 @@ describe('bounded Search Receipt live collection', () => {
     await expectNoEvidenceWrites(evidenceDirectory);
   });
 
-  it.each([' incident-b', 'incident-b ', 'incident/b', 'incident.b'])(
+  it.each([
+    '',
+    ' incident-b',
+    'incident-b ',
+    'incident/b',
+    'incident\\b',
+    'incident.b',
+    '%69ncident-b',
+  ])(
     'rejects a noncanonical status incident id %s without writing evidence',
     async (incidentId) => {
       const parsed = JSON.parse(STATUS_BYTES.toString('utf8')) as Array<
@@ -767,6 +775,27 @@ describe('bounded Search Receipt live collection', () => {
     [
       'absolute credentials',
       'https://user@status.search.google.com/incidents/incident-b',
+    ],
+    [
+      'absolute password credentials',
+      'https://user:pass@status.search.google.com/incidents/incident-b',
+    ],
+    ['foreign origin', 'https://evil.example/incidents/incident-b'],
+    [
+      'non-HTTPS scheme',
+      'http://status.search.google.com/incidents/incident-b',
+    ],
+    [
+      'explicit default port',
+      'https://status.search.google.com:443/incidents/incident-b',
+    ],
+    [
+      'absolute backslash',
+      'https://status.search.google.com/incidents\\incident-b',
+    ],
+    [
+      'absolute encoded separator',
+      'https://status.search.google.com/incidents%2Fincident-b',
     ],
   ] as const)(
     'rejects a status incident URL with a %s',
