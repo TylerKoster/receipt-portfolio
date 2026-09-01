@@ -186,11 +186,13 @@ function normalizedIdentity(value: string): string {
 
 function absoluteFeedId(value: unknown): boolean {
   if (!nonEmpty(value) || /\s/u.test(value)) return false;
+  if (value.startsWith('urn:')) {
+    return /^urn:[a-z0-9][a-z0-9-]{1,31}:[^\s:][^\s]*$/iu.test(value);
+  }
   try {
     const url = new URL(value);
     return (
-      url.protocol === 'urn:' ||
-      (url.protocol === 'https:' && url.username === '' && url.password === '')
+      url.protocol === 'https:' && url.username === '' && url.password === ''
     );
   } catch {
     return false;
@@ -429,6 +431,15 @@ export function validateProductBlogRegistries(
           claimTexts.push(paragraph.text);
         }
       }
+      const boundaries = postValue.boundaries;
+      if (isRecord(boundaries)) {
+        if (typeof boundaries.currentness === 'string') {
+          claimTexts.push(boundaries.currentness);
+        }
+        if (typeof boundaries.noCausation === 'string') {
+          claimTexts.push(boundaries.noCausation);
+        }
+      }
       const claims = prohibitedClaim(claimTexts);
       if (claims.currentStatus) {
         diagnostics.push(
@@ -439,7 +450,6 @@ export function validateProductBlogRegistries(
         diagnostics.push(`BLOG_CAUSATION_CLAIM:${registryIndex}:${postIndex}`);
       }
 
-      const boundaries = postValue.boundaries;
       if (
         !isRecord(boundaries) ||
         !nonEmpty(boundaries.currentness) ||

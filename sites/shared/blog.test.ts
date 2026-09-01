@@ -117,6 +117,22 @@ describe('evidence-bound product blog contract', () => {
       'BLOG_CAUSATION_CLAIM:0:0',
     ],
     [
+      'current-status claim appended to currentness boundary',
+      (candidate: ProductBlogRegistry) => {
+        candidate.posts[0]!.boundaries.currentness +=
+          ' Google Search is down right now.';
+      },
+      'BLOG_CURRENT_STATUS_CLAIM:0:0',
+    ],
+    [
+      'causation claim appended to no-causation boundary',
+      (candidate: ProductBlogRegistry) => {
+        candidate.posts[0]!.boundaries.noCausation +=
+          ' This explains the site change.';
+      },
+      'BLOG_CAUSATION_CLAIM:0:0',
+    ],
+    [
       'invalid published date',
       (candidate: ProductBlogRegistry) => {
         candidate.posts[0]!.publishedAt = '2026-02-30T12:00:00.000Z';
@@ -248,6 +264,10 @@ describe('evidence-bound product blog contract', () => {
 
     const invalidFeedId = structuredClone(fixture);
     invalidFeedId.posts[0]!.feedId = 'not an absolute atom id';
+    expect(diagnosticsFor([invalidFeedId])).toContain(
+      'BLOG_FEED_ID_INVALID:0:0',
+    );
+    invalidFeedId.posts[0]!.feedId = 'urn:';
     expect(diagnosticsFor([invalidFeedId])).toContain(
       'BLOG_FEED_ID_INVALID:0:0',
     );
