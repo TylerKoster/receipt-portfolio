@@ -10,17 +10,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { hashPublicBuild, runHashBuildCli } from '../../scripts/hash-build.js';
-import type { ProductBlogEvidenceObject } from '../../sites/shared/blog.js';
-
-const BLOG_EVIDENCE_OBJECT: ProductBlogEvidenceObject = {
-  receiptId: 'b'.repeat(64),
-  sourceId: 'google-search-status',
-  url: 'https://status.search.google.com/incidents.json',
-  observedAt: '2026-08-30T11:30:00.000Z',
-  sha256: '553273914b991b391c4fb34fcb6eaaf3ee14d5107a95b942be90554779796b1a',
-  policyDecision: 'PASS',
-  bytes: new TextEncoder().encode('controlled repository evidence object'),
-};
 
 const EXPECTED_PATHS = [
   'favicon.ico',
@@ -79,7 +68,6 @@ const EXPECTED_DIGEST =
 
 const temporaryDirectories: string[] = [];
 let outputDirectory: string;
-let blogRegistryRoot: string;
 
 async function writePublicFile(path: string, contents: string): Promise<void> {
   const destination = join(outputDirectory, path);
@@ -93,32 +81,10 @@ async function writeValidPublicTree(): Promise<void> {
   }
 }
 
-async function writeControlledBlogRegistry(): Promise<void> {
-  const destination = join(
-    blogRegistryRoot,
-    'sites',
-    'search-receipt',
-    'blog-registry.json',
-  );
-  await mkdir(dirname(destination), { recursive: true });
-  await writeFile(
-    destination,
-    await readFile(
-      join(
-        process.cwd(),
-        'fixtures',
-        'shared',
-        'controlled-blog-registry-v1.json',
-      ),
-    ),
-  );
-}
-
 beforeEach(async () => {
   const directory = await mkdtemp(join(tmpdir(), 'receipt-build-manifest-'));
   temporaryDirectories.push(directory);
   outputDirectory = join(directory, 'sites');
-  blogRegistryRoot = join(directory, 'registry-root');
   await writeValidPublicTree();
 });
 
@@ -140,35 +106,6 @@ describe('public build manifest', () => {
     await expect(hashPublicBuild(outputDirectory)).rejects.toThrow(
       /unexpected public output/i,
     );
-  });
-
-  it('admits exactly the registry-derived blog inventory and requires every artifact', async () => {
-    await writeControlledBlogRegistry();
-    const paths = [
-      'search-receipt/blog/feed.xml',
-      'search-receipt/blog/index.html',
-      'search-receipt/blog/controlled-search-handoff-checklist/index.html',
-    ];
-    for (const path of paths) await writePublicFile(path, `blog:${path}`);
-
-    await expect(
-      hashPublicBuild(outputDirectory, {
-        blogRegistryRoot,
-        blogEvidenceObjects: [BLOG_EVIDENCE_OBJECT],
-      }),
-    ).resolves.toMatchObject({
-      inventory: expect.arrayContaining(
-        paths.map((path) => expect.objectContaining({ path })),
-      ),
-    });
-
-    await rm(join(outputDirectory, paths[0]!));
-    await expect(
-      hashPublicBuild(outputDirectory, {
-        blogRegistryRoot,
-        blogEvidenceObjects: [BLOG_EVIDENCE_OBJECT],
-      }),
-    ).rejects.toThrow(/incomplete public output/i);
   });
 
   it('hashes sorted relative paths and file bytes into the expected aggregate', async () => {

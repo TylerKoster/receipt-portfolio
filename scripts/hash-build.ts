@@ -6,7 +6,6 @@ import {
   loadProductBlogRegistries,
   loadProductBlogEvidenceObjects,
   productBlogRoutes,
-  type ProductBlogEvidenceObject,
 } from '../sites/shared/blog.js';
 import { loadVerifiedReceipts } from './evidence-cli.js';
 
@@ -243,18 +242,13 @@ export async function hashPublicBuild(
   outputDirectory: string,
   options: {
     readonly blogRegistryRoot?: string;
-    readonly blogEvidenceObjects?: readonly ProductBlogEvidenceObject[];
     readonly evidenceDirectory?: string;
   } = {},
 ): Promise<PublicBuildManifest> {
   const resolvedOutput = resolve(outputDirectory);
   const registryRoot = options.blogRegistryRoot ?? projectRoot();
-  let blogValidation = await loadProductBlogRegistries(
-    registryRoot,
-    options.blogEvidenceObjects,
-  );
+  let blogValidation = await loadProductBlogRegistries(registryRoot);
   if (
-    options.blogEvidenceObjects === undefined &&
     blogValidation.diagnostics.some((diagnostic) =>
       diagnostic.startsWith('BLOG_EVIDENCE_'),
     )
