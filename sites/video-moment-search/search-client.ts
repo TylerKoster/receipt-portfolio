@@ -408,6 +408,26 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const creatorPreviewAvailable = () => creatorPreviewStart instanceof HTMLElement &&
     creatorPreviewStatus instanceof HTMLElement && creatorPreviewResults instanceof HTMLElement &&
     creatorPreviewSummary instanceof HTMLElement && creatorPreviewReset instanceof HTMLElement;
+  const expectedCreatorPreviewMoments = [
+    ['moment-robots-control', 132],
+    ['moment-generative-ai-interface', 18],
+    ['moment-ai-industry-society-panel', 75],
+  ];
+  const admittedCreatorPreviewEntries = () => {
+    if (!index || index.corpusId !== 'wikimedia-commons-ai-video-reviewed-v1' ||
+        index.entries.length !== expectedCreatorPreviewMoments.length) return null;
+    const byMomentId = new Map();
+    for (const entry of index.entries) {
+      if (!safe(entry, index.corpusId) || !entry.reviewEvidence ||
+          byMomentId.has(entry.momentId)) return null;
+      byMomentId.set(entry.momentId, entry);
+    }
+    const admitted = expectedCreatorPreviewMoments.map(([momentId, startSeconds]) => {
+      const entry = byMomentId.get(momentId);
+      return entry && entry.startSeconds === startSeconds ? entry : null;
+    });
+    return admitted.every((entry) => entry !== null) ? admitted : null;
+  };
   handoffText.readOnly = true;
   copy.disabled = true;
   clear.disabled = true;
@@ -722,8 +742,8 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   };
   const renderCreatorPreview = () => {
     if (!creatorPreviewAvailable() || !index) return;
-    const entries = index.entries.filter((entry) => safe(entry, index.corpusId) && entry.reviewEvidence);
-    if (entries.length !== 3 || index.entries.length !== 3) {
+    const entries = admittedCreatorPreviewEntries();
+    if (entries === null) {
       creatorPreviewStart.disabled = true;
       creatorPreviewStatus.textContent = 'Creator review preview is unavailable because the reviewed fixture is not available.';
       return;
@@ -880,8 +900,7 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
       error.hidden = true;
       status.textContent = 'Search is ready. Enter a phrase such as “robots control”.';
       if (creatorPreviewAvailable()) {
-        const reviewed = index.entries.filter((entry) => entry.reviewEvidence);
-        if (index.entries.length === 3 && reviewed.length === 3) {
+        if (admittedCreatorPreviewEntries() !== null) {
           creatorPreviewStart.disabled = false;
           creatorPreviewStatus.textContent = 'Creator review preview is ready. Inspect the three admitted reviewed moments.';
         } else {

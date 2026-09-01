@@ -3329,6 +3329,49 @@ describe('AI Moment Index public search surface', () => {
     expect(harness.indexRequests).toHaveLength(1);
   });
 
+  it.each([
+    [
+      'duplicates one otherwise-valid reviewed entry',
+      (index: ReturnType<typeof serializePublicSearchIndex>) => ({
+        ...index,
+        entries: [index.entries[0]!, index.entries[0]!, index.entries[2]!],
+      }),
+    ],
+    [
+      'substitutes an otherwise-valid reviewed entry',
+      (index: ReturnType<typeof serializePublicSearchIndex>) => ({
+        ...index,
+        entries: [
+          index.entries[0]!,
+          { ...index.entries[1]!, momentId: 'moment-substituted-review' },
+          index.entries[2]!,
+        ],
+      }),
+    ],
+  ] as const)(
+    'keeps the creator preview unavailable when the loaded index %s',
+    async (_, mutateIndex) => {
+      const harness = executeClientPayload();
+
+      await harness.resolveIndex(
+        mutateIndex(serializePublicSearchIndex(fixture, searchIndex)),
+      );
+
+      expect(harness.creatorPreviewStart.disabled).toBe(true);
+      expect(harness.creatorPreviewResults.hidden).toBe(true);
+      expect(harness.creatorPreviewStatus.textContent).toContain(
+        'unavailable because the reviewed fixture is not available',
+      );
+      expect(harness.error.hidden).toBe(true);
+      expect(harness.serverResults.textContent).toBe(
+        'server-rendered initial result',
+      );
+      expect(harness.indexRequests).toEqual([
+        { input: 'search-index.json', options: { credentials: 'omit' } },
+      ]);
+    },
+  );
+
   it('records the bounded deterministic-route experiment without usability or demand claims', () => {
     const ledger = JSON.parse(
       readFileSync(
