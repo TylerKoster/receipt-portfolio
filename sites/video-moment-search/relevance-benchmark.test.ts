@@ -38,6 +38,7 @@ type ResearcherRelevanceBenchmark = {
   readonly corpusId: string;
   readonly target: {
     readonly minimumControlledPositiveCases: number;
+    readonly minimumPositiveCasesPerMoment: number;
     readonly minimumTopThreePercent: number;
     readonly maximumTimestampLandingErrorSeconds: number;
     readonly negativeControlFalsePositiveCount: number;
@@ -76,9 +77,7 @@ function controlledPositiveContractDiagnostics(
     (benchmarkCase) => benchmarkCase.expectedMomentId !== null,
   );
   const diagnostics: string[] = [];
-  if (
-    positiveCases.length !== benchmark.target.minimumControlledPositiveCases
-  ) {
+  if (positiveCases.length < benchmark.target.minimumControlledPositiveCases) {
     diagnostics.push(
       `expected ${benchmark.target.minimumControlledPositiveCases} positive cases, got ${positiveCases.length}`,
     );
@@ -91,37 +90,53 @@ function controlledPositiveContractDiagnostics(
     diagnostics.push('positive queries must be normalized-unique');
   }
 
-  const moment = fixture.moments.find(
-    ({ id }) => id === 'moment-robots-control',
-  )!;
-  const video = fixture.videos.find(({ id }) => id === moment.videoId)!;
-  const annotation = fixture.cues
-    .filter(
-      ({ videoId, evidenceKind }) =>
-        videoId === moment.videoId && evidenceKind === 'editorial-annotation',
-    )
-    .map(({ text }) => text)
-    .join(' ');
-  const supportedTokensByBasis = {
-    title: new Set(normalizedTokens(video.title)),
-    'title-and-topic': new Set(
-      normalizedTokens(`${video.title} ${moment.topicSlugs.join(' ')}`),
-    ),
-    'title-and-original-editorial-annotation': new Set(
-      normalizedTokens(`${video.title} ${annotation}`),
-    ),
-  } as const;
+  const admittedMomentIds = [
+    'moment-robots-control',
+    'moment-generative-ai-interface',
+    'moment-ai-industry-society-panel',
+  ] as const;
+  for (const momentId of admittedMomentIds) {
+    const caseCount = positiveCases.filter(
+      (benchmarkCase) => benchmarkCase.expectedMomentId === momentId,
+    ).length;
+    if (caseCount < benchmark.target.minimumPositiveCasesPerMoment) {
+      diagnostics.push(
+        `expected at least ${benchmark.target.minimumPositiveCasesPerMoment} positive cases for ${momentId}, got ${caseCount}`,
+      );
+    }
+  }
 
   for (const benchmarkCase of positiveCases) {
     const queryTokens = normalizedTokens(benchmarkCase.query);
-    if (
-      !queryTokens.some((token) => token === 'robots' || token === 'control')
-    ) {
-      diagnostics.push('positive query must include robots or control');
-    }
     if (queryTokens.includes('transcript')) {
       diagnostics.push('positive query must not contain transcript');
     }
+    const moment = fixture.moments.find(
+      ({ id }) => id === benchmarkCase.expectedMomentId,
+    );
+    if (!moment) {
+      diagnostics.push(
+        `positive query expected moment ${benchmarkCase.expectedMomentId} is not admitted`,
+      );
+      continue;
+    }
+    const video = fixture.videos.find(({ id }) => id === moment.videoId)!;
+    const annotation = fixture.cues
+      .filter(
+        ({ videoId, evidenceKind }) =>
+          videoId === moment.videoId && evidenceKind === 'editorial-annotation',
+      )
+      .map(({ text }) => text)
+      .join(' ');
+    const supportedTokensByBasis = {
+      title: new Set(normalizedTokens(video.title)),
+      'title-and-topic': new Set(
+        normalizedTokens(`${video.title} ${moment.topicSlugs.join(' ')}`),
+      ),
+      'title-and-original-editorial-annotation': new Set(
+        normalizedTokens(`${video.title} ${annotation}`),
+      ),
+    } as const;
     const supportedTokens =
       benchmarkCase.queryBasis === 'synthetic-unrelated-negative-control'
         ? undefined
@@ -175,6 +190,33 @@ function loadBenchmark(): ResearcherRelevanceBenchmark {
       'utf8',
     ),
   ) as ResearcherRelevanceBenchmark;
+}
+
+function loadOperatorRunbook(): string {
+  return readFileSync(
+    new URL(
+      '../../docs/video-moment-search/operator-runbook.md',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+}
+
+function loadPublicExperimentArtifact(): {
+  readonly evidenceClassification: { readonly limitations: readonly string[] };
+  readonly experiment: {
+    readonly status: string;
+    readonly baseline: string;
+    readonly target: string;
+    readonly fixedFlow: { readonly expectedTimestampUrl: string };
+  };
+} {
+  return JSON.parse(
+    readFileSync(
+      new URL('./product-experiment-ledger.json', import.meta.url),
+      'utf8',
+    ),
+  );
 }
 
 describe('controlled researcher-relevance benchmark', () => {
@@ -256,10 +298,43 @@ describe('controlled researcher-relevance benchmark', () => {
     });
     expect(benchmark.target).toEqual({
       minimumControlledPositiveCases: 20,
+      minimumPositiveCasesPerMoment: 6,
       minimumTopThreePercent: 80,
       maximumTimestampLandingErrorSeconds: 0,
       negativeControlFalsePositiveCount: 0,
     });
+  });
+
+  it('describes the released three-moment rank-3 regression without stale one-moment or production-candidate wording', () => {
+    const runbook = loadOperatorRunbook();
+    const publicArtifact = loadPublicExperimentArtifact();
+
+    expect(runbook).toContain(
+      'spans the three admitted moments with a controlled 7/7/6 distribution at 132/18/75 seconds',
+    );
+    expect(runbook).toContain('**>=80% top-three relevance** heuristic gate');
+    expect(runbook).not.toContain('over one admitted moment');
+    expect(runbook).not.toContain('one-moment heuristic regression only');
+
+    expect(publicArtifact.evidenceClassification.limitations).toContain(
+      'This three-source, three-moment controlled corpus does not establish a live creator library, endorsement, public usability, demand, or revenue.',
+    );
+    expect(publicArtifact.experiment.status).toBe(
+      'RELEASED_HEURISTIC_BASELINE',
+    );
+    expect(publicArtifact.experiment.baseline).toBe(
+      'Accepted v0.1.65 exposes three evidence-admitted moments; no measured-user baseline exists.',
+    );
+    expect(publicArtifact.experiment.target).toBe(
+      '100% deterministic fixed-flow integrity; expected moment appears in the top three; zero timestamp landing error.',
+    );
+    expect(publicArtifact.experiment.fixedFlow.expectedTimestampUrl).toBe(
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/47/How_can_we_keep_robots_under_control.webm/How_can_we_keep_robots_under_control.webm.240p.vp9.webm#t=132',
+    );
+    expect(JSON.stringify(publicArtifact)).not.toContain(
+      'LOCAL_INTEGRATION_CANDIDATE',
+    );
+    expect(JSON.stringify(publicArtifact)).not.toContain('returned 404');
   });
 
   it('stops before evaluation when a valid corpus changes without changing retrieval outcomes', () => {
@@ -366,100 +441,118 @@ describe('controlled researcher-relevance benchmark', () => {
         expectedTimestampSuffix: '#t=132',
       },
       {
-        query: 'keep robots',
+        query: 'generative ai',
         queryBasis: 'title',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
       },
       {
-        query: 'under control',
+        query: 'generative ai explained',
         queryBasis: 'title',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
       },
       {
-        query: 'how can we keep robots',
+        query: 'ai explained',
         queryBasis: 'title',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
       },
       {
-        query: 'how robots control',
+        query: 'explained minutes',
         queryBasis: 'title',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
       },
       {
-        query: 'can we control robots',
+        query: 'conversational interfaces',
+        queryBasis: 'title-and-topic',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
+      },
+      {
+        query: 'human chatbot interaction',
+        queryBasis: 'title-and-topic',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
+      },
+      {
+        query: 'campus animation smartphone chat bubbles',
+        queryBasis: 'title-and-original-editorial-annotation',
+        expectedMomentId: 'moment-generative-ai-interface',
+        expectedStartSeconds: 18,
+        expectedTimestampSuffix: '#t=18',
+      },
+      {
+        query: 'davos 2016 artificial intelligence',
         queryBasis: 'title',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
       {
-        query: 'lecture how can we keep robots',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        query: 'state artificial intelligence',
+        queryBasis: 'title',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
       {
-        query: 'timestamped robots',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        query: 'ai industry society',
+        queryBasis: 'title-and-topic',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
       {
-        query: 'review robots control',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        query: 'multi stakeholder panel',
+        queryBasis: 'title-and-topic',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
       {
-        query: 'original robots annotation',
+        query: 'world economic forum panel',
         queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
       {
-        query: 'index robots control',
+        query: 'moderator blue lit room',
         queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
-      },
-      {
-        query: 'lecture control',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
-      },
-      {
-        query: 'review point robots',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
-      },
-      {
-        query: 'timestamped review robots',
-        queryBasis: 'title-and-original-editorial-annotation',
-        expectedMomentId: 'moment-robots-control',
-        expectedStartSeconds: 132,
-        expectedTimestampSuffix: '#t=132',
+        expectedMomentId: 'moment-ai-industry-society-panel',
+        expectedStartSeconds: 75,
+        expectedTimestampSuffix: '#t=75',
       },
     ]);
     expect(positiveCases).toHaveLength(
       benchmark.target.minimumControlledPositiveCases,
     );
+    expect(
+      Object.fromEntries(
+        [
+          'moment-robots-control',
+          'moment-generative-ai-interface',
+          'moment-ai-industry-society-panel',
+        ].map((momentId) => [
+          momentId,
+          positiveCases.filter(
+            (benchmarkCase) => benchmarkCase.expectedMomentId === momentId,
+          ).length,
+        ]),
+      ),
+    ).toEqual({
+      'moment-robots-control': 7,
+      'moment-generative-ai-interface': 7,
+      'moment-ai-industry-society-panel': 6,
+    });
     expect(controlledPositiveContractDiagnostics(benchmark)).toEqual([]);
 
     const withoutPositive = structuredClone(
@@ -473,6 +566,20 @@ describe('controlled researcher-relevance benchmark', () => {
     expect(controlledPositiveContractDiagnostics(withoutPositive)).toContain(
       'expected 20 positive cases, got 19',
     );
+
+    const withAdditionalPositive = structuredClone(
+      benchmark,
+    ) as Mutable<ResearcherRelevanceBenchmark>;
+    withAdditionalPositive.cases.push({
+      query: 'under robots control',
+      queryBasis: 'title',
+      expectedMomentId: 'moment-robots-control',
+      expectedStartSeconds: 132,
+      expectedTimestampSuffix: '#t=132',
+    });
+    expect(
+      controlledPositiveContractDiagnostics(withAdditionalPositive),
+    ).toEqual([]);
 
     const withDuplicateNormalizedQuery = structuredClone(
       benchmark,

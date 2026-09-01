@@ -23,6 +23,7 @@
   "corpusId": "wikimedia-commons-ai-video-reviewed-v1",
   "target": {
     "minimumControlledPositiveCases": 20,
+    "minimumPositiveCasesPerMoment": 6,
     "minimumTopThreePercent": 80,
     "maximumTimestampLandingErrorSeconds": 0,
     "negativeControlFalsePositiveCount": 0
@@ -78,95 +79,95 @@
       "expectedTimestampSuffix": "#t=132"
     },
     {
-      "query": "keep robots",
+      "query": "generative ai",
       "queryBasis": "title",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
     },
     {
-      "query": "under control",
+      "query": "generative ai explained",
       "queryBasis": "title",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
     },
     {
-      "query": "how can we keep robots",
+      "query": "ai explained",
       "queryBasis": "title",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
     },
     {
-      "query": "how robots control",
+      "query": "explained minutes",
       "queryBasis": "title",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
     },
     {
-      "query": "can we control robots",
+      "query": "conversational interfaces",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
+    },
+    {
+      "query": "human chatbot interaction",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
+    },
+    {
+      "query": "campus animation smartphone chat bubbles",
+      "queryBasis": "title-and-original-editorial-annotation",
+      "expectedMomentId": "moment-generative-ai-interface",
+      "expectedStartSeconds": 18,
+      "expectedTimestampSuffix": "#t=18"
+    },
+    {
+      "query": "davos 2016 artificial intelligence",
       "queryBasis": "title",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
-      "query": "lecture how can we keep robots",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "query": "state artificial intelligence",
+      "queryBasis": "title",
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
-      "query": "timestamped robots",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "query": "ai industry society",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
-      "query": "review robots control",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "query": "multi stakeholder panel",
+      "queryBasis": "title-and-topic",
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
-      "query": "original robots annotation",
+      "query": "world economic forum panel",
       "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
-      "query": "index robots control",
+      "query": "moderator blue lit room",
       "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
-    },
-    {
-      "query": "lecture control",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
-    },
-    {
-      "query": "review point robots",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
-    },
-    {
-      "query": "timestamped review robots",
-      "queryBasis": "title-and-original-editorial-annotation",
-      "expectedMomentId": "moment-robots-control",
-      "expectedStartSeconds": 132,
-      "expectedTimestampSuffix": "#t=132"
+      "expectedMomentId": "moment-ai-industry-society-panel",
+      "expectedStartSeconds": 75,
+      "expectedTimestampSuffix": "#t=75"
     },
     {
       "query": "neural networks",
