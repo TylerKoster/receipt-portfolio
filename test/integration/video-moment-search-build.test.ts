@@ -7,7 +7,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildSites } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
@@ -16,6 +16,30 @@ import { searchPublicIndex } from '../../sites/video-moment-search/search-client
 const temporaryDirectories: string[] = [];
 let evidenceDirectory: string;
 let outputDirectory: string;
+
+async function fileInventory(
+  directory: string,
+): Promise<Record<string, string>> {
+  const inventory: Record<string, string> = {};
+
+  async function visit(currentDirectory: string): Promise<void> {
+    const entries = await readdir(currentDirectory, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      const path = join(currentDirectory, entry.name);
+      if (entry.isDirectory()) await visit(path);
+      else if (entry.isFile()) {
+        inventory[relative(directory, path).split(sep).join('/')] = (
+          await readFile(path)
+        ).toString('base64');
+      }
+    }
+  }
+
+  await visit(directory);
+  return inventory;
+}
 
 beforeEach(async () => {
   const directory = await mkdtemp(join(tmpdir(), 'video-moment-search-build-'));
@@ -53,6 +77,57 @@ afterEach(async () => {
 });
 
 describe('atomic AI Moment Index build', () => {
+  it('rejects uploader and publisher conflation before staging and preserves prior output', async () => {
+    const validationNow = new Date('2026-08-31T12:00:00.000Z');
+    await buildSites({
+      evidenceDirectory,
+      outputDirectory,
+      includeVideoMomentSearch: true,
+      videoMomentValidationNow: validationNow,
+    });
+    const priorInventory = await fileInventory(outputDirectory);
+    const manifest = JSON.parse(
+      await readFile(
+        new URL(
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    const evidenceId = 'commons-how-can-we-keep-robots-under-control-v1';
+    const record = manifest.records.find(
+      (candidate: { evidenceId: string }) =>
+        candidate.evidenceId === evidenceId,
+    );
+    expect(record).toBeDefined();
+    if (record === undefined) return;
+    record.roles.uploader = { ...record.roles.publisher };
+    const manifestPath = join(
+      dirname(outputDirectory),
+      'conflated-role-manifest.json',
+    );
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await expect(
+      buildSites({
+        evidenceDirectory,
+        outputDirectory,
+        includeVideoMomentSearch: true,
+        videoMomentEvidenceManifestPath: manifestPath,
+        videoMomentValidationNow: validationNow,
+      }),
+    ).rejects.toThrow(
+      `SOURCE_EVIDENCE_UPLOADER_ATTRIBUTED_CREATOR_CONFLATION:${evidenceId}, SOURCE_EVIDENCE_UPLOADER_PUBLISHER_CONFLATION:${evidenceId}, SOURCE_EVIDENCE_UPLOADER_RIGHTS_AUTHORITY_CONFLATION:${evidenceId}, SOURCE_EVIDENCE_UPLOADER_ROLE_CONTRACT_MISMATCH:${evidenceId}`,
+    );
+    expect(await fileInventory(outputDirectory)).toEqual(priorInventory);
+    expect(
+      (await readdir(dirname(outputDirectory))).filter((name) =>
+        name.includes('.sites-stage-'),
+      ),
+    ).toEqual([]);
+  });
+
   it('rejects tandem publication-boundary removal before output or staging residue', async () => {
     const [corpus, manifest] = await Promise.all(
       [

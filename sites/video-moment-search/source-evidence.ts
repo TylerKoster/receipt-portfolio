@@ -138,6 +138,49 @@ export interface CommonsSourceEvidenceValidation {
   readonly diagnostics: readonly string[];
 }
 
+interface ExpectedRoleIdentity {
+  readonly id: string;
+  readonly name: string;
+}
+
+interface ExpectedReviewedRoleContract {
+  readonly publisherCreatorAndLicensor: ExpectedRoleIdentity;
+  readonly uploader: ExpectedRoleIdentity;
+  readonly evidenceIssuer: ExpectedRoleIdentity;
+}
+
+const EXPECTED_REVIEWED_ROLE_CONTRACTS: Readonly<
+  Record<string, ExpectedReviewedRoleContract>
+> = {
+  'commons-how-can-we-keep-robots-under-control-v1': {
+    publisherCreatorAndLicensor: {
+      id: 'university-of-the-netherlands',
+      name: 'University of the Netherlands',
+    },
+    uploader: { id: 'pj-geest', name: 'PJ Geest' },
+    evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
+  },
+  'commons-generative-ai-explained-in-2-minutes-v1': {
+    publisherCreatorAndLicensor: {
+      id: 'ki-campus',
+      name: 'KI-Campus',
+    },
+    uploader: { id: 'prototyperspective', name: 'Prototyperspective' },
+    evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
+  },
+  'commons-davos-2016-state-of-artificial-intelligence-v1': {
+    publisherCreatorAndLicensor: {
+      id: 'world-economic-forum',
+      name: 'World Economic Forum',
+    },
+    uploader: {
+      id: 'vanished-account-byeznhpyxeuztibuo',
+      name: 'Vanished Account Byeznhpyxeuztibuo',
+    },
+    evidenceIssuer: { id: 'wikimedia-commons', name: 'Wikimedia Commons' },
+  },
+};
+
 export const AI_MOMENT_INDEX_PUBLICATION_BOUNDARY_V1 = Object.freeze({
   policyId: 'ai-moment-index-publication-boundary-v1',
   included: Object.freeze(['timestamp link', 'original editorial annotation']),
@@ -159,6 +202,13 @@ function sameStrings(
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function sameRole(
+  left: ExpectedRoleIdentity,
+  right: ExpectedRoleIdentity,
+): boolean {
+  return left.id === right.id && left.name === right.name;
 }
 
 function timestampUrl(sourceUrl: string, seconds: number): string {
@@ -327,6 +377,50 @@ export function validateCommonsSourceEvidence(
 
   for (const record of manifest.records) {
     const id = record.evidenceId;
+    const expectedRoles = EXPECTED_REVIEWED_ROLE_CONTRACTS[id];
+    if (expectedRoles !== undefined) {
+      const roleChecks = [
+        [
+          'PUBLISHER',
+          record.roles.publisher,
+          expectedRoles.publisherCreatorAndLicensor,
+        ],
+        ['UPLOADER', record.roles.uploader, expectedRoles.uploader],
+        [
+          'ATTRIBUTED_CREATOR',
+          record.roles.attributedCreator,
+          expectedRoles.publisherCreatorAndLicensor,
+        ],
+        [
+          'RIGHTS_AUTHORITY',
+          record.roles.rightsAuthority,
+          expectedRoles.publisherCreatorAndLicensor,
+        ],
+        [
+          'EVIDENCE_ISSUER',
+          record.roles.evidenceIssuer,
+          expectedRoles.evidenceIssuer,
+        ],
+      ] as const;
+      for (const [role, actual, expected] of roleChecks) {
+        if (!sameRole(actual, expected)) {
+          diagnostics.push(
+            `SOURCE_EVIDENCE_${role}_ROLE_CONTRACT_MISMATCH:${id}`,
+          );
+        }
+      }
+      const uploaderDistinctFrom = [
+        ['PUBLISHER', record.roles.publisher],
+        ['ATTRIBUTED_CREATOR', record.roles.attributedCreator],
+        ['RIGHTS_AUTHORITY', record.roles.rightsAuthority],
+        ['EVIDENCE_ISSUER', record.roles.evidenceIssuer],
+      ] as const;
+      for (const [role, identity] of uploaderDistinctFrom) {
+        if (sameRole(record.roles.uploader, identity)) {
+          diagnostics.push(`SOURCE_EVIDENCE_UPLOADER_${role}_CONFLATION:${id}`);
+        }
+      }
+    }
     if (
       !sameStrings(
         record.productBoundary.included,

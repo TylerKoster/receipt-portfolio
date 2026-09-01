@@ -958,6 +958,50 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual({ ok: true, diagnostics: [] });
   });
 
+  it('rejects uploader conflation with each distinct role in the accepted per-record contract', () => {
+    const evidenceId =
+      'commons-how-can-we-keep-robots-under-control-v1' as const;
+    const conflations = [
+      {
+        role: 'publisher',
+        expected: [
+          `SOURCE_EVIDENCE_UPLOADER_ATTRIBUTED_CREATOR_CONFLATION:${evidenceId}`,
+          `SOURCE_EVIDENCE_UPLOADER_PUBLISHER_CONFLATION:${evidenceId}`,
+          `SOURCE_EVIDENCE_UPLOADER_RIGHTS_AUTHORITY_CONFLATION:${evidenceId}`,
+          `SOURCE_EVIDENCE_UPLOADER_ROLE_CONTRACT_MISMATCH:${evidenceId}`,
+        ],
+      },
+      {
+        role: 'evidenceIssuer',
+        expected: [
+          `SOURCE_EVIDENCE_UPLOADER_EVIDENCE_ISSUER_CONFLATION:${evidenceId}`,
+          `SOURCE_EVIDENCE_UPLOADER_ROLE_CONTRACT_MISMATCH:${evidenceId}`,
+        ],
+      },
+    ] as const;
+
+    for (const { role, expected } of conflations) {
+      const manifest = structuredClone(
+        sourceEvidenceManifest,
+      ) as Mutable<VideoSourceEvidenceManifest>;
+      const record = manifest.records.find(
+        (candidate) => candidate.evidenceId === evidenceId,
+      );
+      expect(record).toBeDefined();
+      if (record === undefined) continue;
+      record.roles.uploader = { ...record.roles[role] };
+
+      const diagnostics = validateCommonsSourceEvidence(
+        fixture,
+        manifest,
+        validationNow,
+      ).diagnostics.filter((diagnostic) =>
+        diagnostic.startsWith('SOURCE_EVIDENCE_UPLOADER_'),
+      );
+      expect(diagnostics, role).toEqual(expected);
+    }
+  });
+
   it('rejects tandem removal of a mandatory publication-boundary exclusion before reviewed serialization or rendering', () => {
     const corpus = structuredClone(fixture) as Mutable<VideoCorpus>;
     const manifest = structuredClone(
@@ -1991,7 +2035,7 @@ describe('AI Moment Index public search surface', () => {
       'How to use it',
       '<strong>What you get:</strong>',
       '<strong>Rights boundary:</strong>',
-      'reviewed Commons source',
+      'These reviewed Commons source records.',
       'timestamp link plus an original editorial annotation only',
       'does not host, embed, or distribute media or transcripts',
       'claim endorsement or inferred permission',
@@ -2000,6 +2044,7 @@ describe('AI Moment Index public search surface', () => {
     ]) {
       expect(html).toContain(copy);
     }
+    expect(html).not.toContain('This reviewed Commons source');
   });
 
   it('indexes every nonempty admitted canonical page while keeping query state out of discovery', () => {
