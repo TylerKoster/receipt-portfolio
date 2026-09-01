@@ -16,6 +16,16 @@ function notAdmitted(message: string): never {
   throw new Error(`SOURCE_DATA_NOT_ADMITTED: ${message}`);
 }
 
+const STRICT_UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
+
+function decodeUtf8(bytes: Uint8Array, name: string): string {
+  try {
+    return STRICT_UTF8_DECODER.decode(bytes);
+  } catch {
+    return notAdmitted(`${name} is not valid UTF-8`);
+  }
+}
+
 function record(value: unknown, name: string): Record<string, unknown> {
   if (
     value === null ||
@@ -88,9 +98,9 @@ function verifyFetchBinding(manifest: SourceManifest, fetched: RawFetch): void {
 function normalizeStatus(fetched: RawFetch): ReceiptPublicFacts {
   let input: unknown;
   try {
-    input = JSON.parse(Buffer.from(fetched.bytes).toString('utf8'));
+    input = JSON.parse(decodeUtf8(fetched.bytes, 'status response'));
   } catch {
-    return notAdmitted('status response is not valid JSON');
+    return notAdmitted('status response is not valid JSON or UTF-8');
   }
   if (!Array.isArray(input))
     return notAdmitted('status response must be an array');
@@ -314,13 +324,18 @@ function parseXml(xml: string): XmlNode {
       if (end < 0)
         return notAdmitted('feed processing instruction is malformed');
       const instruction = xml.slice(offset, end + 2);
+      const declaration = instruction.match(
+        /^<\?xml\s+version=(?:"1\.0"|'1\.0')(?:\s+encoding=(?:"([A-Za-z][A-Za-z0-9._-]*)"|'([A-Za-z][A-Za-z0-9._-]*)'))?(?:\s+standalone=(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/,
+      );
+      const declaredEncoding = declaration?.[1] ?? declaration?.[2];
       if (
         offset !== 0 ||
-        !/^<\?xml\s+version=(?:"1\.0"|'1\.0')(?:\s+encoding=(?:"[A-Za-z][A-Za-z0-9._-]*"|'[A-Za-z][A-Za-z0-9._-]*'))?(?:\s+standalone=(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/.test(
-          instruction,
-        )
+        declaration === null ||
+        (declaredEncoding !== undefined && !/^utf-?8$/i.test(declaredEncoding))
       ) {
-        return notAdmitted('feed XML declaration is malformed or misplaced');
+        return notAdmitted(
+          'feed XML declaration is malformed, misplaced, or not UTF-8',
+        );
       }
       offset = end + 2;
       continue;
@@ -498,7 +513,7 @@ function entryUrl(entry: XmlNode, name: string): string {
 }
 
 function normalizeFeed(fetched: RawFetch): ReceiptPublicFacts {
-  const xml = Buffer.from(fetched.bytes).toString('utf8');
+  const xml = decodeUtf8(fetched.bytes, 'feed response');
   const feed = parseXml(xml);
   const entries = feed.children
     .filter(

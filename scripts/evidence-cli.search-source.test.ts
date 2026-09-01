@@ -662,7 +662,7 @@ describe('bounded Search Receipt live collection', () => {
 
   it('does not admit a foreign feed entry URL', async () => {
     const bytes = Buffer.from(
-      `<feed><entry><id>foreign</id><title>Foreign</title><link href="https://evil.example/phish"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>foreign</id><title>Foreign</title><link href="https://evil.example/phish"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
     );
     const evidenceDirectory = await newEvidenceDirectory(
       'search-feed-admission-',
@@ -677,7 +677,9 @@ describe('bounded Search Receipt live collection', () => {
           bytes,
         }),
       }),
-    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    ).rejects.toThrow(
+      'SOURCE_DATA_NOT_ADMITTED: entry[0].link destination is not admitted',
+    );
     await expectNoEvidenceWrites(evidenceDirectory);
   });
 
@@ -768,6 +770,10 @@ describe('bounded Search Receipt live collection', () => {
       `<?xml?><feed xmlns="http://www.w3.org/2005/Atom"/>`,
     ],
     [
+      'non-UTF-8 XML declaration',
+      `<?xml version="1.0" encoding="ISO-8859-1"?><feed xmlns="http://www.w3.org/2005/Atom"/>`,
+    ],
+    [
       'misplaced XML declaration',
       `<feed xmlns="http://www.w3.org/2005/Atom"><?xml version="1.0"?></feed>`,
     ],
@@ -810,7 +816,7 @@ describe('bounded Search Receipt live collection', () => {
 
   it('rejects a Search Central URL with a nondefault port', async () => {
     const bytes = Buffer.from(
-      `<feed><entry><id>port</id><title>Port</title><link href="https://developers.google.com:444/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+      `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>port</id><title>Port</title><link href="https://developers.google.com:444/search/blog/x"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
     );
     const evidenceDirectory = await newEvidenceDirectory('search-feed-port-');
     await expect(
@@ -823,9 +829,56 @@ describe('bounded Search Receipt live collection', () => {
           bytes,
         }),
       }),
-    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    ).rejects.toThrow(
+      'SOURCE_DATA_NOT_ADMITTED: entry[0].link destination is not admitted',
+    );
     await expectNoEvidenceWrites(evidenceDirectory);
   });
+
+  it.each([
+    ['status summary', 'google-search-status'],
+    ['Atom title', 'google-search-central-blog'],
+  ] as const)(
+    'rejects malformed UTF-8 in a %s and preserves prior evidence byte-for-byte',
+    async (_label, sourceId) => {
+      const evidenceDirectory = await newEvidenceDirectory(
+        'search-invalid-utf8-',
+      );
+      await collectSearchSource(sourceId, {
+        evidenceDirectory,
+        fetchSource: async (manifest) => rawFetch(manifest),
+      });
+      const before = await evidenceSnapshot(evidenceDirectory);
+      const validBytes =
+        sourceId === 'google-search-status' ? STATUS_BYTES : FEED_BYTES;
+      const marker =
+        sourceId === 'google-search-status'
+          ? Buffer.from('Delayed reports.')
+          : Buffer.from('Second &amp; newer');
+      const markerOffset = validBytes.indexOf(marker);
+      expect(markerOffset).toBeGreaterThanOrEqual(0);
+      const bytes = Buffer.concat([
+        validBytes.subarray(0, markerOffset),
+        Buffer.from([0xc3, 0x28]),
+        validBytes.subarray(markerOffset + marker.byteLength),
+      ]);
+
+      await expect(
+        collectSearchSource(sourceId, {
+          evidenceDirectory,
+          fetchSource: async (manifest) => ({
+            ...rawFetch(manifest),
+            observedAt: '2026-09-01T00:00:00.000Z',
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          }),
+        }),
+      ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+      expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
+      await verifyEvidenceTree(evidenceDirectory, { expectedReceiptCount: 1 });
+    },
+  );
 
   it('exposes only the closed source selector through the CLI', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'search-cli-'));
