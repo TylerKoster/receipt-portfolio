@@ -62,6 +62,18 @@ type ResearcherRelevanceBenchmark = {
   };
 };
 
+const aliasParityCases = [
+  ['outsmart question robots', 'moment-robots-outsmart-question'],
+  ['Charite hospital animation', 'moment-medical-ai-hospital-setting'],
+  ['symptom scales checkboxes', 'moment-medical-ai-symptom-inputs'],
+  ['medical AI branching outputs', 'moment-medical-ai-decision-paths'],
+  ['patient data processing', 'moment-medical-ai-decision-paths'],
+  ['human oversight medical AI', 'moment-medical-ai-clinician-patient'],
+  ['patient clinicians tablet', 'moment-medical-ai-clinician-patient'],
+  ['hospital bedside discussion', 'moment-medical-ai-clinician-patient'],
+  ['medical AI human oversight', 'moment-medical-ai-clinician-patient'],
+] as const;
+
 function normalizedTokens(value: string): readonly string[] {
   return (
     value
@@ -828,6 +840,55 @@ describe('controlled researcher-relevance benchmark', () => {
     expect(searchMoments(index, 'outsmart questions robots', 3)).toEqual([]);
     expect(searchMoments(index, 'symptom scale checkbox', 3)).toEqual([]);
     expect(searchMoments(index, 'patient clinician tablet', 3)).toEqual([]);
+  });
+
+  it('binds every approved alias to its target while preserving literal matches on unrelated entries', () => {
+    const index = buildSearchIndex(fixture);
+    const literalEntries = aliasParityCases.map(
+      ([query, targetMomentId], position) => {
+        const target = index.entries.find(
+          (entry) => entry.moment.id === targetMomentId,
+        );
+        expect(target, query).toBeDefined();
+        if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
+        const literalMomentId = `moment-literal-alias-${position}`;
+        const startSeconds = 900 + position;
+        return {
+          ...target,
+          moment: {
+            ...target.moment,
+            id: literalMomentId,
+            startSeconds,
+            endSeconds: startSeconds + 1,
+            excerpt: query,
+            topicSlugs: [],
+          },
+          video: {
+            ...target.video,
+            id: `video-literal-alias-${position}`,
+            slug: `literal-alias-${position}`,
+            title: `Literal alias control ${position}`,
+            sourceUrl: `https://video.example/literal-alias-${position}.webm`,
+          },
+          title: `literal alias control ${position}`,
+          topics: '',
+          excerpt: query.toLocaleLowerCase('en-US'),
+          tokens: new Set(normalizedTokens(query)),
+        };
+      },
+    );
+    const expandedIndex = { entries: [...index.entries, ...literalEntries] };
+
+    for (const [query, targetMomentId] of aliasParityCases) {
+      const position = aliasParityCases.findIndex(
+        ([candidate]) => candidate === query,
+      );
+      const ids = searchMoments(expandedIndex, query, 10).map(
+        (result) => result.momentId,
+      );
+      expect(ids, query).toContain(targetMomentId);
+      expect(ids, query).toContain(`moment-literal-alias-${position}`);
+    }
   });
 
   it('records the fixed descriptive fixture-regression evaluation only', () => {

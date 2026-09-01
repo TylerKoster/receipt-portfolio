@@ -77,20 +77,22 @@ function normalize(value: string): string {
     .trim();
 }
 
-const CONTROLLED_CORPUS_QUERY_REWRITES: Readonly<Record<string, string>> = {
-  'charite hospital animation': 'hospital animation',
-  'hospital bedside discussion': 'hospital bedside clinicians',
-  'human oversight medical ai': 'human oversight ai',
-  'medical ai branching outputs': 'medical ai decision paths',
-  'medical ai human oversight': 'ai human oversight',
-  'outsmart question robots': 'outsmart robots',
-  'patient clinicians tablet': 'patient clinicians tablets',
-  'patient data processing': 'patient decision system',
-  'symptom scales checkboxes': 'symptom checklist',
-};
+const CONTROLLED_CORPUS_QUERY_ALIASES = [
+  { query: 'charite hospital animation', rewrite: 'hospital animation', momentId: 'moment-medical-ai-hospital-setting' },
+  { query: 'hospital bedside discussion', rewrite: 'hospital bedside clinicians', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'human oversight medical ai', rewrite: 'human oversight ai', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'medical ai branching outputs', rewrite: 'medical ai decision paths', momentId: 'moment-medical-ai-decision-paths' },
+  { query: 'medical ai human oversight', rewrite: 'ai human oversight', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'outsmart question robots', rewrite: 'outsmart robots', momentId: 'moment-robots-outsmart-question' },
+  { query: 'patient clinicians tablet', rewrite: 'patient clinicians tablets', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'patient data processing', rewrite: 'patient decision system', momentId: 'moment-medical-ai-decision-paths' },
+  { query: 'symptom scales checkboxes', rewrite: 'symptom checklist', momentId: 'moment-medical-ai-symptom-inputs' },
+] as const;
 
-function controlledCorpusQuery(value: string): string {
-  return CONTROLLED_CORPUS_QUERY_REWRITES[value] ?? value;
+function controlledCorpusQuery(value: string, momentId: string): string {
+  return CONTROLLED_CORPUS_QUERY_ALIASES.find(
+    (alias) => alias.query === value && alias.momentId === momentId,
+  )?.rewrite ?? value;
 }
 
 function tokens(value: string): readonly string[] {
@@ -323,7 +325,10 @@ function safeTimestampEntry(
 }
 
 function score(entry: PublicSearchEntry, query: string): number {
-  const controlledQuery = controlledCorpusQuery(normalize(query));
+  const controlledQuery = controlledCorpusQuery(
+    normalize(query),
+    entry.momentId,
+  );
   const queryTokens = tokens(controlledQuery);
   const title = normalize(entry.videoTitle);
   const topics = normalize(entry.topicSlugs.join(' '));
@@ -459,19 +464,22 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
   const normalize = (value) => value.normalize('NFKC').toLocaleLowerCase('en-US')
     .replace(/[\p{Pd}_]/gu, ' ').replace(/\s+/gu, ' ').trim();
   const tokens = (value) => normalize(value).match(/[\p{L}\p{N}]+/gu) || [];
-  const controlledCorpusQueryRewrites = {
-    'charite hospital animation': 'hospital animation',
-    'hospital bedside discussion': 'hospital bedside clinicians',
-    'human oversight medical ai': 'human oversight ai',
-    'medical ai branching outputs': 'medical ai decision paths',
-    'medical ai human oversight': 'ai human oversight',
-    'outsmart question robots': 'outsmart robots',
-    'patient clinicians tablet': 'patient clinicians tablets',
-    'patient data processing': 'patient decision system',
-    'symptom scales checkboxes': 'symptom checklist'
+  const controlledCorpusQueryAliases = [
+    { query: 'charite hospital animation', rewrite: 'hospital animation', momentId: 'moment-medical-ai-hospital-setting' },
+    { query: 'hospital bedside discussion', rewrite: 'hospital bedside clinicians', momentId: 'moment-medical-ai-clinician-patient' },
+    { query: 'human oversight medical ai', rewrite: 'human oversight ai', momentId: 'moment-medical-ai-clinician-patient' },
+    { query: 'medical ai branching outputs', rewrite: 'medical ai decision paths', momentId: 'moment-medical-ai-decision-paths' },
+    { query: 'medical ai human oversight', rewrite: 'ai human oversight', momentId: 'moment-medical-ai-clinician-patient' },
+    { query: 'outsmart question robots', rewrite: 'outsmart robots', momentId: 'moment-robots-outsmart-question' },
+    { query: 'patient clinicians tablet', rewrite: 'patient clinicians tablets', momentId: 'moment-medical-ai-clinician-patient' },
+    { query: 'patient data processing', rewrite: 'patient decision system', momentId: 'moment-medical-ai-decision-paths' },
+    { query: 'symptom scales checkboxes', rewrite: 'symptom checklist', momentId: 'moment-medical-ai-symptom-inputs' }
+  ];
+  const controlledCorpusQuery = (value, momentId) => {
+    const alias = controlledCorpusQueryAliases.find((candidate) =>
+      candidate.query === value && candidate.momentId === momentId);
+    return alias ? alias.rewrite : value;
   };
-  const controlledCorpusQuery = (value) =>
-    controlledCorpusQueryRewrites[value] || value;
   const containsPhrase = (value, phrase) => {
     const phraseTokens = tokens(phrase);
     const valueTokens = tokens(value);
@@ -629,10 +637,11 @@ export function buildVideoMomentSearchClient(validationNow?: Date): string {
     }
   };
   const find = (query) => {
-    const controlledQuery = controlledCorpusQuery(normalize(query));
-    const queryTokens = tokens(controlledQuery);
-    if (queryTokens.length === 0 || !index) return [];
+    const normalizedQuery = normalize(query);
+    if (tokens(normalizedQuery).length === 0 || !index) return [];
     return index.entries.filter((entry) => safe(entry, index.corpusId)).map((entry) => {
+      const controlledQuery = controlledCorpusQuery(normalizedQuery, entry.momentId);
+      const queryTokens = tokens(controlledQuery);
       const title = normalize(entry.videoTitle);
       const topics = normalize(entry.topicSlugs.join(' '));
       const excerpt = normalize(entry.excerpt);

@@ -51,6 +51,17 @@ const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 const validationNow = new Date('2026-09-01T12:00:00.000Z');
+const aliasParityCases = [
+  ['outsmart question robots', 'moment-robots-outsmart-question'],
+  ['Charite hospital animation', 'moment-medical-ai-hospital-setting'],
+  ['symptom scales checkboxes', 'moment-medical-ai-symptom-inputs'],
+  ['medical AI branching outputs', 'moment-medical-ai-decision-paths'],
+  ['patient data processing', 'moment-medical-ai-decision-paths'],
+  ['human oversight medical AI', 'moment-medical-ai-clinician-patient'],
+  ['patient clinicians tablet', 'moment-medical-ai-clinician-patient'],
+  ['hospital bedside discussion', 'moment-medical-ai-clinician-patient'],
+  ['medical AI human oversight', 'moment-medical-ai-clinician-patient'],
+] as const;
 
 function searchPublicIndex(
   index: Parameters<typeof searchPublicIndexRaw>[0],
@@ -1448,6 +1459,31 @@ describe('AI Moment Index public search surface', () => {
     ).toContain(
       'SOURCE_EVIDENCE_GRANT_RELATIONSHIP_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
     );
+  });
+
+  it('rejects valid-looking caption coverage from original-editorial-only source records', () => {
+    const corpus = structuredClone(fixture) as Mutable<VideoCorpus>;
+    corpus.rights[0]!.coveredCaptionHashes.push('a'.repeat(64));
+
+    const result = validateCommonsSourceEvidence(
+      corpus,
+      sourceEvidenceManifest,
+      validationNow,
+    );
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [
+        'SOURCE_EVIDENCE_GRANT_RELATIONSHIP_MISMATCH:commons-how-can-we-keep-robots-under-control-v1',
+      ],
+    });
+    expect(() =>
+      serializePublicSearchIndexRaw(
+        corpus,
+        buildSearchIndex(corpus),
+        sourceEvidenceManifest,
+        validationNow,
+      ),
+    ).toThrow(result.diagnostics.join(', '));
   });
 
   it('requires the manifest on every reviewed rendering path', () => {
@@ -3329,6 +3365,56 @@ describe('AI Moment Index public search surface', () => {
         (article) => article.dataset.momentId,
       ),
     ).toEqual(expectedOrder);
+  });
+
+  it('keeps all nine target-bound aliases in parity while preserving unrelated literal matches', async () => {
+    const baseIndex = serializePublicSearchIndex(fixture, searchIndex);
+    const literalEntries = aliasParityCases.map(
+      ([query, targetMomentId], position) => {
+        const target = baseIndex.entries.find(
+          (entry) => entry.momentId === targetMomentId,
+        );
+        expect(target, query).toBeDefined();
+        if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
+        const startSeconds = 900 + position;
+        const sourceUrl = `https://video.example/literal-alias-${position}.webm`;
+        return {
+          ...target,
+          momentId: `moment-literal-alias-${position}`,
+          videoId: `video-literal-alias-${position}`,
+          videoSlug: `literal-alias-${position}`,
+          videoTitle: `Literal alias control ${position}`,
+          sourceUrl,
+          startSeconds,
+          endSeconds: startSeconds + 1,
+          excerpt: query,
+          topicSlugs: [],
+          timestampUrl: `${sourceUrl}#t=${startSeconds}`,
+        };
+      },
+    );
+    const publicIndex = {
+      ...baseIndex,
+      entries: [...baseIndex.entries, ...literalEntries],
+    };
+    const harness = executeClientPayload();
+    await harness.resolveIndex(publicIndex);
+
+    for (const [query, targetMomentId] of aliasParityCases) {
+      const position = aliasParityCases.findIndex(
+        ([candidate]) => candidate === query,
+      );
+      const helperIds = searchPublicIndex(publicIndex, query).map(
+        (entry) => entry.momentId,
+      );
+      harness.submit(query);
+      const shippedIds = descendants(harness.results, 'article').map(
+        (article) => article.dataset.momentId,
+      );
+      expect(helperIds, query).toContain(targetMomentId);
+      expect(helperIds, query).toContain(`moment-literal-alias-${position}`);
+      expect(shippedIds, query).toEqual(helperIds);
+    }
   });
 
   it('keeps all shipped equal-score tie breakers equal to the helper/core order', async () => {

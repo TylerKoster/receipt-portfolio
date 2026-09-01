@@ -547,6 +547,7 @@ export function validateCommonsSourceEvidence(
         grant.creatorId !== record.roles.rightsAuthority.id ||
         !sameStrings(grant.coveredVideoIds, [record.bindings.videoId]) ||
         !sameStrings(grant.coveredSourceUrls, [record.delivery.url]) ||
+        !sameStrings(grant.coveredCaptionHashes, []) ||
         !sameStrings(
           grant.coveredAnnotationHashes ?? [],
           record.moments.map((moment) => moment.annotation.sha256),
