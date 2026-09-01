@@ -1496,6 +1496,28 @@ describe('AI Moment Index public search surface', () => {
       serverCard.indexOf('<dl class="moment-meta">'),
     );
 
+    // Break caught: omitting or duplicating the request section on any admitted
+    // canonical route leaves an inconsistent public correction path.
+    for (const { momentId, timestamp } of [
+      { momentId: 'moment-robots-control', timestamp: 132 },
+      { momentId: 'moment-generative-ai-interface', timestamp: 18 },
+      { momentId: 'moment-ai-industry-society-panel', timestamp: 75 },
+    ]) {
+      const canonicalMoment = renderMomentPage(
+        fixture,
+        searchIndex,
+        momentId,
+        baseUrl,
+      );
+      expect(
+        canonicalMoment.match(/<section id="correction-and-removal"/gu),
+      ).toHaveLength(1);
+      expect(canonicalMoment).toContain(
+        `<strong>Moment ID:</strong> ${momentId}`,
+      );
+      expect(canonicalMoment).toContain(`#t=${timestamp}"`);
+    }
+
     const moment = renderMomentPage(
       fixture,
       searchIndex,
