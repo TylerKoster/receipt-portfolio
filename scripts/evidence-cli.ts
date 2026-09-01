@@ -48,7 +48,10 @@ import {
   createMicrosoftSkillCreatorObservationFromFetches,
   type MicrosoftSkillCreatorPublicFacts,
 } from '../sites/skill-ledger/microsoft-skill-creator-source-observation.js';
-import { normalizeSearchFetch } from './search-evidence-normalizer.js';
+import {
+  normalizeSearchFetch,
+  searchFactsDiffRatio,
+} from './search-evidence-normalizer.js';
 
 const USAGE =
   'Usage: evidence <collect-fixtures|verify --all> | evidence collect-search <google-search-status|google-search-central-blog|--all> | evidence test-mutation | evidence dry-run-live [--output <artifacts/*.json>]';
@@ -854,6 +857,19 @@ export interface SearchCollectionResult {
   readonly idempotent: boolean;
 }
 
+interface PreparedSearchSource {
+  readonly sourceId: SearchSourceId;
+  readonly manifest: SourceManifest;
+  readonly fetch: RawFetch;
+  readonly publicFacts: ReceiptPublicFacts;
+  readonly normalizedBytes: Uint8Array;
+  readonly normalizedSha256: string;
+}
+
+interface PlannedSearchSource extends SearchCollectionResult {
+  readonly prepared: PreparedSearchSource;
+}
+
 function searchPresentation(sourceId: SearchSourceId): {
   readonly topicSlug: string;
   readonly interpretation: string;
@@ -913,6 +929,145 @@ async function existingVerifiedReceipts(
   return paths.length === 0 ? [] : loadVerifiedReceipts(evidenceDirectory);
 }
 
+async function prepareSearchSource(
+  sourceIdInput: SearchSourceId,
+  fetchSource: (manifest: SourceManifest) => Promise<RawFetch>,
+): Promise<PreparedSearchSource> {
+  if (!isSearchSourceId(sourceIdInput)) {
+    throw new Error(`SEARCH_SOURCE_NOT_ADMITTED: ${String(sourceIdInput)}`);
+  }
+  const manifest = await loadSearchManifest(sourceIdInput);
+  const fetched = await fetchSource(manifest);
+  const publicFacts = normalizeSearchFetch(manifest, fetched);
+  const normalizedBytes = new TextEncoder().encode(canonicalJson(publicFacts));
+  return {
+    sourceId: sourceIdInput,
+    manifest,
+    fetch: fetched,
+    publicFacts,
+    normalizedBytes,
+    normalizedSha256: sha256(normalizedBytes),
+  };
+}
+
+function planSearchSource(
+  prepared: PreparedSearchSource,
+  verifiedReceipts: readonly Receipt[],
+  evidenceDirectory: string,
+): PlannedSearchSource {
+  const { sourceId, manifest, fetch: fetched, publicFacts } = prepared;
+  const history = sourceHistory(verifiedReceipts, sourceId);
+  const manifestDigest = manifestSha256(manifest);
+  const existing = history.find(
+    (receipt) =>
+      receipt.payload.manifestSha256 === manifestDigest &&
+      receipt.payload.rawSha256 === fetched.rawSha256 &&
+      receipt.payload.normalizedSha256 === prepared.normalizedSha256,
+  );
+  if (existing !== undefined) {
+    return {
+      prepared,
+      receipt: existing,
+      path: join(
+        evidenceDirectory,
+        'receipts',
+        existing.payload.siteId,
+        `${existing.id}.json`,
+      ),
+      fetch: fetched,
+      idempotent: true,
+    };
+  }
+
+  const predecessor = history.at(-1);
+  const gateInputs = {
+    manifestValid: true,
+    enabled: manifest.enabled,
+    publicationMode: manifest.publicationMode,
+    evidenceClass: 'live-source' as const,
+    rawSha256: fetched.rawSha256,
+    normalizedSha256: prepared.normalizedSha256,
+    ambiguous: false,
+    diffRatio: searchFactsDiffRatio(
+      predecessor?.payload.publicFacts,
+      publicFacts as Parameters<typeof searchFactsDiffRatio>[1],
+    ),
+  };
+  const policy = evaluatePublication(gateInputs);
+  if (policy.decision !== 'PASS') {
+    throw new Error(
+      `SEARCH_COLLECTION_POLICY_${policy.decision}: ${policy.reasonCodes.join(',')}`,
+    );
+  }
+  const presentation = searchPresentation(sourceId);
+  const receipt = verifyReceipt(
+    createReceipt({
+      siteId: 'search-receipt',
+      sourceId,
+      observedAt: fetched.observedAt,
+      sourceUrl: manifest.endpoint,
+      manifestSha256: manifestDigest,
+      rawSha256: fetched.rawSha256,
+      normalizedSha256: prepared.normalizedSha256,
+      rawObjectPath: `objects/raw/${fetched.rawSha256}.bin`,
+      normalizedObjectPath: `objects/normalized/${prepared.normalizedSha256}.json`,
+      sequence: (predecessor?.payload.sequence ?? 0) + 1,
+      ...(predecessor === undefined
+        ? {}
+        : { predecessorReceiptId: predecessor.id }),
+      topicSlug: presentation.topicSlug,
+      provenance: {
+        evidenceClass: 'live-source',
+        publicationMode: manifest.publicationMode,
+        publisherName: manifest.publisherName,
+        sourceClass: manifest.sourceClass,
+        extractionSelector: manifest.extractionSelector,
+        extractionContractId: manifest.extractionContractId,
+        normalizerId: manifest.normalizerId,
+        diffStrategyId: manifest.diffStrategyId,
+        schemaId: manifest.schemaId,
+      },
+      publicFacts,
+      interpretation: presentation.interpretation,
+      unknowns: [...presentation.unknowns],
+      correction: { kind: 'original' },
+      gateInputs,
+      policy: {
+        decision: policy.decision,
+        reasonCodes: [...policy.reasonCodes],
+      },
+    }),
+  );
+  return {
+    prepared,
+    receipt,
+    path: join(
+      evidenceDirectory,
+      'receipts',
+      receipt.payload.siteId,
+      `${receipt.id}.json`,
+    ),
+    fetch: fetched,
+    idempotent: false,
+  };
+}
+
+async function persistSearchPlan(
+  plan: PlannedSearchSource,
+  evidenceDirectory: string,
+): Promise<void> {
+  if (plan.idempotent) return;
+  await persistFixtureEvidence(
+    plan.receipt,
+    {
+      rawBytes: plan.fetch.bytes,
+      normalizedBytes: plan.prepared.normalizedBytes,
+    },
+    plan.prepared.manifest,
+    evidenceDirectory,
+  );
+}
+
 export async function collectSearchSource(
   sourceIdInput: SearchSourceId,
   options: CollectSearchSourceOptions,
@@ -920,114 +1075,83 @@ export async function collectSearchSource(
   if (!isSearchSourceId(sourceIdInput)) {
     throw new Error(`SEARCH_SOURCE_NOT_ADMITTED: ${String(sourceIdInput)}`);
   }
-  const sourceId = sourceIdInput;
-  const manifest = await loadSearchManifest(sourceId);
-
   // Existing evidence is authenticated before network access. A corrupt tree
   // cannot be hidden by appending another otherwise-valid receipt.
   await existingVerifiedReceipts(options.evidenceDirectory);
-  const fetched = await (options.fetchSource ?? fetchAllowedSource)(manifest);
-  const publicFacts = normalizeSearchFetch(manifest, fetched);
-  const normalizedBytes = new TextEncoder().encode(canonicalJson(publicFacts));
-  const normalizedSha256 = sha256(normalizedBytes);
+  const prepared = await prepareSearchSource(
+    sourceIdInput,
+    options.fetchSource ?? fetchAllowedSource,
+  );
 
   return withEvidenceSourceLock(
     options.evidenceDirectory,
-    manifest.sourceId,
+    prepared.sourceId,
     async () => {
       const verifiedReceipts = await existingVerifiedReceipts(
         options.evidenceDirectory,
       );
-      const history = sourceHistory(verifiedReceipts, sourceId);
-      const manifestDigest = manifestSha256(manifest);
-      const existing = history.find(
-        (receipt) =>
-          receipt.payload.manifestSha256 === manifestDigest &&
-          receipt.payload.rawSha256 === fetched.rawSha256 &&
-          receipt.payload.normalizedSha256 === normalizedSha256,
-      );
-      if (existing !== undefined) {
-        return {
-          receipt: existing,
-          path: join(
-            options.evidenceDirectory,
-            'receipts',
-            existing.payload.siteId,
-            `${existing.id}.json`,
-          ),
-          fetch: fetched,
-          idempotent: true,
-        };
-      }
-
-      const predecessor = history.at(-1);
-      const gateInputs = {
-        manifestValid: true,
-        enabled: manifest.enabled,
-        publicationMode: manifest.publicationMode,
-        evidenceClass: 'live-source' as const,
-        rawSha256: fetched.rawSha256,
-        normalizedSha256,
-        ambiguous: false,
-        diffRatio: diffRatio(
-          predecessor?.payload.publicFacts as NormalizedRecord | undefined,
-          publicFacts as NormalizedRecord,
-        ),
-      };
-      const policy = evaluatePublication(gateInputs);
-      if (policy.decision !== 'PASS') {
-        throw new Error(
-          `SEARCH_COLLECTION_POLICY_${policy.decision}: ${policy.reasonCodes.join(',')}`,
-        );
-      }
-      const presentation = searchPresentation(sourceId);
-      const receipt = verifyReceipt(
-        createReceipt({
-          siteId: 'search-receipt',
-          sourceId,
-          observedAt: fetched.observedAt,
-          sourceUrl: manifest.endpoint,
-          manifestSha256: manifestDigest,
-          rawSha256: fetched.rawSha256,
-          normalizedSha256,
-          rawObjectPath: `objects/raw/${fetched.rawSha256}.bin`,
-          normalizedObjectPath: `objects/normalized/${normalizedSha256}.json`,
-          sequence: (predecessor?.payload.sequence ?? 0) + 1,
-          ...(predecessor === undefined
-            ? {}
-            : { predecessorReceiptId: predecessor.id }),
-          topicSlug: presentation.topicSlug,
-          provenance: {
-            evidenceClass: 'live-source',
-            publicationMode: manifest.publicationMode,
-            publisherName: manifest.publisherName,
-            sourceClass: manifest.sourceClass,
-            extractionSelector: manifest.extractionSelector,
-            extractionContractId: manifest.extractionContractId,
-            normalizerId: manifest.normalizerId,
-            diffStrategyId: manifest.diffStrategyId,
-            schemaId: manifest.schemaId,
-          },
-          publicFacts,
-          interpretation: presentation.interpretation,
-          unknowns: [...presentation.unknowns],
-          correction: { kind: 'original' },
-          gateInputs,
-          policy: {
-            decision: policy.decision,
-            reasonCodes: [...policy.reasonCodes],
-          },
-        }),
-      );
-      const path = await persistFixtureEvidence(
-        receipt,
-        { rawBytes: fetched.bytes, normalizedBytes },
-        manifest,
+      const plan = planSearchSource(
+        prepared,
+        verifiedReceipts,
         options.evidenceDirectory,
       );
+      await persistSearchPlan(plan, options.evidenceDirectory);
       await verifyEvidenceTree(options.evidenceDirectory);
-      return { receipt, path, fetch: fetched, idempotent: false };
+      return {
+        receipt: plan.receipt,
+        path: plan.path,
+        fetch: plan.fetch,
+        idempotent: plan.idempotent,
+      };
     },
+  );
+}
+
+export async function collectAllSearchSources(
+  options: CollectSearchSourceOptions,
+): Promise<readonly SearchCollectionResult[]> {
+  await existingVerifiedReceipts(options.evidenceDirectory);
+  const fetchSource = options.fetchSource ?? fetchAllowedSource;
+  // Both source responses are fetched, admitted, and normalized before either
+  // source can acquire a persistence lock or write canonical evidence.
+  const prepared = await Promise.all(
+    SEARCH_SOURCE_IDS.map((sourceId) =>
+      prepareSearchSource(sourceId, fetchSource),
+    ),
+  );
+  return withEvidenceSourceLock(
+    options.evidenceDirectory,
+    SEARCH_SOURCE_IDS[0],
+    () =>
+      withEvidenceSourceLock(
+        options.evidenceDirectory,
+        SEARCH_SOURCE_IDS[1],
+        async () => {
+          const verifiedReceipts = await existingVerifiedReceipts(
+            options.evidenceDirectory,
+          );
+          const plans = prepared.map((source) =>
+            planSearchSource(
+              source,
+              verifiedReceipts,
+              options.evidenceDirectory,
+            ),
+          );
+          // Every receipt and PASS decision is complete before the first
+          // immutable canonical write. Source failures therefore leave the
+          // prior evidence inventory unchanged.
+          for (const plan of plans) {
+            await persistSearchPlan(plan, options.evidenceDirectory);
+          }
+          await verifyEvidenceTree(options.evidenceDirectory);
+          return plans.map((plan) => ({
+            receipt: plan.receipt,
+            path: plan.path,
+            fetch: plan.fetch,
+            idempotent: plan.idempotent,
+          }));
+        },
+      ),
   );
 }
 
@@ -1426,6 +1550,42 @@ async function verifyEvidenceTreeInternal(
       receipt.payload.normalizedSha256,
       receipt.payload.publicFacts,
     );
+    const searchFacts = receipt.payload.publicFacts;
+    if (
+      (searchFacts.kind === 'search-status' && 'incidents' in searchFacts) ||
+      searchFacts.kind === 'search-feed'
+    ) {
+      const rawBytes = await readFile(
+        join(evidenceDirectory, receipt.payload.rawObjectPath),
+      );
+      let rederivedFacts: ReceiptPublicFacts;
+      try {
+        rederivedFacts = normalizeSearchFetch(manifest, {
+          sourceUrl: receipt.payload.sourceUrl,
+          observedAt: receipt.payload.observedAt,
+          mediaType: searchFacts.mediaType,
+          status: searchFacts.responseStatus,
+          byteCount: searchFacts.byteCount,
+          rawSha256: receipt.payload.rawSha256,
+          bytes: rawBytes,
+        });
+      } catch (error) {
+        throw new EvidenceIntegrityError(
+          'OBJECT_INTEGRITY_MISMATCH',
+          'Search source raw bytes are not admitted by the bound extraction contract',
+          { cause: error },
+        );
+      }
+      if (
+        canonicalJson(rederivedFacts) !==
+        canonicalJson(receipt.payload.publicFacts)
+      ) {
+        throw new EvidenceIntegrityError(
+          'OBJECT_INTEGRITY_MISMATCH',
+          'Search source raw bytes do not reproduce the authenticated public facts',
+        );
+      }
+    }
     if (manifest.extractionContractId === 'skill-declared-metadata-v1') {
       const observationBytes = await readFile(
         join(evidenceDirectory, receipt.payload.rawObjectPath),
@@ -2198,20 +2358,25 @@ export async function runCli(
     arguments_[0] === 'collect-search' &&
     (arguments_[1] === '--all' || isSearchSourceId(arguments_[1] ?? ''))
   ) {
-    const requested =
+    const collectionOptions = {
+      evidenceDirectory,
+      ...(dependencies.fetchSource === undefined
+        ? {}
+        : { fetchSource: dependencies.fetchSource }),
+    };
+    const results =
       arguments_[1] === '--all'
-        ? SEARCH_SOURCE_IDS
-        : [arguments_[1] as SearchSourceId];
-    for (const sourceId of requested) {
-      const result = await collectSearchSource(sourceId, {
-        evidenceDirectory,
-        ...(dependencies.fetchSource === undefined
-          ? {}
-          : { fetchSource: dependencies.fetchSource }),
-      });
+        ? await collectAllSearchSources(collectionOptions)
+        : [
+            await collectSearchSource(
+              arguments_[1] as SearchSourceId,
+              collectionOptions,
+            ),
+          ];
+    for (const result of results) {
       console.log(
         canonicalJson({
-          sourceId,
+          sourceId: result.receipt.payload.sourceId,
           sourceUrl: result.fetch.sourceUrl,
           observedAt: result.fetch.observedAt,
           responseStatus: result.fetch.status,

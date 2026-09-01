@@ -10,6 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  canonicalJson,
+  createReceipt,
   sha256,
   verifyReceipt,
   type RawFetch,
@@ -81,6 +83,25 @@ async function newEvidenceDirectory(prefix: string): Promise<string> {
 
 async function expectNoEvidenceWrites(evidenceDirectory: string) {
   await expect(access(evidenceDirectory)).rejects.toThrow();
+}
+
+async function evidenceSnapshot(
+  directory: string,
+  root = directory,
+): Promise<Readonly<Record<string, string>>> {
+  const snapshot: Record<string, string> = {};
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name === '.locks') continue;
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      Object.assign(snapshot, await evidenceSnapshot(path, root));
+    } else if (entry.isFile()) {
+      snapshot[path.slice(root.length + 1).replaceAll('\\', '/')] = (
+        await readFile(path)
+      ).toString('base64');
+    }
+  }
+  return snapshot;
 }
 
 afterEach(async () => {
@@ -335,6 +356,203 @@ describe('bounded Search Receipt live collection', () => {
       }),
     ).rejects.toMatchObject({ code: 'NON_CANONICAL_RECEIPT_BYTES' });
     expect(fetchSource).not.toHaveBeenCalled();
+  });
+
+  it('re-derives Search facts from raw bytes during verification', async () => {
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-semantic-tamper-',
+    );
+    const first = await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const replacementRaw = Buffer.from('[]');
+    const replacementRawSha256 = sha256(replacementRaw);
+    const { schemaVersion, ...receiptInput } = first.receipt.payload;
+    void schemaVersion;
+    const replacement = createReceipt({
+      ...receiptInput,
+      rawSha256: replacementRawSha256,
+      rawObjectPath: `objects/raw/${replacementRawSha256}.bin`,
+      gateInputs: {
+        ...receiptInput.gateInputs,
+        rawSha256: replacementRawSha256,
+      },
+    });
+    await rm(
+      join(
+        evidenceDirectory,
+        ...first.receipt.payload.rawObjectPath.split('/'),
+      ),
+    );
+    await rm(first.path);
+    await writeFile(
+      join(evidenceDirectory, ...replacement.payload.rawObjectPath.split('/')),
+      replacementRaw,
+    );
+    await writeFile(
+      join(
+        evidenceDirectory,
+        'receipts',
+        'search-receipt',
+        `${replacement.id}.json`,
+      ),
+      canonicalJson(replacement),
+    );
+
+    await expect(verifyEvidenceTree(evidenceDirectory)).rejects.toMatchObject({
+      code: 'OBJECT_INTEGRITY_MISMATCH',
+    });
+  });
+
+  it('writes nothing when all-source collection has a malformed second response', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'search-all-fail-'));
+    temporaryDirectories.push(directory);
+    await expect(
+      runCli(['collect-search', '--all'], {
+        projectDirectory: directory,
+        fetchSource: async (manifest) => {
+          if (manifest.sourceId === 'google-search-status') {
+            return rawFetch(manifest);
+          }
+          const bytes = Buffer.from('<feed><entry></feed>');
+          return {
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          };
+        },
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    await expect(access(join(directory, 'evidence'))).rejects.toThrow();
+  });
+
+  it('preserves prior evidence byte-for-byte when all-source admission fails', async () => {
+    const evidenceDirectory = await newEvidenceDirectory('search-all-prior-');
+    await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const before = await evidenceSnapshot(evidenceDirectory);
+    const directory = join(evidenceDirectory, '..');
+    await expect(
+      runCli(['collect-search', '--all'], {
+        projectDirectory: directory,
+        fetchSource: async (manifest) => {
+          if (manifest.sourceId === 'google-search-status') {
+            return rawFetch(manifest);
+          }
+          const bytes = Buffer.from('<feed><entry></feed>');
+          return {
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          };
+        },
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    expect(await evidenceSnapshot(evidenceDirectory)).toEqual(before);
+  });
+
+  it('requires review when the complete incident set is replaced', async () => {
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-large-change-',
+    );
+    await collectSearchSource('google-search-status', {
+      evidenceDirectory,
+      fetchSource: async (manifest) => rawFetch(manifest),
+    });
+    const replacementBytes = Buffer.from(
+      JSON.stringify([
+        {
+          id: 'replacement',
+          service_name: 'Different service',
+          begin: '2026-09-01T00:00:00Z',
+          end: null,
+          modified: '2026-09-01T00:30:00Z',
+          status_impact: 'SERVICE_OUTAGE',
+          severity: 'SERVICE_OUTAGE',
+          external_desc: 'Completely different incident.',
+          uri: 'https://status.search.google.com/incidents/replacement',
+        },
+      ]),
+    );
+    await expect(
+      collectSearchSource('google-search-status', {
+        evidenceDirectory,
+        fetchSource: async (manifest) => ({
+          ...rawFetch(manifest),
+          observedAt: '2026-09-01T00:31:00.000Z',
+          byteCount: replacementBytes.byteLength,
+          rawSha256: sha256(replacementBytes),
+          bytes: replacementBytes,
+        }),
+      }),
+    ).rejects.toThrow(/SEARCH_COLLECTION_POLICY_REVIEW_REQUIRED/);
+    expect(
+      await readdir(join(evidenceDirectory, 'receipts', 'search-receipt')),
+    ).toHaveLength(1);
+  });
+
+  it('ignores a complete entry contained only in an XML comment', async () => {
+    const bytes = Buffer.from(
+      `<feed><!--<entry><id>comment</id><title>Comment</title><link href="https://developers.google.com/search/blog/comment"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry>--></feed>`,
+    );
+    const result = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory: await newEvidenceDirectory('search-feed-comment-'),
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        byteCount: bytes.byteLength,
+        rawSha256: sha256(bytes),
+        bytes,
+      }),
+    });
+    expect(result.receipt.payload.publicFacts).toMatchObject({
+      kind: 'search-feed',
+      entries: [],
+    });
+  });
+
+  it('does not treat a structurally nested entry as a direct feed entry', async () => {
+    const bytes = Buffer.from(
+      `<feed><wrapper><entry><id>nested</id><title>Nested</title><link href="https://developers.google.com/search/blog/nested"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></wrapper></feed>`,
+    );
+    const result = await collectSearchSource('google-search-central-blog', {
+      evidenceDirectory: await newEvidenceDirectory('search-feed-nested-'),
+      fetchSource: async (manifest) => ({
+        ...rawFetch(manifest),
+        byteCount: bytes.byteLength,
+        rawSha256: sha256(bytes),
+        bytes,
+      }),
+    });
+    expect(result.receipt.payload.publicFacts).toMatchObject({
+      kind: 'search-feed',
+      entries: [],
+    });
+  });
+
+  it('does not admit a foreign feed entry URL', async () => {
+    const bytes = Buffer.from(
+      `<feed><entry><id>foreign</id><title>Foreign</title><link href="https://evil.example/phish"/><published>2026-08-31T00:00:00Z</published><updated>2026-08-31T00:00:00Z</updated></entry></feed>`,
+    );
+    const evidenceDirectory = await newEvidenceDirectory(
+      'search-feed-admission-',
+    );
+    await expect(
+      collectSearchSource('google-search-central-blog', {
+        evidenceDirectory,
+        fetchSource: async (manifest) => ({
+          ...rawFetch(manifest),
+          byteCount: bytes.byteLength,
+          rawSha256: sha256(bytes),
+          bytes,
+        }),
+      }),
+    ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+    await expectNoEvidenceWrites(evidenceDirectory);
   });
 
   it('exposes only the closed source selector through the CLI', async () => {
