@@ -181,7 +181,28 @@ interface XmlNode {
 
 interface XmlFrame {
   readonly node: XmlNode;
-  readonly namespaces: ReadonlySet<string>;
+  readonly namespaces: ReadonlyMap<string, string>;
+}
+
+const XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
+const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
+const NC_NAME = /^[A-Za-z_][\w.-]*$/;
+
+function qualifiedName(name: string, label: string): {
+  readonly prefix?: string;
+  readonly local: string;
+} {
+  const parts = name.split(':');
+  if (
+    parts.length > 2 ||
+    parts.some((part) => !NC_NAME.test(part)) ||
+    parts[0] === 'xmlns'
+  ) {
+    return notAdmitted(`${label} uses a malformed XML qualified name`);
+  }
+  return parts.length === 2
+    ? { prefix: parts[0]!, local: parts[1]! }
+    : { local: parts[0]! };
 }
 
 function localName(name: string): string {
@@ -287,6 +308,7 @@ function parseXml(xml: string): XmlNode {
       if (!/^[A-Za-z_:][\w:.-]*$/.test(closingName)) {
         return notAdmitted('feed closing tag is malformed');
       }
+      qualifiedName(closingName, 'feed closing tag');
       const open = stack.pop();
       if (open === undefined || open.node.name !== closingName) {
         return notAdmitted('feed tags are not properly nested');
@@ -300,23 +322,39 @@ function parseXml(xml: string): XmlNode {
       }
       const parsedAttributes = parseAttributes(match[2]);
       const parent = stack.at(-1);
-      const namespaces = new Set(parent?.namespaces ?? ['xml']);
-      for (const name of Object.keys(parsedAttributes)) {
-        if (name.startsWith('xmlns:')) namespaces.add(name.slice(6));
+      const namespaces = new Map(
+        parent?.namespaces ?? [['xml', XML_NAMESPACE]],
+      );
+      for (const [name, namespace] of Object.entries(parsedAttributes)) {
+        if (name === 'xmlns') {
+          if (namespace === XML_NAMESPACE || namespace === XMLNS_NAMESPACE) {
+            return notAdmitted('feed default namespace uses a reserved URI');
+          }
+          namespaces.set('', namespace);
+          continue;
+        }
+        if (!name.startsWith('xmlns:')) continue;
+        const prefix = name.slice(6);
+        if (
+          !NC_NAME.test(prefix) ||
+          prefix === 'xmlns' ||
+          namespace.length === 0 ||
+          namespace === XMLNS_NAMESPACE ||
+          (prefix === 'xml') !== (namespace === XML_NAMESPACE)
+        ) {
+          return notAdmitted('feed namespace declaration is malformed');
+        }
+        namespaces.set(prefix, namespace);
       }
-      const elementPrefix = match[1].includes(':')
-        ? match[1].split(':', 1)[0]?.toLowerCase()
-        : undefined;
+      const elementPrefix = qualifiedName(match[1], 'feed element').prefix;
       if (elementPrefix !== undefined && !namespaces.has(elementPrefix)) {
         return notAdmitted('feed element uses an unbound namespace prefix');
       }
       for (const name of Object.keys(parsedAttributes)) {
-        const attributePrefix = name.includes(':')
-          ? name.split(':', 1)[0]
-          : undefined;
+        if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
+        const attributePrefix = qualifiedName(name, 'feed attribute').prefix;
         if (
           attributePrefix !== undefined &&
-          attributePrefix !== 'xmlns' &&
           !namespaces.has(attributePrefix)
         ) {
           return notAdmitted('feed attribute uses an unbound namespace prefix');

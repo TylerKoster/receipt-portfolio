@@ -645,6 +645,16 @@ describe('bounded Search Receipt live collection', () => {
       'unbound namespace prefix',
       `<x:feed><x:entry><x:id>x</x:id><x:title>X</x:title><x:link href="https://developers.google.com/search/blog/x"/><x:published>2026-08-31T00:00:00Z</x:published><x:updated>2026-08-31T00:00:00Z</x:updated></x:entry></x:feed>`,
     ],
+    ['empty prefixed namespace binding', `<x:feed xmlns:x=""></x:feed>`],
+    [
+      'rebound reserved xml prefix',
+      `<feed xmlns:xml="https://evil.example/ns"></feed>`,
+    ],
+    ['multi-colon qualified name', `<a:b:feed xmlns:a="urn:a"></a:b:feed>`],
+    [
+      'reserved xmlns element prefix',
+      `<xmlns:feed xmlns:xmlns="urn:x"></xmlns:feed>`,
+    ],
   ] as const)('rejects malformed XML with an %s', async (_label, xml) => {
     const bytes = Buffer.from(xml);
     const evidenceDirectory = await newEvidenceDirectory('search-xml-invalid-');
