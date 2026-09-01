@@ -47,6 +47,7 @@ import {
   type PublicSkillLedgerRecord,
 } from '../../sites/skill-ledger/public-inventory-adapter.js';
 import { workflowTestLabSite } from '../../sites/workflow-test-lab/index.js';
+import { copyCanonicalSearchEvidence } from '../support/canonical-search-evidence.js';
 
 vi.mock('node:fs/promises', async () => {
   const actual =
@@ -136,6 +137,7 @@ async function collectAcceptedFixtures(): Promise<void> {
     'skill-inventory-v1.json',
     { evidenceDirectory: testEvidenceDirectory },
   );
+  await copyCanonicalSearchEvidence(testEvidenceDirectory);
   const observedAt = '2026-08-31T04:32:41.239Z';
   const observation: MicrosoftSkillCreatorObservation = {
     observedAt,
@@ -396,6 +398,21 @@ afterEach(async () => {
 });
 
 describe('static receipt site build', () => {
+  it('includes the tracked official Search evidence in temporary build evidence', async () => {
+    const receipts = await searchReceiptEntries();
+
+    expect(
+      receipts
+        .map(({ receipt }) => receipt.payload.sourceId)
+        .filter((sourceId) =>
+          ['google-search-central-blog', 'google-search-status'].includes(
+            sourceId,
+          ),
+        )
+        .sort(),
+    ).toEqual(['google-search-central-blog', 'google-search-status']);
+  });
+
   it('emits blog routes only for the product-owned admitted registry', async () => {
     const registryRoot = join(dirname(outputDirectory), 'blog-registry-root');
     await writeBlogRegistryRoot(

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildSites } from '../../scripts/build-sites.js';
 import { collectFixturePair } from '../../scripts/evidence-cli.js';
 import { searchPublicIndex } from '../../sites/video-moment-search/search-client.js';
+import { copyCanonicalSearchEvidence } from '../support/canonical-search-evidence.js';
 
 const temporaryDirectories: string[] = [];
 let evidenceDirectory: string;
@@ -66,6 +67,7 @@ beforeEach(async () => {
     'skill-inventory-v1.json',
     { evidenceDirectory },
   );
+  await copyCanonicalSearchEvidence(evidenceDirectory);
 });
 
 afterEach(async () => {

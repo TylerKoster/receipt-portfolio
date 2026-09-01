@@ -23,6 +23,7 @@ import {
   collectFixturePair,
   verifyEvidenceTree,
 } from '../../scripts/evidence-cli.js';
+import { copyCanonicalSearchEvidence } from '../support/canonical-search-evidence.js';
 
 const temporaryDirectories: string[] = [];
 let evidenceDirectory: string;
@@ -46,6 +47,7 @@ async function collectExamples(directory = evidenceDirectory): Promise<void> {
     'skill-inventory-v1.json',
     { evidenceDirectory: directory },
   );
+  await copyCanonicalSearchEvidence(directory);
 }
 
 async function receiptPaths(directory = evidenceDirectory): Promise<string[]> {
@@ -92,6 +94,7 @@ afterEach(async () => {
 
 describe('authenticated examples and retained objects', () => {
   it('binds every controlled fixture receipt to explicit example provenance and content-addressed objects', async () => {
+    let controlledReceiptCount = 0;
     for (const path of await receiptPaths()) {
       const receipt = (await readReceipt(path)) as unknown as {
         payload: {
@@ -104,6 +107,11 @@ describe('authenticated examples and retained objects', () => {
           gateInputs?: unknown;
         };
       };
+
+      if (receipt.payload.provenance?.evidenceClass !== 'controlled-example') {
+        continue;
+      }
+      controlledReceiptCount += 1;
 
       expect(receipt.payload.provenance).toMatchObject({
         publicationMode: 'fixture-example',
@@ -120,6 +128,7 @@ describe('authenticated examples and retained objects', () => {
       expect(receipt.payload.unknowns).not.toHaveLength(0);
       expect(receipt.payload.gateInputs).toBeDefined();
     }
+    expect(controlledReceiptCount).toBeGreaterThan(0);
 
     await expect(
       verifyEvidenceTree(evidenceDirectory),
