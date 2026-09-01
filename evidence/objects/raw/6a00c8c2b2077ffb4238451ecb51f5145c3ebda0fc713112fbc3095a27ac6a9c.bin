@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+<channel>
+  <title>Google Search Central Blog</title>
+  <link>https://developers.google.com/search/blog/</link>
+  <description>Official news for web professionals about Google Search, related products, and events.</description>
+  <item>
+    <title>Update to the Site Reputation Policy</title>
+    <link>https://developers.google.com/search/blog/2026/08/update-site-reputation-policy</link>
+    <description>
+      <![CDATA[<p>
+      In 2024, we
+  introduced our site reputation policy
+  to stop a practice where third-party content is published on a trusted website just to exploit that
+  site&#39;s good reputation to rank higher in Search. This practice hurts search quality, and creates a
+  bad experience for users.
+      </p>]]>
+    </description>
+    <pubDate>Fri, 28 Aug 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-08-28-Update-to-the-Site-Reputation-Policy</guid>
+  </item>
+  <item>
+    <title>Platform properties roll out globally, plus a new social and video performance guide</title>
+    <link>https://developers.google.com/search/blog/2026/07/platform-properties-social-video-guide</link>
+    <description>
+      <![CDATA[<p>
+      Earlier this month, we announced platform properties for Search Console,
+  allowing you to track how your social and video posts on Instagram, TikTok, X, and YouTube perform on Google Search,
+  Discover, and Google News. Today, platform properties are globally available to everyone.
+      </p>]]>
+    </description>
+    <pubDate>Wed, 29 Jul 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-07-29-Platform-properties-roll-out-globally,-plus-a-new-social-and-video-performance-guide</guid>
+  </item>
+  <item>
+    <title>See how content from social and video platforms performs on Google Search</title>
+    <link>https://developers.google.com/search/blog/2026/07/search-console-social-video-platforms</link>
+    <description>
+      <![CDATA[<p>
+      Content creators and publishers use many channels beyond their own websites to reach their audiences.
+  As people gravitate toward firsthand perspectives and different content formats, we want to make
+  it easier for site owners and creators&amp;mdash;even those without their own website&amp;mdash;to get a consolidated view
+  of how all of their content is getting discovered on Search.
+      </p>]]>
+    </description>
+    <pubDate>Tue, 07 Jul 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-07-07-See-how-content-from-social-and-video-platforms-performs-on-Google-Search</guid>
+  </item>
+  <item>
+    <title>Search Central Deep Dive Europe 2026: Apparently we're going to Barcelona</title>
+    <link>https://developers.google.com/search/blog/2026/07/search-central-live-deep-dive-europe-2026</link>
+    <description>
+      <![CDATA[<p>
+      We&#39;re excited to officially announce the next stop for
+  Search Central Live Deep Dive Europe 2026! Mark your calendars: based directly on
+  your feedback, we&#39;re headed to
+  Barcelona, Spain, from September 30 to October 2, 2026.
+      </p>]]>
+    </description>
+    <pubDate>Mon, 06 Jul 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-07-06-Search-Central-Deep-Dive-Europe-2026:-Apparently-we're-going-to-Barcelona</guid>
+  </item>
+  <item>
+    <title>Help Us Pick the Next Stop in Europe for Search Central Live Deep Dive 2026!</title>
+    <link>https://developers.google.com/search/blog/2026/06/scl-deep-dive-europe-2026</link>
+    <description>
+      <![CDATA[<p>
+      As we mentioned a
+  few months ago,
+  we are bringing the Search Central Live Deep Dive format to the EMEA region. This SCL format
+  requires finding the absolute best home for the event&amp;mdash;a place where all of you can truly
+  connect, learn, and enjoy.
+      </p>]]>
+    </description>
+    <pubDate>Thu, 18 Jun 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-06-18-Help-Us-Pick-the-Next-Stop-in-Europe-for-Search-Central-Live-Deep-Dive-2026!</guid>
+  </item>
+  <item>
+    <title>Introducing Search Generative AI performance reports in Search Console</title>
+    <link>https://developers.google.com/search/blog/2026/06/gen-ai-performance-reports</link>
+    <description>
+      <![CDATA[<p>
+      Today, we&#39;re excited to announce the launch of new Search Generative AI performance reports
+  in Search Console, including dedicated reports for Search and Discover, to help you understand your
+  site&#39;s visibility within generative AI features on Search.
+      </p>]]>
+    </description>
+    <pubDate>Wed, 03 Jun 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-06-03-Introducing-Search-Generative-AI-performance-reports-in-Search-Console</guid>
+  </item>
+  <item>
+    <title>A new resource for optimizing for generative AI in Google Search</title>
+    <link>https://developers.google.com/search/blog/2026/05/a-new-resource-for-optimizing</link>
+    <description>
+      <![CDATA[<p>
+      As people increasingly gravitate to generative AI experiences and find information in new ways,
+  we&#39;re publishing a new resource to help website owners, SEOs, and developers understand how to
+  optimize their content for appearance in generative AI features in Search, and in turn Google
+  Search overall.
+      </p>]]>
+    </description>
+    <pubDate>Fri, 15 May 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-05-15-A-new-resource-for-optimizing-for-generative-AI-in-Google-Search</guid>
+  </item>
+  <item>
+    <title>Introducing a new spam policy for "back button hijacking"</title>
+    <link>https://developers.google.com/search/blog/2026/04/back-button-hijacking</link>
+    <description>
+      <![CDATA[<p>
+      Today, we are expanding our spam policies
+  to address a deceptive practice known as &quot;back button hijacking&quot;, which will become an explicit
+  violation of the &quot;malicious practices&quot;
+  of spam policies, leading to potential spam actions.
+      </p>]]>
+    </description>
+    <pubDate>Mon, 13 Apr 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-04-13-Introducing-a-new-spam-policy-for-"back-button-hijacking"</guid>
+  </item>
+  <item>
+    <title>Search Central Live is Coming to Shanghai in 2026!</title>
+    <link>https://developers.google.com/search/blog/2026/04/scl-shanghai-2026</link>
+    <description>
+      <![CDATA[<p>
+      We are hosting Search Central Live Shanghai 2026 on May 15.
+  This event is structured for the local community, with a specific focus on
+  optimizing sites that target users outside of China.
+      </p>]]>
+    </description>
+    <pubDate>Thu, 02 Apr 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-04-02-Search-Central-Live-is-Coming-to-Shanghai-in-2026!</guid>
+  </item>
+  <item>
+    <title>New Location for the Google Crawlers' IP Range Files</title>
+    <link>https://developers.google.com/search/blog/2026/03/crawler-ip-ranges</link>
+    <description>
+      <![CDATA[<p>
+      Just a short note this time!
+      </p>]]>
+    </description>
+    <pubDate>Tue, 31 Mar 2026 00:00:00 +0000</pubDate>
+    <guid isPermaLink="false">2026-03-31-New-Location-for-the-Google-Crawlers'-IP-Range-Files</guid>
+  </item>
+</channel>
+</rss>
