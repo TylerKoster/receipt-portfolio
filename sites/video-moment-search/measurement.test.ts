@@ -24,7 +24,7 @@ const fixture = JSON.parse(
 const evidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
       import.meta.url,
     ),
     'utf8',
@@ -44,6 +44,10 @@ const runbook = readFileSync(
     '../../docs/video-moment-search/operator-runbook.md',
     import.meta.url,
   ),
+  'utf8',
+);
+const laneContract = readFileSync(
+  new URL('../../docs/operations/video-moment-search-lane.md', import.meta.url),
   'utf8',
 );
 
@@ -404,6 +408,25 @@ describe('privacy-preserving measurement contract', () => {
     ).toBe(10);
     expect(runbook).toContain(
       'Target: **10 admitted reviewed moments; exact timestamp landing error 0;',
+    );
+  });
+
+  it('keeps lane recovery aligned to the authorized three-plus-seven corpus', () => {
+    const normalizedLaneContract = laneContract.replace(/\s+/gu, ' ');
+    expect(normalizedLaneContract).toContain(
+      'last-known-good original three moments',
+    );
+    expect(normalizedLaneContract).toContain(
+      'current explicitly authorized candidate contains ten moments',
+    );
+    expect(normalizedLaneContract).toContain(
+      '3 established plus 7 authorized additions',
+    );
+    expect(normalizedLaneContract).toContain(
+      'does not download or scrape media or transcripts',
+    );
+    expect(normalizedLaneContract).not.toContain(
+      'No lane work admits another moment',
     );
   });
 

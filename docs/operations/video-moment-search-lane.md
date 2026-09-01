@@ -108,10 +108,16 @@ good hosted release through the coordinator's human-controlled recovery path,
 then rerun the three public checks: the AI Moment Index home page,
 `videos/robots-under-control/`, and `moments/moment-robots-control/`. The two
 representative public documents must each retain the ordinary source media
-fragment `#t=132`. The current accepted proof corpus contains three admitted
-moments: robots control at `#t=132`, the KI-Campus generative-AI interface at
-`#t=18`, and the World Economic Forum industry/society panel at `#t=75`.
-Additional records are permitted only through the private-library authority,
-security, evidence, and publication gates above. The lane never scrapes
-unauthorized transcripts or downloads audiovisual media without explicit
-authority.
+fragment `#t=132`. Those recovery checks identify the last-known-good original
+three moments: robots control at `#t=132`, the KI-Campus generative-AI interface
+at `#t=18`, and the World Economic Forum industry/society panel at `#t=75`.
+
+The accepted rights-reviewed proof corpus contains ten moments: 3 established
+plus 7 authorized additions. The additions are the robots-outsmart question at
+`#t=20`, robot visual learning at `#t=300`, robot reward learning at `#t=435`,
+medical-AI hospital setting at `#t=5`, symptom inputs at `#t=25`, decision paths
+at `#t=50`, and clinician-patient communication at `#t=80`. Additional records
+are permitted only through the private-library authority, security, evidence,
+and publication gates above plus explicit coordinator authority. The lane never
+scrapes unauthorized transcripts, downloads audiovisual media without explicit
+authority, infers rights, or performs an unplanned admission.

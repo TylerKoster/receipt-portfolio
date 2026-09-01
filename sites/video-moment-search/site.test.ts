@@ -41,7 +41,7 @@ const fixture = JSON.parse(
 const sourceEvidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
       import.meta.url,
     ),
     'utf8',
@@ -51,16 +51,52 @@ const sourceRightsEvidence = sourceEvidenceManifest.records[0]!;
 const baseUrl = 'https://receipt-portfolio.example/';
 const searchIndex = buildSearchIndex(fixture);
 const validationNow = new Date('2026-09-01T12:00:00.000Z');
-const aliasParityCases = [
-  ['outsmart question robots', 'moment-robots-outsmart-question'],
-  ['Charite hospital animation', 'moment-medical-ai-hospital-setting'],
-  ['symptom scales checkboxes', 'moment-medical-ai-symptom-inputs'],
-  ['medical AI branching outputs', 'moment-medical-ai-decision-paths'],
-  ['patient data processing', 'moment-medical-ai-decision-paths'],
-  ['human oversight medical AI', 'moment-medical-ai-clinician-patient'],
-  ['patient clinicians tablet', 'moment-medical-ai-clinician-patient'],
-  ['hospital bedside discussion', 'moment-medical-ai-clinician-patient'],
-  ['medical AI human oversight', 'moment-medical-ai-clinician-patient'],
+const literalTopicCases = [
+  [
+    'outsmart question robots',
+    'moment-robots-outsmart-question',
+    'outsmart-question-robots',
+  ],
+  [
+    'Charite hospital animation',
+    'moment-medical-ai-hospital-setting',
+    'charite-hospital-animation',
+  ],
+  [
+    'symptom scales checkboxes',
+    'moment-medical-ai-symptom-inputs',
+    'symptom-scales-checkboxes',
+  ],
+  [
+    'medical AI branching outputs',
+    'moment-medical-ai-decision-paths',
+    'medical-ai-branching-outputs',
+  ],
+  [
+    'patient data processing',
+    'moment-medical-ai-decision-paths',
+    'patient-data-processing',
+  ],
+  [
+    'human oversight medical AI',
+    'moment-medical-ai-clinician-patient',
+    'medical-ai-human-oversight',
+  ],
+  [
+    'patient clinicians tablet',
+    'moment-medical-ai-clinician-patient',
+    'patient-clinicians-tablet',
+  ],
+  [
+    'hospital bedside discussion',
+    'moment-medical-ai-clinician-patient',
+    'hospital-bedside-discussion',
+  ],
+  [
+    'medical AI human oversight',
+    'moment-medical-ai-clinician-patient',
+    'medical-ai-human-oversight',
+  ],
 ] as const;
 
 function searchPublicIndex(
@@ -1709,7 +1745,7 @@ describe('AI Moment Index public search surface', () => {
       sourceEvidenceManifest,
     );
     expect(html).toContain(
-      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-07-17, 2024-08-06. Fresh source-record status: observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z, observed on 2026-09-01 (date precision); freshness expires 2026-10-01T00:00:00.000Z.',
+      'Historical license review dates: 2016-12-21, 2022-01-18, 2024-07-17, 2024-08-06. Fresh source-record status: observed on 2026-08-31 (date precision); freshness expires 2026-09-30T00:00:00.000Z.',
     );
     expect(html).toContain(
       'Search queries stay in this page and are not stored or sent. Opening a result leaves this site and loads media from Wikimedia under its policies.',
@@ -3367,43 +3403,53 @@ describe('AI Moment Index public search surface', () => {
     ).toEqual(expectedOrder);
   });
 
-  it('keeps all nine target-bound aliases in parity while preserving unrelated literal matches', async () => {
+  it('keeps literal topic retrieval in parity and does not rewrite unsupported target entries', async () => {
     const baseIndex = serializePublicSearchIndex(fixture, searchIndex);
-    const literalEntries = aliasParityCases.map(
-      ([query, targetMomentId], position) => {
-        const target = baseIndex.entries.find(
-          (entry) => entry.momentId === targetMomentId,
-        );
-        expect(target, query).toBeDefined();
-        if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
-        const startSeconds = 900 + position;
-        const sourceUrl = `https://video.example/literal-alias-${position}.webm`;
-        return {
-          ...target,
-          momentId: `moment-literal-alias-${position}`,
-          videoId: `video-literal-alias-${position}`,
-          videoSlug: `literal-alias-${position}`,
-          videoTitle: `Literal alias control ${position}`,
-          sourceUrl,
-          startSeconds,
-          endSeconds: startSeconds + 1,
-          excerpt: query,
-          topicSlugs: [],
-          timestampUrl: `${sourceUrl}#t=${startSeconds}`,
-        };
-      },
-    );
-    const publicIndex = {
-      ...baseIndex,
-      entries: [...baseIndex.entries, ...literalEntries],
-    };
-    const harness = executeClientPayload();
-    await harness.resolveIndex(publicIndex);
+    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
+      const helperTargetIds = searchPublicIndex(baseIndex, query).map(
+        (entry) => entry.momentId,
+      );
+      expect(helperTargetIds, query).toContain(targetMomentId);
 
-    for (const [query, targetMomentId] of aliasParityCases) {
-      const position = aliasParityCases.findIndex(
+      const entriesWithoutTopic = baseIndex.entries.map((entry) =>
+        entry.momentId === targetMomentId
+          ? {
+              ...entry,
+              topicSlugs: entry.topicSlugs.filter(
+                (candidate) => candidate !== topicSlug,
+              ),
+            }
+          : entry,
+      );
+      const position = literalTopicCases.findIndex(
         ([candidate]) => candidate === query,
       );
+      const target = entriesWithoutTopic.find(
+        (entry) => entry.momentId === targetMomentId,
+      );
+      expect(target, query).toBeDefined();
+      if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
+      const startSeconds = 900 + position;
+      const sourceUrl = `https://video.example/literal-alias-${position}.webm`;
+      const literalEntry = {
+        ...target,
+        momentId: `moment-literal-alias-${position}`,
+        videoId: `video-literal-alias-${position}`,
+        videoSlug: `literal-alias-${position}`,
+        videoTitle: `Literal alias control ${position}`,
+        sourceUrl,
+        startSeconds,
+        endSeconds: startSeconds + 1,
+        excerpt: query,
+        topicSlugs: [],
+        timestampUrl: `${sourceUrl}#t=${startSeconds}`,
+      };
+      const publicIndex = {
+        ...baseIndex,
+        entries: [...entriesWithoutTopic, literalEntry],
+      };
+      const harness = executeClientPayload();
+      await harness.resolveIndex(publicIndex);
       const helperIds = searchPublicIndex(publicIndex, query).map(
         (entry) => entry.momentId,
       );
@@ -3411,8 +3457,8 @@ describe('AI Moment Index public search surface', () => {
       const shippedIds = descendants(harness.results, 'article').map(
         (article) => article.dataset.momentId,
       );
-      expect(helperIds, query).toContain(targetMomentId);
       expect(helperIds, query).toContain(`moment-literal-alias-${position}`);
+      expect(helperIds, query).not.toContain(targetMomentId);
       expect(shippedIds, query).toEqual(helperIds);
     }
   });

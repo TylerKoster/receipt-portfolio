@@ -18,7 +18,7 @@ type BenchmarkCase = {
     | 'title'
     | 'title-and-topic'
     | 'title-and-original-editorial-annotation'
-    | 'reviewed-visual-and-topic-synthesis'
+    | 'title-topic-and-original-editorial-annotation'
     | 'synthetic-unrelated-negative-control';
   readonly expectedMomentId: string | null;
   readonly expectedStartSeconds: number | null;
@@ -62,16 +62,52 @@ type ResearcherRelevanceBenchmark = {
   };
 };
 
-const aliasParityCases = [
-  ['outsmart question robots', 'moment-robots-outsmart-question'],
-  ['Charite hospital animation', 'moment-medical-ai-hospital-setting'],
-  ['symptom scales checkboxes', 'moment-medical-ai-symptom-inputs'],
-  ['medical AI branching outputs', 'moment-medical-ai-decision-paths'],
-  ['patient data processing', 'moment-medical-ai-decision-paths'],
-  ['human oversight medical AI', 'moment-medical-ai-clinician-patient'],
-  ['patient clinicians tablet', 'moment-medical-ai-clinician-patient'],
-  ['hospital bedside discussion', 'moment-medical-ai-clinician-patient'],
-  ['medical AI human oversight', 'moment-medical-ai-clinician-patient'],
+const literalTopicCases = [
+  [
+    'outsmart question robots',
+    'moment-robots-outsmart-question',
+    'outsmart-question-robots',
+  ],
+  [
+    'Charite hospital animation',
+    'moment-medical-ai-hospital-setting',
+    'charite-hospital-animation',
+  ],
+  [
+    'symptom scales checkboxes',
+    'moment-medical-ai-symptom-inputs',
+    'symptom-scales-checkboxes',
+  ],
+  [
+    'medical AI branching outputs',
+    'moment-medical-ai-decision-paths',
+    'medical-ai-branching-outputs',
+  ],
+  [
+    'patient data processing',
+    'moment-medical-ai-decision-paths',
+    'patient-data-processing',
+  ],
+  [
+    'human oversight medical AI',
+    'moment-medical-ai-clinician-patient',
+    'medical-ai-human-oversight',
+  ],
+  [
+    'patient clinicians tablet',
+    'moment-medical-ai-clinician-patient',
+    'patient-clinicians-tablet',
+  ],
+  [
+    'hospital bedside discussion',
+    'moment-medical-ai-clinician-patient',
+    'hospital-bedside-discussion',
+  ],
+  [
+    'medical AI human oversight',
+    'moment-medical-ai-clinician-patient',
+    'medical-ai-human-oversight',
+  ],
 ] as const;
 
 function normalizedTokens(value: string): readonly string[] {
@@ -156,13 +192,16 @@ function controlledPositiveContractDiagnostics(
       'title-and-original-editorial-annotation': new Set(
         normalizedTokens(`${video.title} ${annotation}`),
       ),
+      'title-topic-and-original-editorial-annotation': new Set(
+        normalizedTokens(
+          `${video.title} ${moment.topicSlugs.join(' ')} ${annotation}`,
+        ),
+      ),
     } as const;
     const supportedTokens =
       benchmarkCase.queryBasis === 'synthetic-unrelated-negative-control'
         ? undefined
-        : benchmarkCase.queryBasis === 'reviewed-visual-and-topic-synthesis'
-          ? new Set(normalizedTokens(benchmarkCase.query))
-          : supportedTokensByBasis[benchmarkCase.queryBasis];
+        : supportedTokensByBasis[benchmarkCase.queryBasis];
     for (const token of queryTokens) {
       if (!supportedTokens?.has(token)) {
         diagnostics.push(
@@ -316,7 +355,7 @@ describe('controlled researcher-relevance benchmark', () => {
         'revenue',
       ],
       evaluatedCorpusSemanticSha256:
-        'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
+        '53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973',
     });
     expect(benchmark.target).toEqual({
       minimumControlledPositiveCases: 62,
@@ -394,7 +433,7 @@ describe('controlled researcher-relevance benchmark', () => {
     };
 
     expect(canonicalVideoCorpusSemanticSha256(fixture)).toBe(
-      'e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137',
+      '53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973',
     );
     expect(canonicalVideoCorpusSemanticSha256(reorderedCorpus)).toBe(
       canonicalVideoCorpusSemanticSha256(fixture),
@@ -843,13 +882,43 @@ describe('controlled researcher-relevance benchmark', () => {
 
     expect(searchMoments(index, 'outsmart questions robots', 3)).toEqual([]);
     expect(searchMoments(index, 'symptom scale checkbox', 3)).toEqual([]);
-    expect(searchMoments(index, 'patient clinician tablet', 3)).toEqual([]);
+    expect(searchMoments(index, 'patient clinician tablet scale', 3)).toEqual(
+      [],
+    );
   });
 
-  it('binds every approved alias to its target while preserving literal matches on unrelated entries', () => {
+  it('uses reviewed topic text for every formerly non-literal benchmark phrase', () => {
     const index = buildSearchIndex(fixture);
-    const literalEntries = aliasParityCases.map(
-      ([query, targetMomentId], position) => {
+    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
+      const moment = fixture.moments.find(({ id }) => id === targetMomentId);
+      expect(moment, query).toBeDefined();
+      expect(moment?.topicSlugs, query).toContain(topicSlug);
+      expect(
+        searchMoments(index, query, 3).map((result) => result.momentId),
+        query,
+      ).toContain(targetMomentId);
+    }
+  });
+
+  it('scores the original literal phrase when target topic support is removed', () => {
+    for (const [query, targetMomentId, topicSlug] of literalTopicCases) {
+      const corpus = structuredClone(fixture) as Mutable<VideoCorpus>;
+      const moment = corpus.moments.find(({ id }) => id === targetMomentId);
+      expect(moment, query).toBeDefined();
+      if (moment === undefined) throw new Error(`Missing ${targetMomentId}`);
+      moment.topicSlugs = moment.topicSlugs.filter(
+        (candidate) => candidate !== topicSlug,
+      );
+      const index = buildSearchIndex(corpus);
+      const target = index.entries.find(
+        (entry) => entry.moment.id === targetMomentId,
+      );
+      expect(target, query).toBeDefined();
+      if (target === undefined) throw new Error(`Missing ${targetMomentId}`);
+      const position = literalTopicCases.findIndex(
+        ([candidate]) => candidate === query,
+      );
+      const literalEntry = (() => {
         const target = index.entries.find(
           (entry) => entry.moment.id === targetMomentId,
         );
@@ -879,19 +948,14 @@ describe('controlled researcher-relevance benchmark', () => {
           excerpt: query.toLocaleLowerCase('en-US'),
           tokens: new Set(normalizedTokens(query)),
         };
-      },
-    );
-    const expandedIndex = { entries: [...index.entries, ...literalEntries] };
-
-    for (const [query, targetMomentId] of aliasParityCases) {
-      const position = aliasParityCases.findIndex(
-        ([candidate]) => candidate === query,
-      );
-      const ids = searchMoments(expandedIndex, query, 10).map(
-        (result) => result.momentId,
-      );
-      expect(ids, query).toContain(targetMomentId);
+      })();
+      const ids = searchMoments(
+        { entries: [...index.entries, literalEntry] },
+        query,
+        10,
+      ).map((result) => result.momentId);
       expect(ids, query).toContain(`moment-literal-alias-${position}`);
+      expect(ids, query).not.toContain(targetMomentId);
     }
   });
 

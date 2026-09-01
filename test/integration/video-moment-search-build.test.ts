@@ -91,7 +91,7 @@ describe('atomic AI Moment Index build', () => {
     const manifest = JSON.parse(
       await readFile(
         new URL(
-          '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
           import.meta.url,
         ),
         'utf8',
@@ -134,7 +134,7 @@ describe('atomic AI Moment Index build', () => {
     const [corpus, manifest] = await Promise.all(
       [
         '../../fixtures/video-moment-search/authorized-ai-video-v1.json',
-        '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+        '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
       ].map(async (path) =>
         JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8')),
       ),
@@ -194,7 +194,7 @@ describe('atomic AI Moment Index build', () => {
     const manifest = JSON.parse(
       await readFile(
         new URL(
-          '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+          '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
           import.meta.url,
         ),
         'utf8',

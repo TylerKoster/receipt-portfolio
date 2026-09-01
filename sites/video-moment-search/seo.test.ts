@@ -22,7 +22,7 @@ const corpus = JSON.parse(
 const evidenceManifest = JSON.parse(
   readFileSync(
     new URL(
-      '../../fixtures/video-moment-search/video-source-evidence-manifest-v3.json',
+      '../../fixtures/video-moment-search/video-source-evidence-manifest-v2.json',
       import.meta.url,
     ),
     'utf8',

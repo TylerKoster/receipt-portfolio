@@ -1662,13 +1662,13 @@ describe('static receipt site build', () => {
             projectRoot,
             'fixtures',
             'video-moment-search',
-            'video-source-evidence-manifest-v3.json',
+            'video-source-evidence-manifest-v2.json',
           ),
           join(
             firstRuntime,
             'fixtures',
             'video-moment-search',
-            'video-source-evidence-manifest-v3.json',
+            'video-source-evidence-manifest-v2.json',
           ),
         ),
         realFileSystem.copyFile(
@@ -1676,13 +1676,13 @@ describe('static receipt site build', () => {
             projectRoot,
             'fixtures',
             'video-moment-search',
-            'video-source-evidence-manifest-v3.json',
+            'video-source-evidence-manifest-v2.json',
           ),
           join(
             secondRuntime,
             'fixtures',
             'video-moment-search',
-            'video-source-evidence-manifest-v3.json',
+            'video-source-evidence-manifest-v2.json',
           ),
         ),
         realFileSystem.copyFile(
@@ -2009,7 +2009,7 @@ describe('static receipt site build', () => {
       evidenceDirectory: testEvidenceDirectory,
       outputDirectory,
       includeVideoMomentSearch: true,
-      videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
+      videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
     });
     const previousInventory = await fileInventory(outputDirectory);
     const entry = await searchReceiptEntryByIdentity(
@@ -2029,7 +2029,7 @@ describe('static receipt site build', () => {
         evidenceDirectory: testEvidenceDirectory,
         outputDirectory,
         includeVideoMomentSearch: true,
-        videoMomentValidationNow: new Date('2026-09-01T12:00:00.000Z'),
+        videoMomentValidationNow: new Date('2026-08-31T12:00:00.000Z'),
       }),
     ).rejects.toThrow(/digest/i);
     expect(await fileInventory(outputDirectory)).toEqual(previousInventory);

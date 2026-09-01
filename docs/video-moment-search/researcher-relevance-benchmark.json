@@ -6,7 +6,7 @@
     "benchmarkStrings": "controlled-synthetic-not-raw-user-queries",
     "caseReview": "independent-code-review-not-user-research",
     "transcriptDerivedCases": "prohibited",
-    "evaluatedCorpusSemanticSha256": "e2e633c6584ef5ecaa4e74f2eb2b19336cbca62a07b2f055e60acae643574137",
+    "evaluatedCorpusSemanticSha256": "53b2ca2f12329e13759a790f638f40470b4a2584c3b249cda8df7fe5fa5a5973",
     "prohibitedClaims": [
       "user",
       "usability",
@@ -171,294 +171,294 @@
     },
     {
       "query": "will robots outsmart us",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "robots outsmart humans",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "human oversight robots",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "robot intelligence",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "animated robots display",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "outsmart question robots",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robots-outsmart-question",
       "expectedStartSeconds": 20,
       "expectedTimestampSuffix": "#t=20"
     },
     {
       "query": "robot visual learning",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "artificial intelligence perception",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "pattern recognition spider",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "brain spider image",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "colored brain points",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "visual learning brain",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-visual-learning",
       "expectedStartSeconds": 300,
       "expectedTimestampSuffix": "#t=300"
     },
     {
       "query": "robot reward learning",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "robot training",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "humanoid robot dog",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "dog meat robot learning",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "artificial intelligence robot learning",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "robot learning example",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-robot-reward-example",
       "expectedStartSeconds": 435,
       "expectedTimestampSuffix": "#t=435"
     },
     {
       "query": "medical AI hospital",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "hospital AI",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "healthcare AI",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "Charite hospital animation",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "AI Campus hospital",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "medical artificial intelligence hospital",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-hospital-setting",
       "expectedStartSeconds": 5,
       "expectedTimestampSuffix": "#t=5"
     },
     {
       "query": "clinical symptom inputs",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "medical AI data",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "patient assessment",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "health symptom checklist",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "symptom scales checkboxes",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "thermometer heart symptom icons",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-symptom-inputs",
       "expectedStartSeconds": 25,
       "expectedTimestampSuffix": "#t=25"
     },
     {
       "query": "medical AI decision paths",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "patient specific results",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "explainable AI results",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "health signs decision system",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "medical AI branching outputs",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "patient data processing",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-decision-paths",
       "expectedStartSeconds": 50,
       "expectedTimestampSuffix": "#t=50"
     },
     {
       "query": "clinician patient communication",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
       "query": "doctor patient relationship",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
       "query": "human oversight medical AI",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
       "query": "patient clinicians tablet",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
       "query": "hospital bedside discussion",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"
     },
     {
       "query": "medical AI human oversight",
-      "queryBasis": "reviewed-visual-and-topic-synthesis",
+      "queryBasis": "title-topic-and-original-editorial-annotation",
       "expectedMomentId": "moment-medical-ai-clinician-patient",
       "expectedStartSeconds": 80,
       "expectedTimestampSuffix": "#t=80"

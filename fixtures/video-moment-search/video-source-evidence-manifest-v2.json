@@ -356,9 +356,9 @@
       "observedStatus": {
         "status": "source-record-observed",
         "precision": "date",
-        "observedOn": "2026-09-01",
-        "normalizedAt": "2026-09-01T00:00:00.000Z",
-        "expiresAt": "2026-10-01T00:00:00.000Z",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
+        "expiresAt": "2026-09-30T00:00:00.000Z",
         "sourcePageRevisionId": "1092595730",
         "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Will_robots_outsmart_us.webm&oldid=1092595730",
         "sourcePageRevisionAt": "2025-09-29T14:11:18.000Z"
@@ -481,9 +481,9 @@
       "observedStatus": {
         "status": "source-record-observed",
         "precision": "date",
-        "observedOn": "2026-09-01",
-        "normalizedAt": "2026-09-01T00:00:00.000Z",
-        "expiresAt": "2026-10-01T00:00:00.000Z",
+        "observedOn": "2026-08-31",
+        "normalizedAt": "2026-08-31T00:00:00.000Z",
+        "expiresAt": "2026-09-30T00:00:00.000Z",
         "sourcePageRevisionId": "1145693057",
         "sourcePageRevisionUrl": "https://commons.wikimedia.org/w/index.php?title=File:Ethics_of_AI_in_Digital_Medicine_–_Explanation_why_transparent_explainable_AI_is_important.webm&oldid=1145693057",
         "sourcePageRevisionAt": "2026-01-10T22:07:18.000Z"
