@@ -31,14 +31,10 @@ function controlledProspectiveSource(): AmdLocalAiUseProspectiveSource {
       sha256:
         '61f11302b346130f8a676f4ff3d28734857beb8a09362d797fc43ffc9b014755',
     },
-    normalizedSha256:
-      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-    contentSha256:
-      'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     declaredMetadata: {
       name: 'local-ai-use',
       description:
-        'Controlled declared description fixture; no recommendation.',
+        "Makes this agent generate images, transcribe audio, and synthesize speech on the user's own machine through a local Lemonade Server instead of a paid cloud API. Use it above all to change that routing persistently, from now on — keep generating pictures locally while chat stays on the cloud; set this workspace up to make images on my own machine — even when the user asks for no image or file in the same breath. Also use it for a single request the user wants done locally, offline, on-device, or kept private: transcribe this recording, make this picture, read this text aloud. Applies in Claude, Cursor, Codex, or any agent harness. Use when the user wants to cut cost or tokens on image, audio, or voice API calls, or to drop DALL-E, hosted Whisper, ElevenLabs, or other paid multimodal APIs; or mentions Lemonade Server, OmniRouter, SD-Turbo, kokoro, Ryzen AI, or NPU/iGPU/dGPU inference. Changes no application source code; do not use it if the user is adding local AI to an app they ship.",
     },
   };
 }
@@ -67,6 +63,11 @@ describe('AMD local-ai-use designated source contract', () => {
         sha256:
           '61f11302b346130f8a676f4ff3d28734857beb8a09362d797fc43ffc9b014755',
       },
+      declaredMetadata: {
+        name: 'local-ai-use',
+        description:
+          "Makes this agent generate images, transcribe audio, and synthesize speech on the user's own machine through a local Lemonade Server instead of a paid cloud API. Use it above all to change that routing persistently, from now on — keep generating pictures locally while chat stays on the cloud; set this workspace up to make images on my own machine — even when the user asks for no image or file in the same breath. Also use it for a single request the user wants done locally, offline, on-device, or kept private: transcribe this recording, make this picture, read this text aloud. Applies in Claude, Cursor, Codex, or any agent harness. Use when the user wants to cut cost or tokens on image, audio, or voice API calls, or to drop DALL-E, hosted Whisper, ElevenLabs, or other paid multimodal APIs; or mentions Lemonade Server, OmniRouter, SD-Turbo, kokoro, Ryzen AI, or NPU/iGPU/dGPU inference. Changes no application source code; do not use it if the user is adding local AI to an app they ship.",
+      },
     });
     expect(AMD_LOCAL_AI_USE_SOURCE_BOUNDARY).toBe(
       'This contract admits designated static declared metadata only. It does not publish or execute the instruction body, verify currentness or provenance, or establish security, safety, runtime behavior, adoption, suitability, recommendation, endorsement, demand, conversion, revenue, or public deployment. Coordinator-owned evidence collection and inventory wiring remain required.',
@@ -90,8 +91,6 @@ describe('AMD local-ai-use designated source contract', () => {
       observedAt: record.observedAt,
       hashes: {
         rawSha256: record.raw.sha256,
-        normalizedSha256: record.normalizedSha256,
-        contentSha256: record.contentSha256,
       },
       declaredMetadata: record.declaredMetadata,
       boundary: AMD_LOCAL_AI_USE_SOURCE_BOUNDARY,
@@ -154,4 +153,37 @@ describe('AMD local-ai-use designated source contract', () => {
       ).toMatchObject({ kind: 'not-ready', issues: [issue] });
     },
   );
+
+  it('rejects declared metadata altered from the designated static observation', () => {
+    const record = controlledProspectiveSource();
+
+    expect(
+      assessAmdLocalAiUseProspectiveSource({
+        ...record,
+        declaredMetadata: {
+          ...record.declaredMetadata,
+          description: 'Not the designated declared description.',
+        },
+      }),
+    ).toMatchObject({
+      kind: 'not-ready',
+      issues: ['declared-description-mismatch'],
+    });
+  });
+
+  it('rejects unbound derived hashes instead of disclosing them', () => {
+    const record = controlledProspectiveSource();
+
+    expect(
+      discloseAmdLocalAiUseProspectiveSource({
+        ...record,
+        normalizedSha256: 'a'.repeat(64),
+        contentSha256: 'b'.repeat(64),
+      }),
+    ).toMatchObject({
+      kind: 'not-ready',
+      issues: ['unknown-root-fields'],
+      disclosure: null,
+    });
+  });
 });

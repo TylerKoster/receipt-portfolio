@@ -14,6 +14,12 @@ const designatedRaw = Object.freeze({
   sha256: '61f11302b346130f8a676f4ff3d28734857beb8a09362d797fc43ffc9b014755',
 } as const);
 
+const designatedDeclaredMetadata = Object.freeze({
+  name: 'local-ai-use',
+  description:
+    "Makes this agent generate images, transcribe audio, and synthesize speech on the user's own machine through a local Lemonade Server instead of a paid cloud API. Use it above all to change that routing persistently, from now on — keep generating pictures locally while chat stays on the cloud; set this workspace up to make images on my own machine — even when the user asks for no image or file in the same breath. Also use it for a single request the user wants done locally, offline, on-device, or kept private: transcribe this recording, make this picture, read this text aloud. Applies in Claude, Cursor, Codex, or any agent harness. Use when the user wants to cut cost or tokens on image, audio, or voice API calls, or to drop DALL-E, hosted Whisper, ElevenLabs, or other paid multimodal APIs; or mentions Lemonade Server, OmniRouter, SD-Turbo, kokoro, Ryzen AI, or NPU/iGPU/dGPU inference. Changes no application source code; do not use it if the user is adding local AI to an app they ship.",
+} as const);
+
 export const AMD_LOCAL_AI_USE_SOURCE_DESIGNATION = Object.freeze({
   repository: 'https://github.com/amd/skills',
   commit: 'e867fa4ae4516f644221cb04dcdf24008a43cb99',
@@ -25,6 +31,7 @@ export const AMD_LOCAL_AI_USE_SOURCE_DESIGNATION = Object.freeze({
   allowedDeclaredFields: Object.freeze(['name', 'description'] as const),
   inheritedLicense,
   raw: designatedRaw,
+  declaredMetadata: designatedDeclaredMetadata,
 } as const);
 
 export type AmdLocalAiUseProspectiveSource = Readonly<{
@@ -46,8 +53,6 @@ export type AmdLocalAiUseProspectiveSource = Readonly<{
     bytes: number;
     sha256: string;
   }>;
-  normalizedSha256: string;
-  contentSha256: string;
   declaredMetadata: Readonly<{
     name: string;
     description: string;
@@ -71,9 +76,9 @@ export type AmdLocalAiUseSourceContractIssue =
   | 'invalid-raw-fields'
   | 'raw-bytes-mismatch'
   | 'raw-sha256-mismatch'
-  | 'invalid-normalized-sha256'
-  | 'invalid-content-sha256'
   | 'invalid-declared-metadata-fields'
+  | 'declared-name-mismatch'
+  | 'declared-description-mismatch'
   | 'missing-declared-name'
   | 'missing-declared-description';
 
@@ -104,8 +109,6 @@ export type AmdLocalAiUsePublicDisclosure = Readonly<{
   observedAt: string;
   hashes: Readonly<{
     rawSha256: string;
-    normalizedSha256: string;
-    contentSha256: string;
   }>;
   declaredMetadata: Readonly<{
     name: string;
@@ -131,8 +134,6 @@ const ROOT_FIELDS = [
   'inheritedLicense',
   'observedAt',
   'raw',
-  'normalizedSha256',
-  'contentSha256',
   'declaredMetadata',
 ] as const;
 
@@ -171,10 +172,6 @@ function isStrictUtcTimestamp(value: string): boolean {
   return (
     !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value
   );
-}
-
-function isLowercaseSha256(value: string): boolean {
-  return /^[0-9a-f]{64}$/.test(value);
 }
 
 function isDesignatedRawUrl(value: string): boolean {
@@ -269,12 +266,6 @@ export function assessAmdLocalAiUseProspectiveSource(
   if (raw.sha256 !== AMD_LOCAL_AI_USE_SOURCE_DESIGNATION.raw.sha256) {
     issues.push('raw-sha256-mismatch');
   }
-  if (!isLowercaseSha256(stringAt(record, 'normalizedSha256'))) {
-    issues.push('invalid-normalized-sha256');
-  }
-  if (!isLowercaseSha256(stringAt(record, 'contentSha256'))) {
-    issues.push('invalid-content-sha256');
-  }
   if (
     !hasExactFields(
       declaredMetadata,
@@ -282,6 +273,18 @@ export function assessAmdLocalAiUseProspectiveSource(
     )
   ) {
     issues.push('invalid-declared-metadata-fields');
+  }
+  if (
+    stringAt(declaredMetadata, 'name') !==
+    AMD_LOCAL_AI_USE_SOURCE_DESIGNATION.declaredMetadata.name
+  ) {
+    issues.push('declared-name-mismatch');
+  }
+  if (
+    stringAt(declaredMetadata, 'description') !==
+    AMD_LOCAL_AI_USE_SOURCE_DESIGNATION.declaredMetadata.description
+  ) {
+    issues.push('declared-description-mismatch');
   }
   if (stringAt(declaredMetadata, 'name').trim() === '') {
     issues.push('missing-declared-name');
@@ -338,8 +341,6 @@ export function discloseAmdLocalAiUseProspectiveSource(
     observedAt: stringAt(record, 'observedAt'),
     hashes: {
       rawSha256: stringAt(raw, 'sha256'),
-      normalizedSha256: stringAt(record, 'normalizedSha256'),
-      contentSha256: stringAt(record, 'contentSha256'),
     },
     declaredMetadata: {
       name: stringAt(declaredMetadata, 'name'),
