@@ -1,22 +1,29 @@
 # Receipt Portfolio
 
-Receipt Portfolio is a local static release candidate for four distinct,
-source-bound products that share maintainable release infrastructure. The
-first three products are controlled evidence demonstrations built from
-authenticated fixtures; scheduled dry-run manifests separately admit approved
-official Search sources without publishing them:
+Receipt Portfolio now operates one active commercial product direction with
+three preserved legacy surfaces. The active managed-pilot experiment is a
+video-library indexing service; AI Moment Index is its working public proof.
+The prior products remain preserved as legacy public demonstrations without an
+active availability SLA while their strongest infrastructure is absorbed
+through reviewed changes rather than continued as separate businesses:
 
-- **Search Receipt** records confirmed source changes for independent site
-  owners without claiming that ordinary search movement proves a platform
-  update.
-- **Workflow Test Lab** presents original, fixture-checked workflow recipes and
-  their limits; it is not a universal benchmark or copied prompt directory.
-- **SkillLedger** presents non-executing metadata about repository-hosted skill
-  packages; it does not install, run, trust, certify, or rank them.
-- **AI Moment Index** is a working rights-bounded search utility that returns
-  reviewed moments and routes each result to the stored integer timestamp in
-  its ordinary source URL. Its current corpus remains a narrow reviewed
-  example, not evidence of creator demand, nationwide coverage, or revenue.
+- **Video Library Indexing Service / AI Moment Index** is the active product.
+  It is being expanded from a rights-bounded exact-moment search proof into an
+  owner-authorized library service with private cited retrieval, creator review,
+  optional public discovery, corrections, synchronization, and measurable
+  commercial pilots.
+- **Search Receipt** is parked as a standalone product. Its source observation,
+  correction, feed, and evidence capabilities are candidates for video-library
+  health and source-drift monitoring.
+- **Workflow Test Lab** is retired from active development and retained as a
+  legacy public demonstration. Its deterministic fixtures and negative tests
+  are candidates for an internal Retrieval QA Lab.
+- **SkillLedger** is parked as a standalone product. Its immutable-source,
+  license, allowlist, and no-execution controls are candidates for connector and
+  rights admission.
+
+The disposition, customer, commercial offer, product gates, and stop rules are
+recorded in `docs/product/2026-09-01-video-library-service-strategy.md`.
 
 ## Local commands
 
@@ -118,11 +125,10 @@ paths:
 - `https://tylerkoster.github.io/receipt-portfolio/skill-ledger/`
 - `https://tylerkoster.github.io/receipt-portfolio/video-moment-search/`
 
-The AI Moment Index route and its accepted v0.1.36 behaviors are released and
-were publicly verified: the fixed query `robots control` returns
-`moment-robots-control`, source navigation preserves the stored integer
-timestamp `#t=132`, canonical moment discovery and the normal sitemap/feed are
-available, and `video-sitemap.xml` is intentionally absent. This Task 6 branch
-only prepares the next atomic four-product build candidate; a local
-production-base build is not evidence that its new root discovery files have
-been deployed.
+The accepted repository release is `v0.1.70` at `024c497`. The shipped proof
+retains the deterministic `robots control` to `moment-robots-control` flow and
+the stored `#t=132` destination contract. Repository acceptance is not current
+public-health, indexing, customer, demand, conversion, or revenue evidence;
+those outcomes require their own observed records. The service strategy is
+forward-looking and does not imply that private multi-tenant ingestion, cited
+answers, synchronization, or paid-pilot operation has already shipped.

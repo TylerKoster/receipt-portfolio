@@ -1,5 +1,14 @@
 # Automation and rollback
 
+> Historical topology notice (2026-09-01): the independent four-lane operator
+> model below is superseded by `receipt-portfolio-release-topology.md` and
+> `../product/2026-09-01-video-library-service-strategy.md`. Only the video
+> library service lane and serial release coordinator remain active. Search
+> Receipt and SkillLedger are parked; Workflow Test Lab is retired from active
+> development. The collection, publication, verification, and rollback
+> mechanics in this document remain current unless the newer topology states
+> otherwise.
+
 ## Operator and workflow roles
 
 The portfolio uses four permanent checkouts with single-writer ownership:

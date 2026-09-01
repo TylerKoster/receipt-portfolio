@@ -1,4 +1,11 @@
-# AI Moment Index product lane
+# Video Library Indexing Service / AI Moment Index lane
+
+This lane contract implements
+`../product/2026-09-01-video-library-service-strategy.md` under the release
+authority in `receipt-portfolio-release-topology.md`. Those documents supersede
+the earlier three-moment-only product boundary. AI Moment Index remains the
+public proof; the active product direction is an owner-authorized video-library
+indexing service.
 
 ## Ownership and authority
 
@@ -13,8 +20,46 @@ serial release coordinator's authority.
 An operator may prepare one immutable candidate receipt, but never merges,
 pushes, tags, deploys, or triggers another product lane. Controlled fixtures
 and synthetic personas are regression inputs, not demand or usability evidence.
-Measurement remains discard-only and not configured; it neither transmits nor
-retains events and is not evidence.
+The currently shipped measurement adapter remains discard-only and not
+configured. A later privacy-reviewed measurement adapter requires an explicit
+event schema, notice and consent decision, retention/deletion policy, access
+boundary, deterministic tests, and coordinator integration. Until that gate
+passes, no transmitted or retained product event may be inferred.
+
+## Private-library authority and security gate
+
+No customer or pilot content may be ingested from a source, storage location,
+account, transcript, caption, or media package until a reviewed contract binds:
+
+- customer and source-owner authority;
+- speaker, guest, likeness, voice, transcript, caption, thumbnail, embed,
+  excerpt, and publication authority where applicable;
+- admitted private and public fields;
+- any external transcription, embedding, model, analytics, storage, or backup
+  processor and permitted data egress;
+- tenant isolation, authentication, authorization or inherited ACLs,
+  encryption, retention, backups, export, query/event retention, and incident
+  handling;
+- verified revocation, correction, customer termination, source deletion, cache
+  invalidation, derived-data deletion, and downstream public-removal behavior.
+
+Authority over a channel or folder is not authority over every speaker,
+transcript, derivative, processor, or publication surface. Unclear authority is
+held private or rejected; it is never inferred from public availability.
+
+## Retrieval and answer-grounding gate
+
+Retrieval and generated answers are evaluated separately. Every factual answer
+span must bind to admitted source, source version, and exact time evidence. The
+service abstains when evidence is absent, insufficient, conflicting, stale,
+revoked, corrected, removed, or outside the admitted customer boundary.
+
+Corrections, supersession, revocation, and deletion must propagate to private
+search, generated answers, caches, exports, feeds, sitemaps, and public pages.
+The deterministic benchmark includes expected retrieval, exact timestamp,
+abstention, contradiction, correction, supersession, access denial, revocation,
+and deletion cases. A correct link alone does not prove that an answer is
+supported.
 
 ## Heartbeat and bounded recovery
 
@@ -63,7 +108,10 @@ good hosted release through the coordinator's human-controlled recovery path,
 then rerun the three public checks: the AI Moment Index home page,
 `videos/robots-under-control/`, and `moments/moment-robots-control/`. The two
 representative public documents must each retain the ordinary source media
-fragment `#t=132`. The controlled corpus contains exactly three admitted
+fragment `#t=132`. The current accepted proof corpus contains three admitted
 moments: robots control at `#t=132`, the KI-Campus generative-AI interface at
-`#t=18`, and the World Economic Forum industry/society panel at `#t=75`. No
-lane work admits another moment or downloads/scrapes media.
+`#t=18`, and the World Economic Forum industry/society panel at `#t=75`.
+Additional records are permitted only through the private-library authority,
+security, evidence, and publication gates above. The lane never scrapes
+unauthorized transcripts or downloads audiovisual media without explicit
+authority.
