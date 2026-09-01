@@ -99,8 +99,12 @@ function normalizeStatus(fetched: RawFetch): ReceiptPublicFacts {
     const incident = record(value, `incident[${index}]`);
     const end = incident.end;
     const url = httpsUrl(incident.uri, `incident[${index}].uri`);
-    if (new URL(url).hostname !== 'status.search.google.com') {
-      return notAdmitted(`incident[${index}].uri host is not admitted`);
+    const parsedUrl = new URL(url);
+    if (
+      parsedUrl.origin !== 'https://status.search.google.com' ||
+      !parsedUrl.pathname.startsWith('/incidents/')
+    ) {
+      return notAdmitted(`incident[${index}].uri destination is not admitted`);
     }
     return {
       incidentId: requiredString(incident.id, `incident[${index}].id`),

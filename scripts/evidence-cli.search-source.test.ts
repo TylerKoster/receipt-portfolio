@@ -682,6 +682,39 @@ describe('bounded Search Receipt live collection', () => {
   });
 
   it.each([
+    [
+      'nondefault port',
+      'https://status.search.google.com:444/incidents/example-b',
+    ],
+    ['non-incident path', 'https://status.search.google.com/not-an-incident'],
+  ] as const)(
+    'rejects a status incident URL with a %s',
+    async (_label, url) => {
+      const bytes = Buffer.from(
+        STATUS_BYTES.toString('utf8').replace(
+          'https://status.search.google.com/incidents/example-b',
+          url,
+        ),
+      );
+      const evidenceDirectory = await newEvidenceDirectory(
+        'search-status-url-invalid-',
+      );
+      await expect(
+        collectSearchSource('google-search-status', {
+          evidenceDirectory,
+          fetchSource: async (manifest) => ({
+            ...rawFetch(manifest),
+            byteCount: bytes.byteLength,
+            rawSha256: sha256(bytes),
+            bytes,
+          }),
+        }),
+      ).rejects.toThrow(/SOURCE_DATA_NOT_ADMITTED/);
+      await expectNoEvidenceWrites(evidenceDirectory);
+    },
+  );
+
+  it.each([
     ['illegal comment', `<feed><!--bad--comment--></feed>`],
     [
       'forbidden text terminator',
