@@ -23,7 +23,7 @@ Gate A may use customer assertions/documents but fetches no source metadata, cap
 
 ## Gate B — after narrow OAuth preflight, before content processing
 
-Gate B follows a Gate-A authorization. It permits only narrowly authorized metadata and caption-availability preflight; it must not transfer captions to models, transcribe, embed, index, process content, or publish. All items below begin `not_observed` or `blocked`.
+After Gate A authorizes the narrow metadata and caption-availability preflight, Gate B evaluates its results; it permits no content processing until it passes. The preflight must not transfer captions to models, transcribe, embed, index, process content, or publish. All items below begin `not_observed` or `blocked`.
 
 | Required private evidence record    | Required coverage / verdict rule                                                                                                                                                                                                                |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
