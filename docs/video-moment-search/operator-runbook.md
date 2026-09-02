@@ -2,13 +2,15 @@
 
 ## Scope and evidence status
 
-`experiment-ledger.json` is the ranked 90-day operator source. It supplements, and does not replace, the released historical public artifact at `sites/video-moment-search/product-experiment-ledger.json`.
+The current operator queue is the [service experiment ledger](service-experiment-ledger.md), subordinate to the [lane](../operations/video-moment-search-lane.md) and the [service strategy](../product/2026-09-01-video-library-service-strategy.md). Its current cycle produces a [pilot-entry review packet](pilot-entry-review.md), not a customer authorization or processing decision.
+
+`experiment-ledger.json` and the ranked sequence below are preserved historical public-proof experiments. They supplement, and do not replace, the service ledger or the released historical public artifact at `sites/video-moment-search/product-experiment-ledger.json`. In particular, the historical 500-moment continuation target does not authorize corpus expansion and cannot outrank service utility, incumbent-sufficiency, authority, privacy, or paid-pilot gates.
 
 The local measurement contract is deliberately **not configured**: it discards events and neither sends nor stores them. It has no endpoint, analytics SDK, cookies, local storage, query persistence, URL query state, fingerprinting, raw query text, email address, or cross-site identifier. No data means unknown or blocked, never zero demand.
 
 The released preview is a heuristic regression gate only. It does not establish usability, demand, creator participation, referral outcomes, task completion, revenue, or a paid pilot.
 
-## Ranked operating sequence
+## Historical public-proof experiment record (preserved)
 
 1. **Creator authorization (rank 1).** Verify source identity and authority attestation, covered URLs and content, rights, commercial/excerpt/expiry/revocation terms, and caption provenance. Quarantine any ambiguity. A creator preview must allow inspection, correction, and removal. Publication follows only passing evidence; attributable campaign evidence follows only approved measurement. The continuation gate is **3 authorized creators and 100 covered videos**.
 2. **Corpus growth (rank 2).** Admit only rights-validated moments with exact timestamp routing, correction/removal review, and source evidence. The continuation gate is **500 verified moments**.
