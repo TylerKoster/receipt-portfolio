@@ -1,8 +1,10 @@
-# Pilot-entry review packet
+# Future real-customer pilot-entry review packet
 
 ## Purpose and non-authority
 
-This is a template to fill only in a separately approved private system. It records no customer identity, content, credential, token, source URL, or contract text. A blank template, synthetic example, canary result, OAuth success, or completed form does not grant permission. Current readiness is only `not_observed` or `blocked`; Phase 0A canary-only success satisfies neither customer authorization gate.
+This is a future real-customer pilot-readiness template to fill only in a separately approved private system. It grants no current demo authority and is not a prerequisite for the private, local-only, fictional, transcript-first demonstration using approved openly licensed material. Current execution instead follows the coordinator-supplied September 2 [Owned Video Library demonstration PRD](C:/Users/Tkost/Documents/ChatGPT/SEO/docs/product/2026-09-02-owned-video-library-demo-prd.md) §14 and its [timeboxed task plan](C:/Users/Tkost/Documents/ChatGPT/SEO/docs/superpowers/plans/2026-09-02-owned-library-timeboxed-delivery.md) §§2 and 5. Those documents are draft implementation direction supplied by the coordinator; they have not been integrated into accepted `main`.
+
+This packet records no customer identity, content, credential, token, source URL, or contract text. A blank template, synthetic example, canary result, OAuth success, or completed form does not grant permission. During the current demonstration, every customer-pilot, paid-order, OAuth, provider, and 40-query requirement in this packet is dormant and non-applicable. Future readiness is only `not_observed` or `blocked`; Phase 0A canary-only success satisfies neither customer authorization gate.
 
 For every packet item, the private system records an immutable evidence reference, SHA-256 hash, version, role/owner, review date, expiry, verdict (`not_observed`, `blocked`, or `ready_for_authorized_review`), missing item, and next safe action. Restriction, expiry, revocation, or deletion invalidates all dependent scopes and derivatives. Public output needs separately opted-in and approved authority.
 
@@ -36,9 +38,9 @@ After Gate A authorizes the narrow metadata and caption-availability preflight, 
 
 ## Traceability anchors and dry-run
 
-The private reviewer links each evidence record to PRD §7.1 (immutable authority/approval records), §§9.1–9.2 (preflight/connectors), §13.2 (40-query benchmark), §§14.2–14.6 (security, rights, privacy, retention, incident/restore), §§20.1/20.3/20.5 (entry, measures, stop rules), Customer Gates A/B in §21, and §25 (service-pilot definition of done). The queue is [service-experiment-ledger.md](service-experiment-ledger.md).
+For a future real-customer pilot, the private reviewer links each evidence record to PRD §7.1 (immutable authority/approval records), §§9.1–9.2 (preflight/connectors), §13.2 (40-query benchmark), §§14.2–14.6 (security, rights, privacy, retention, incident/restore), §§20.1/20.3/20.5 (entry, measures, stop rules), Customer Gates A/B in §21, and §25 (service-pilot definition of done). The future queue is [service-experiment-ledger.md](service-experiment-ledger.md); it does not control the current demonstration.
 
-Dry run, no customer evidence: Gate A `blocked`; Gate B `blocked`; customer processing `blocked`; public output `blocked`. The safe next action is a separately approved private-system review, not a connector call or collection activity.
+Future-pilot dry run, no customer evidence: Gate A `blocked`; Gate B `blocked`; customer processing `blocked`; public output `blocked`. The safe future action is a separately approved private-system review, not a connector call or collection activity. These outcomes do not block or authorize the current demonstration.
 
 | Negative tabletop case                     | Verdict   | Next safe action                                                             |
 | ------------------------------------------ | --------- | ---------------------------------------------------------------------------- |
